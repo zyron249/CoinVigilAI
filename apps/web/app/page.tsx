@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { MarketTable } from "../components/MarketTable";
 import { MetricCard } from "../components/MetricCard";
 import { Radar } from "../components/Radar";
@@ -14,38 +15,54 @@ export default async function Home() {
   return (
     <main>
       <nav>
-        <div className="brand"><span className="brand-mark">V</span> CoinVigil <b>AI</b></div>
+        <Link className="brand" href="/"><span className="brand-mark">V</span> CoinVigil <b>AI</b></Link>
         <div className="nav-links">
-          <span>Markets</span><span>AI Radar</span><span>News</span><span>Watchlist</span>
+          <span>Markets</span><span>AI Radar</span><span>News</span><Link href="/token-studio">Token Studio</Link>
         </div>
-        <button>Launch Terminal</button>
+        <Link className="nav-cta" href="/token-studio">Create Token</Link>
       </nav>
 
       <section className="hero">
         <div className="hero-copy">
           <div className="eyebrow hero-tag">ALWAYS-ON CRYPTO INTELLIGENCE</div>
           <h1>The market never sleeps.<br /><span>Neither does CoinVigil.</span></h1>
-          <p>Live prices, AI-assisted analysis, risk scoring and global market signals in one terminal.</p>
-          <div className="hero-actions"><button>Explore Markets</button><button className="ghost">Open AI Radar</button></div>
+          <p>Live prices, multi-model AI analysis, professional chart research, risk scoring and a non-custodial token launchpad in one terminal.</p>
+          <div className="hero-actions">
+            <a className="button-link" href="#markets">Explore Markets</a>
+            <Link className="button-link ghost" href="/token-studio">Open Token Studio</Link>
+          </div>
         </div>
         <div className="orb-wrap"><div className="orb"><div className="orb-core">AI</div></div></div>
       </section>
 
       <section className="metrics-grid">
-        <MetricCard label="TRACKED NOW" value={`${assets.length || 0} assets`} note="MVP market universe" />
+        <MetricCard label="TRACKED NOW" value={`${assets.length || 0} assets`} note="Click any asset for Pro Chart Lab" />
         <MetricCard label="MARKET CAP" value={`$${compact.format(marketCap)}`} note="Across visible assets" />
         <MetricCard label="24H VOLUME" value={`$${compact.format(volume)}`} note="Live provider snapshot" />
         <MetricCard label="POSITIVE 24H" value={`${gainers}/${assets.length || 0}`} note="Current breadth" />
       </section>
 
-      <section className="dashboard-grid">
+      <section id="markets" className="dashboard-grid">
         <MarketTable assets={assets} />
         <Radar signals={radar} />
       </section>
 
+      <section className="feature-strip">
+        <Link className="card feature-card" href={assets[0] ? `/asset/${assets[0].id}` : "/"}>
+          <div className="eyebrow">PRO CHART LAB</div>
+          <h3>Draw, measure and analyze</h3>
+          <p>Interactive candlesticks, trend lines, horizontal levels, Fibonacci, brush tools, indicators and PNG export.</p>
+        </Link>
+        <Link className="card feature-card" href="/token-studio">
+          <div className="eyebrow">TOKEN STUDIO</div>
+          <h3>Create on-chain</h3>
+          <p>Configure a standard token and sign the deployment from your own wallet on supported EVM chains.</p>
+        </Link>
+      </section>
+
       <footer>
-        <div>CoinVigil AI · Intelligence, not financial advice.</div>
-        <div>v0.1.0 MVP</div>
+        <div>CoinVigil AI · Intelligence and research tools, not financial advice.</div>
+        <div>v0.3.0</div>
       </footer>
     </main>
   );
