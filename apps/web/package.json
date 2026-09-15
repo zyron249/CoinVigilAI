@@ -1,6 +1,6 @@
 {
   "name": "coinvigil-web",
-  "version": "0.1.0",
+  "version": "0.3.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -9,9 +9,11 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "klinecharts": "^10.0.0",
     "next": "latest",
     "react": "latest",
-    "react-dom": "latest"
+    "react-dom": "latest",
+    "viem": "latest"
   },
   "devDependencies": {
     "@types/node": "latest",
