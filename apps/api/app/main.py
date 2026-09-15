@@ -4,13 +4,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.config import get_settings
 from app.models import AssetAnalysis, RadarSignal
 from app.services.ai import deterministic_view, provider_status, run_ai_council
-from app.services.market import get_asset, get_markets
+from app.services.market import get_asset, get_candles, get_markets
 from app.services.news import get_news
 from app.services.risk import assess_risk
 
 app = FastAPI(
     title="CoinVigil AI API",
-    version="0.2.0",
+    version="0.3.0",
     description="24/7 multi-model AI-powered crypto market intelligence API",
 )
 
@@ -25,7 +25,7 @@ app.add_middleware(
 
 @app.get("/health")
 async def health():
-    return {"status": "ok", "service": "coinvigil-api", "version": "0.2.0"}
+    return {"status": "ok", "service": "coinvigil-api", "version": "0.3.0"}
 
 
 @app.get("/api/ai/council/status")
@@ -45,6 +45,19 @@ async def ai_council_status():
 async def market(limit: int = Query(20, ge=1, le=100)):
     assets = await get_markets(limit)
     return {"data": [asset.model_dump() for asset in assets], "count": len(assets)}
+
+
+@app.get("/api/assets/{coin_id}/candles")
+async def asset_candles(coin_id: str, days: int = Query(90, ge=1, le=365)):
+    candles, source = await get_candles(coin_id, days)
+    if not candles:
+        raise HTTPException(status_code=404, detail="Candle data unavailable")
+    return {
+        "data": [candle.model_dump() for candle in candles],
+        "count": len(candles),
+        "source": source,
+        "days": days,
+    }
 
 
 @app.get("/api/assets/{coin_id}/analysis", response_model=AssetAnalysis)
