@@ -200,7 +200,6 @@ async def _anthropic_response(prompt: str, settings: Settings) -> str:
     body = {
         "model": settings.anthropic_model,
         "max_tokens": 700,
-        "temperature": 0.1,
         "system": (
             "You are an independent member of a multi-model financial intelligence council. "
             "Return only the requested JSON and never invent unavailable facts."
