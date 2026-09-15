@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { MarketAsset } from "../lib/api";
 
 const usd = new Intl.NumberFormat("en-US", {
@@ -37,16 +38,18 @@ export function MarketTable({ assets }: { assets: MarketAsset[] }) {
             {assets.map((asset) => {
               const change = asset.price_change_percentage_24h ?? 0;
               return (
-                <tr key={asset.id}>
+                <tr key={asset.id} className="market-row">
                   <td>{asset.market_cap_rank ?? "—"}</td>
                   <td>
-                    <div className="asset-cell">
-                      {asset.image ? <img src={asset.image} alt="" width={28} height={28} /> : <div className="coin-placeholder" />}
-                      <div>
-                        <strong>{asset.name}</strong>
-                        <span>{asset.symbol.toUpperCase()}</span>
+                    <Link className="asset-link" href={`/asset/${asset.id}`}>
+                      <div className="asset-cell">
+                        {asset.image ? <img src={asset.image} alt="" width={28} height={28} /> : <div className="coin-placeholder" />}
+                        <div>
+                          <strong>{asset.name}</strong>
+                          <span>{asset.symbol.toUpperCase()} · Open chart</span>
+                        </div>
                       </div>
-                    </div>
+                    </Link>
                   </td>
                   <td>{usd.format(asset.current_price ?? 0)}</td>
                   <td className={change >= 0 ? "positive" : "negative"}>{change >= 0 ? "+" : ""}{change.toFixed(2)}%</td>
