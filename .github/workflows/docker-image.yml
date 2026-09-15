@@ -126,7 +126,7 @@ jobs:
               sleep 2
               continue
             fi
-            if ! grep -q "Pro Chart Lab" /tmp/bitcoin.html; then
+            if ! grep -q "PRO CHART LAB" /tmp/bitcoin.html; then
               sleep 2
               continue
             fi
