@@ -65,9 +65,9 @@ jobs:
         working-directory: contracts
         run: node --check scripts/deploy-factory.mjs
 
-      - name: Test factory deployment safety policy
+      - name: Test contract deployment safety
         working-directory: contracts
-        run: node --test scripts/deployment-policy.test.mjs
+        run: npm test
 
       - name: Build web image
         run: docker build --pull --tag coinvigil-web:test ./apps/web
