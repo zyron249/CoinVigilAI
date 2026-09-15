@@ -118,6 +118,14 @@ export function TokenStudio() {
         });
       }
 
+      // Never trust a wallet switch request alone. Verify the provider actually moved
+      // to the selected chain before reading a factory address or asking for a signature.
+      const activeChainIdHex = await ethereum.request({ method: "eth_chainId" });
+      const activeChainId = typeof activeChainIdHex === "string" ? Number.parseInt(activeChainIdHex, 16) : Number.NaN;
+      if (activeChainId !== network.chain.id) {
+        throw new Error(`Wallet is on chain ${Number.isFinite(activeChainId) ? activeChainId : "unknown"}, but ${network.label} (${network.chain.id}) is required. Transaction cancelled.`);
+      }
+
       const publicClient = createPublicClient({ chain: network.chain as any, transport: custom(ethereum) });
       const factoryCode = await publicClient.getBytecode({ address: network.factory });
       if (!factoryCode || factoryCode === "0x") {
