@@ -61,6 +61,10 @@ jobs:
           test -n "$(find build -name '*.bin' -type f -size +0c -print -quit)"
           test -n "$(find build -name '*.abi' -type f -size +0c -print -quit)"
 
+      - name: Validate factory deployment helper
+        working-directory: contracts
+        run: node --check scripts/deploy-factory.mjs
+
       - name: Build web image
         run: docker build --pull --tag coinvigil-web:test ./apps/web
 
