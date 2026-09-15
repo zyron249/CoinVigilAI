@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useMemo, useState } from "react";
-import { createWalletClient, custom, parseUnits } from "viem";
+import { createPublicClient, createWalletClient, custom, isAddress, parseUnits } from "viem";
 import { arbitrum, base, bsc, mainnet, polygon } from "viem/chains";
 
 const FACTORY_ABI = [
@@ -43,7 +43,7 @@ export function TokenStudio() {
   const [busy, setBusy] = useState(false);
 
   const network = useMemo(() => NETWORKS.find((item) => item.key === networkKey) ?? NETWORKS[1], [networkKey]);
-  const deploymentReady = Boolean(network.factory);
+  const deploymentReady = Boolean(network.factory && isAddress(network.factory));
 
   async function connectWallet() {
     const ethereum = (window as any).ethereum;
@@ -91,6 +91,10 @@ export function TokenStudio() {
       setStatus(`${network.label} factory is not configured yet. Deploy the audited factory and set its NEXT_PUBLIC_FACTORY_* address first.`);
       return;
     }
+    if (!isAddress(network.factory)) {
+      setStatus(`${network.label} factory configuration is invalid. Refusing to submit a transaction.`);
+      return;
+    }
 
     const ethereum = (window as any).ethereum;
     if (!ethereum) {
@@ -114,10 +118,16 @@ export function TokenStudio() {
         });
       }
 
+      const publicClient = createPublicClient({ chain: network.chain as any, transport: custom(ethereum) });
+      const factoryCode = await publicClient.getBytecode({ address: network.factory });
+      if (!factoryCode || factoryCode === "0x") {
+        throw new Error(`No factory contract is deployed at the configured ${network.label} address. Transaction cancelled.`);
+      }
+
       const hash = await client.writeContract({
         account: activeAccount,
         chain: network.chain as any,
-        address: network.factory as `0x${string}`,
+        address: network.factory,
         abi: FACTORY_ABI,
         functionName: "createToken",
         args: [name.trim(), symbol.trim().toUpperCase(), initial, cap, mintable, burnable],
