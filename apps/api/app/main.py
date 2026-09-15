@@ -1,6 +1,7 @@
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.config import get_settings
 from app.models import AssetAnalysis, RadarSignal
 from app.services.ai import deterministic_view, provider_status, run_ai_council
 from app.services.market import get_asset, get_markets
@@ -29,9 +30,10 @@ async def health():
 
 @app.get("/api/ai/council/status")
 async def ai_council_status():
+    settings = get_settings()
     providers = provider_status()
     return {
-        "enabled": True,
+        "enabled": settings.ai_council_enabled,
         "supported": len(providers),
         "configured": sum(1 for provider in providers if provider["configured"]),
         "providers": providers,
