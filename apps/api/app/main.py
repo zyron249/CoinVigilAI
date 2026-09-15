@@ -2,15 +2,15 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.models import AssetAnalysis, RadarSignal
-from app.services.ai import deterministic_view, llm_summary
+from app.services.ai import deterministic_view, provider_status, run_ai_council
 from app.services.market import get_asset, get_markets
 from app.services.news import get_news
 from app.services.risk import assess_risk
 
 app = FastAPI(
     title="CoinVigil AI API",
-    version="0.1.0",
-    description="24/7 AI-powered crypto market intelligence API",
+    version="0.2.0",
+    description="24/7 multi-model AI-powered crypto market intelligence API",
 )
 
 app.add_middleware(
@@ -24,7 +24,19 @@ app.add_middleware(
 
 @app.get("/health")
 async def health():
-    return {"status": "ok", "service": "coinvigil-api", "version": "0.1.0"}
+    return {"status": "ok", "service": "coinvigil-api", "version": "0.2.0"}
+
+
+@app.get("/api/ai/council/status")
+async def ai_council_status():
+    providers = provider_status()
+    return {
+        "enabled": True,
+        "supported": len(providers),
+        "configured": sum(1 for provider in providers if provider["configured"]),
+        "providers": providers,
+        "mode": "parallel_weighted_consensus",
+    }
 
 
 @app.get("/api/market")
@@ -40,16 +52,28 @@ async def asset_analysis(coin_id: str):
         raise HTTPException(status_code=404, detail="Asset not found")
 
     risk = assess_risk(asset)
-    bias, confidence, fallback_summary = deterministic_view(asset, risk)
-    ai_summary = await llm_summary(asset, risk)
+    heuristic_bias, heuristic_confidence, fallback_summary = deterministic_view(asset, risk)
+    council = await run_ai_council(asset, risk)
+
+    if council:
+        return AssetAnalysis(
+            asset=asset,
+            bias=council.bias,
+            confidence=council.confidence,
+            risk=risk,
+            summary=council.summary,
+            engine=f"ai-council:{len(council.providers_responded)}",
+            council=council,
+        )
 
     return AssetAnalysis(
         asset=asset,
-        bias=bias,
-        confidence=confidence,
+        bias=heuristic_bias,
+        confidence=heuristic_confidence,
         risk=risk,
-        summary=ai_summary or fallback_summary,
-        engine="openai" if ai_summary else "heuristic",
+        summary=fallback_summary,
+        engine="heuristic",
+        council=None,
     )
 
 
