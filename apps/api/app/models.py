@@ -15,6 +15,15 @@ class MarketAsset(BaseModel):
     price_change_percentage_24h: float | None = None
 
 
+class Candle(BaseModel):
+    timestamp: int
+    open: float
+    high: float
+    low: float
+    close: float
+    volume: float = 0
+
+
 class RiskAssessment(BaseModel):
     score: int = Field(ge=0, le=100)
     level: str
