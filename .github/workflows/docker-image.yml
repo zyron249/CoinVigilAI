@@ -27,6 +27,41 @@ jobs:
       - name: Build API image
         run: docker build --pull --tag coinvigil-api:test ./apps/api
 
+      - name: Test AI Council consensus logic
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --rm -i coinvigil-api:test python - <<'PY'
+          from app.config import Settings
+          from app.models import AIProviderResult
+          from app.services.ai import _consensus
+
+          settings = Settings(
+              _env_file=None,
+              ai_provider_weights_json='{"openai":1.2,"xai":1.0,"gemini":1.0}'
+          )
+          results = [
+              AIProviderResult(provider='openai', model='test-openai', status='ok', bias='bullish', confidence=82, summary='bullish'),
+              AIProviderResult(provider='xai', model='test-xai', status='ok', bias='bullish', confidence=76, summary='bullish'),
+              AIProviderResult(provider='gemini', model='test-gemini', status='ok', bias='bearish', confidence=55, summary='bearish'),
+          ]
+          decision = _consensus(results, ['openai', 'xai', 'gemini'], settings)
+          assert decision is not None
+          assert decision.bias == 'bullish', decision
+          assert decision.votes == {'bullish': 2, 'bearish': 1, 'neutral': 0}, decision
+          assert decision.providers_responded == ['openai', 'xai', 'gemini'], decision
+          assert 'gemini:bearish' in decision.dissent, decision
+
+          conflict = [
+              AIProviderResult(provider='openai', model='a', status='ok', bias='bullish', confidence=80, summary='bullish'),
+              AIProviderResult(provider='xai', model='b', status='ok', bias='bearish', confidence=80, summary='bearish'),
+          ]
+          conflict_decision = _consensus(conflict, ['openai', 'xai'], Settings(_env_file=None))
+          assert conflict_decision is not None
+          assert conflict_decision.bias == 'neutral', conflict_decision
+          print('AI Council consensus tests passed')
+          PY
+
       - name: Build web image
         run: docker build --pull --tag coinvigil-web:test ./apps/web
 
@@ -74,6 +109,7 @@ jobs:
           assert analysis.get('asset', {}).get('id') == 'bitcoin', analysis
           assert analysis.get('engine') == 'heuristic' or str(analysis.get('engine', '')).startswith('ai-council:'), analysis
           assert isinstance(news.get('data'), list), news
+          assert council_status.get('enabled') is True, council_status
           assert council_status.get('supported', 0) >= 9, council_status
           assert council_status.get('mode') == 'parallel_weighted_consensus', council_status
           assert isinstance(council_status.get('providers'), list), council_status
