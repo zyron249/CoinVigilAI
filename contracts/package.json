@@ -3,9 +3,11 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "build": "rm -rf build && solcjs --bin --abi --optimize src/CoinVigilTokenFactory.sol -o build"
+    "build": "rm -rf build && solcjs --bin --abi --optimize src/CoinVigilTokenFactory.sol -o build",
+    "deploy:factory": "node scripts/deploy-factory.mjs"
   },
   "devDependencies": {
+    "ethers": "^6.15.0",
     "solc": "^0.8.30"
   }
 }
