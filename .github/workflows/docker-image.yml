@@ -109,21 +109,37 @@ jobs:
           print('API, candle and AI Council smoke tests passed')
           PY
 
-      - name: Wait for web application
+      - name: Smoke test web application
         shell: bash
         run: |
           set -euo pipefail
           for i in {1..60}; do
-            if curl -fsS http://127.0.0.1:3000/ > /tmp/web.html; then
-              grep -q "CoinVigil" /tmp/web.html
-              curl -fsS http://127.0.0.1:3000/assets/bitcoin > /tmp/bitcoin.html
-              grep -q "Pro Chart Lab" /tmp/bitcoin.html
-              curl -fsS http://127.0.0.1:3000/token-studio > /tmp/token-studio.html
-              grep -q "Token Studio" /tmp/token-studio.html
-              echo "Web, Chart Lab and Token Studio smoke tests passed"
-              exit 0
+            if ! curl -fsS http://127.0.0.1:3000/ > /tmp/web.html; then
+              sleep 2
+              continue
             fi
-            sleep 2
+            if ! grep -q "CoinVigil" /tmp/web.html; then
+              sleep 2
+              continue
+            fi
+            if ! curl -fsS http://127.0.0.1:3000/asset/bitcoin > /tmp/bitcoin.html; then
+              sleep 2
+              continue
+            fi
+            if ! grep -q "Pro Chart Lab" /tmp/bitcoin.html; then
+              sleep 2
+              continue
+            fi
+            if ! curl -fsS http://127.0.0.1:3000/token-studio > /tmp/token-studio.html; then
+              sleep 2
+              continue
+            fi
+            if ! grep -q "Token Studio" /tmp/token-studio.html; then
+              sleep 2
+              continue
+            fi
+            echo "Web, Chart Lab and Token Studio smoke tests passed"
+            exit 0
           done
           exit 1
 
