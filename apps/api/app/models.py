@@ -21,6 +21,29 @@ class RiskAssessment(BaseModel):
     drivers: list[str]
 
 
+class AIProviderResult(BaseModel):
+    provider: str
+    model: str
+    status: str
+    bias: str | None = None
+    confidence: int | None = Field(default=None, ge=0, le=100)
+    summary: str | None = None
+    latency_ms: int = 0
+    error: str | None = None
+
+
+class AICouncilDecision(BaseModel):
+    bias: str
+    confidence: int = Field(ge=0, le=100)
+    agreement: float = Field(ge=0, le=1)
+    summary: str
+    providers_requested: list[str]
+    providers_responded: list[str]
+    votes: dict[str, int]
+    dissent: list[str]
+    results: list[AIProviderResult]
+
+
 class AssetAnalysis(BaseModel):
     asset: MarketAsset
     bias: str
@@ -28,6 +51,7 @@ class AssetAnalysis(BaseModel):
     risk: RiskAssessment
     summary: str
     engine: str
+    council: AICouncilDecision | None = None
 
 
 class RadarSignal(BaseModel):
