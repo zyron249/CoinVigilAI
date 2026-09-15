@@ -55,6 +55,7 @@ jobs:
           curl -fsS "http://127.0.0.1:8000/api/radar?limit=3" > /tmp/radar.json
           curl -fsS "http://127.0.0.1:8000/api/assets/bitcoin/analysis" > /tmp/analysis.json
           curl -fsS "http://127.0.0.1:8000/api/news?limit=3" > /tmp/news.json
+          curl -fsS "http://127.0.0.1:8000/api/ai/council/status" > /tmp/council-status.json
           python - <<'PY'
           import json
           from pathlib import Path
@@ -64,14 +65,20 @@ jobs:
           radar = json.loads(Path('/tmp/radar.json').read_text())
           analysis = json.loads(Path('/tmp/analysis.json').read_text())
           news = json.loads(Path('/tmp/news.json').read_text())
+          council_status = json.loads(Path('/tmp/council-status.json').read_text())
 
           assert health.get('status') == 'ok', health
+          assert health.get('version') == '0.2.0', health
           assert isinstance(market.get('data'), list) and market['data'], market
           assert isinstance(radar.get('data'), list), radar
           assert analysis.get('asset', {}).get('id') == 'bitcoin', analysis
-          assert analysis.get('engine') in {'heuristic', 'openai'}, analysis
+          assert analysis.get('engine') == 'heuristic' or str(analysis.get('engine', '')).startswith('ai-council:'), analysis
           assert isinstance(news.get('data'), list), news
-          print('API smoke tests passed')
+          assert council_status.get('supported', 0) >= 9, council_status
+          assert council_status.get('mode') == 'parallel_weighted_consensus', council_status
+          assert isinstance(council_status.get('providers'), list), council_status
+          assert not any('api_key' in provider for provider in council_status['providers']), council_status
+          print('API and AI Council smoke tests passed')
           PY
 
       - name: Wait for web application
