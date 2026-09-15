@@ -124,14 +124,17 @@ export function TokenStudio() {
         throw new Error(`No factory contract is deployed at the configured ${network.label} address. Transaction cancelled.`);
       }
 
-      const hash = await client.writeContract({
+      // Simulate the exact factory call before asking the wallet to broadcast it.
+      // This catches contract reverts and malformed deployment parameters without spending gas.
+      const simulation = await publicClient.simulateContract({
         account: activeAccount,
-        chain: network.chain as any,
         address: network.factory,
         abi: FACTORY_ABI,
         functionName: "createToken",
         args: [name.trim(), symbol.trim().toUpperCase(), initial, cap, mintable, burnable],
       });
+
+      const hash = await client.writeContract(simulation.request);
       setAccount(activeAccount);
       setTxHash(hash);
       setStatus("Deployment transaction submitted. Your wallet remains the only signer and CoinVigil never receives your private key.");
