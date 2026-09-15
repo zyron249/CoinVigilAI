@@ -25,7 +25,7 @@ class Settings(BaseSettings):
     gemini_model: str = "gemini-3.8-flash"
 
     anthropic_api_key: str = ""
-    anthropic_model: str = ""
+    anthropic_model: str = "claude-sonnet-5"
 
     mistral_api_key: str = ""
     mistral_model: str = "mistral-large-latest"
