@@ -1,14 +1,15 @@
 import fs from "node:fs";
 import process from "node:process";
 import { ethers } from "ethers";
+import { assertExpectedNetwork, assertMainnetAllowed, parseExpectedChainId } from "./deployment-policy.mjs";
 
 const rpcUrl = process.env.RPC_URL;
 const privateKey = process.env.DEPLOYER_PRIVATE_KEY;
 const deployerAddress = process.env.DEPLOYER_ADDRESS;
-const expectedChainId = process.env.EXPECTED_CHAIN_ID;
+const expectedChainId = parseExpectedChainId(process.env.EXPECTED_CHAIN_ID);
 const shouldBroadcast = process.env.CONFIRM_DEPLOY === "YES";
 
-if (!rpcUrl || !expectedChainId) {
+if (!rpcUrl) {
   throw new Error("RPC_URL and EXPECTED_CHAIN_ID are required");
 }
 if (!shouldBroadcast && !deployerAddress && !privateKey) {
@@ -18,25 +19,10 @@ if (shouldBroadcast && !privateKey) {
   throw new Error("DEPLOYER_PRIVATE_KEY is required only when CONFIRM_DEPLOY=YES");
 }
 
-if (!/^\d+$/.test(expectedChainId) || BigInt(expectedChainId) <= 0n) {
-  throw new Error("EXPECTED_CHAIN_ID must be a positive integer");
-}
-
 const provider = new ethers.JsonRpcProvider(rpcUrl);
 const network = await provider.getNetwork();
-if (network.chainId !== BigInt(expectedChainId)) {
-  throw new Error(`Refusing deployment: connected chain ${network.chainId} != expected ${expectedChainId}`);
-}
-
-// Known production EVM networks require a second, explicit acknowledgement.
-// This keeps the normal deployment path testnet-first and makes accidental
-// mainnet broadcasts materially harder.
-const mainnetChainIds = new Set([1n, 10n, 56n, 137n, 42161n, 43114n, 8453n]);
-if (mainnetChainIds.has(network.chainId) && process.env.ALLOW_MAINNET !== "YES") {
-  throw new Error(
-    `Refusing mainnet deployment on chain ${network.chainId}. Set ALLOW_MAINNET=YES only after reviewing gas, bytecode and configuration.`,
-  );
-}
+assertExpectedNetwork(network.chainId, expectedChainId);
+assertMainnetAllowed(network.chainId, process.env.ALLOW_MAINNET);
 
 const signer = shouldBroadcast ? new ethers.Wallet(privateKey, provider) : null;
 const fromAddress = signer ? signer.address : ethers.getAddress(deployerAddress || new ethers.Wallet(privateKey).address);
