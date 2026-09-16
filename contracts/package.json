@@ -9,6 +9,7 @@
   },
   "devDependencies": {
     "ethers": "^6.15.0",
-    "solc": "^0.8.30"
+    "ganache": "^7.9.2",
+    "solc": "0.8.24"
   }
 }
