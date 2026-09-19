@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { CouncilRoster } from "../../../components/CouncilRoster";
 import { ProChartLab } from "../../../components/ProChartLab";
-import { getAssetAnalysis, getCandles } from "../../../lib/api";
+import { getAssetAnalysis, getCandles, getCouncilStatus } from "../../../lib/api";
 
 const usd = new Intl.NumberFormat("en-US", {
   style: "currency",
@@ -17,9 +18,10 @@ const compact = new Intl.NumberFormat("en-US", {
 
 export default async function AssetPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const [analysis, candleResponse] = await Promise.all([
+  const [analysis, candleResponse, councilStatus] = await Promise.all([
     getAssetAnalysis(id),
     getCandles(id, 90),
+    getCouncilStatus(),
   ]);
 
   if (!analysis) notFound();
@@ -72,7 +74,16 @@ export default async function AssetPage({ params }: { params: Promise<{ id: stri
           <div className="eyebrow">AI COUNCIL VIEW</div>
           <h2>{analysis.bias.toUpperCase()} · {analysis.confidence}% confidence</h2>
           <p>{analysis.summary}</p>
-          <div className="analysis-meta">Engine: {analysis.engine}</div>
+          {analysis.council ? (
+            <div className="analysis-meta">
+              Engine: {analysis.engine} · Agreement {(analysis.council.agreement * 100).toFixed(0)}%
+              {analysis.council.dissent.length ? ` · Dissent ${analysis.council.dissent.join(", ")}` : ""}
+            </div>
+          ) : (
+            <div className="analysis-meta">
+              Engine: {analysis.engine}. Optional council models such as xAI Grok stay idle until their keys are set.
+            </div>
+          )}
         </div>
         <div className="card analysis-card">
           <div className="eyebrow">RISK DRIVERS</div>
@@ -82,6 +93,13 @@ export default async function AssetPage({ params }: { params: Promise<{ id: stri
           </ul>
         </div>
       </section>
+
+      <CouncilRoster
+        providers={councilStatus.providers}
+        configured={councilStatus.configured}
+        supported={councilStatus.supported}
+        results={analysis.council?.results ?? []}
+      />
 
       <footer>
         <div>CoinVigil AI · Interactive research workspace, not financial advice.</div>

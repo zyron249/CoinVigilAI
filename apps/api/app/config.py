@@ -17,6 +17,10 @@ class Settings(BaseSettings):
     openai_api_key: str = ""
     openai_model: str = "gpt-5.6-luna"
 
+    # Official xAI Chat Completions API (OpenAI-compatible).
+    # Docs: https://docs.x.ai/developers/model-capabilities/legacy/chat-completions
+    # Catalog: https://docs.x.ai/developers/models
+    # Keys: https://console.x.ai/  via XAI_API_KEY — skipped when empty.
     xai_api_key: str = ""
     xai_model: str = "grok-4.6"
     xai_base_url: str = "https://api.x.ai/v1"

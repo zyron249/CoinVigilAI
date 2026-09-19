@@ -6,10 +6,10 @@ CoinVigil AI is a 24/7 crypto market intelligence platform that combines live ma
 
 CoinVigil does not rely on one model for the final AI judgment. Every configured provider receives the same canonical market and risk facts independently. Their outputs are normalized into a strict JSON contract, then combined by a weighted consensus engine.
 
-Supported provider adapters:
+Supported provider adapters (all optional; missing keys are skipped):
 
 - OpenAI / ChatGPT models
-- xAI / Grok
+- xAI / Grok (`XAI_API_KEY`, official Chat Completions API)
 - Google Gemini
 - Anthropic Claude
 - Mistral
@@ -101,6 +101,21 @@ OPENROUTER_API_KEY=
 
 Model names are environment variables too, so they can be changed without modifying source code when providers release or retire models.
 
+### xAI / Grok (optional)
+
+CoinVigil calls the official xAI Chat Completions API when `XAI_API_KEY` is set. This is the OpenAI-compatible path documented by xAI — CoinVigil does not invent a custom Grok endpoint.
+
+- Endpoint: `POST https://api.x.ai/v1/chat/completions`
+- Auth: `Authorization: Bearer $XAI_API_KEY`
+- Default model: `grok-4.6` (current xAI catalog flagship for chat / analysis; override with `XAI_MODEL`)
+- Base URL override: `XAI_BASE_URL` (default `https://api.x.ai/v1`)
+- API keys: [xAI console](https://console.x.ai/)
+- Docs: [Chat Completions](https://docs.x.ai/developers/model-capabilities/legacy/chat-completions) and [Models](https://docs.x.ai/developers/models)
+
+If `XAI_API_KEY` is empty, Grok is omitted from the parallel council dispatch and the rest of the stack continues. With no providers configured, analysis falls back to the deterministic heuristic engine so demo mode keeps working.
+
+xAI also publishes a newer Responses API. CoinVigil uses Chat Completions so Grok shares the same OpenAI-compatible adapter contract as Mistral, DeepSeek, Groq, Perplexity, and OpenRouter.
+
 Optional weighting example:
 
 ```text
@@ -144,9 +159,9 @@ The final analysis can include:
 
 ## CI verification
 
-Every push to `main` builds and validates the application in GitHub Actions. The workflow currently checks Python syntax, Docker Compose configuration, API image build, AI Council consensus behavior, frontend production build, full-stack startup, API health, market/radar/analysis/news/council endpoints, and the web application.
+Every push to `main` builds and validates the application in GitHub Actions. The workflow currently checks Python syntax, Docker Compose configuration, API image build, AI Council consensus behavior, mocked xAI/Grok provider wiring, frontend production build, full-stack startup, API health, market/radar/analysis/news/council endpoints, and the web application.
 
-Live third-party AI requests are intentionally not executed in public CI because provider API keys must not be committed to the repository. Adapter code is exercised structurally, consensus logic is tested deterministically, and real provider calls activate when valid keys are supplied in the deployment environment.
+Live third-party AI requests are intentionally not executed in public CI because provider API keys must not be committed to the repository. Adapter code is exercised with mocked HTTP, consensus logic is tested deterministically, and real provider calls activate when valid keys are supplied in the deployment environment.
 
 ## Operational notes
 

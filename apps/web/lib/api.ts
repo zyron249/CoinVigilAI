@@ -27,6 +27,38 @@ export type RiskAssessment = {
   drivers: string[];
 };
 
+export type CouncilProvider = {
+  provider: string;
+  label: string;
+  model: string;
+  configured: boolean;
+  optional: boolean;
+  endpoint?: string;
+};
+
+export type CouncilProviderResult = {
+  provider: string;
+  model: string;
+  status: string;
+  bias?: string | null;
+  confidence?: number | null;
+  summary?: string | null;
+  latency_ms?: number;
+  error?: string | null;
+};
+
+export type CouncilDecision = {
+  bias: string;
+  confidence: number;
+  agreement: number;
+  summary: string;
+  providers_requested: string[];
+  providers_responded: string[];
+  votes: Record<string, number>;
+  dissent: string[];
+  results: CouncilProviderResult[];
+};
+
 export type AssetAnalysis = {
   asset: MarketAsset;
   bias: string;
@@ -34,11 +66,15 @@ export type AssetAnalysis = {
   risk: RiskAssessment;
   summary: string;
   engine: string;
-  council?: {
-    agreement: number;
-    providers_responded: string[];
-    dissent: string[];
-  } | null;
+  council?: CouncilDecision | null;
+};
+
+export type CouncilStatus = {
+  enabled: boolean;
+  supported: number;
+  configured: number;
+  mode: string;
+  providers: CouncilProvider[];
 };
 
 export type RadarSignal = {
@@ -82,6 +118,37 @@ export async function getAssetAnalysis(coinId: string): Promise<AssetAnalysis | 
     return await response.json();
   } catch {
     return null;
+  }
+}
+
+export const OPTIONAL_COUNCIL_PROVIDERS: CouncilProvider[] = [
+  { provider: "openai", label: "OpenAI", model: "gpt-5.6-luna", configured: false, optional: true },
+  { provider: "xai", label: "xAI Grok", model: "grok-4.6", configured: false, optional: true },
+  { provider: "gemini", label: "Google Gemini", model: "gemini-3.8-flash", configured: false, optional: true },
+  { provider: "anthropic", label: "Anthropic Claude", model: "claude-sonnet-5", configured: false, optional: true },
+  { provider: "mistral", label: "Mistral", model: "mistral-large-latest", configured: false, optional: true },
+  { provider: "deepseek", label: "DeepSeek", model: "deepseek-chat", configured: false, optional: true },
+  { provider: "groq", label: "Groq", model: "openai/gpt-oss-120b", configured: false, optional: true },
+  { provider: "perplexity", label: "Perplexity", model: "", configured: false, optional: true },
+  { provider: "openrouter", label: "OpenRouter", model: "", configured: false, optional: true },
+];
+
+export async function getCouncilStatus(): Promise<CouncilStatus> {
+  try {
+    const response = await fetch(`${API}/api/ai/council/status`, { cache: "no-store" });
+    if (!response.ok) {
+      return { enabled: true, supported: OPTIONAL_COUNCIL_PROVIDERS.length, configured: 0, mode: "unavailable", providers: OPTIONAL_COUNCIL_PROVIDERS };
+    }
+    const json = await response.json();
+    return {
+      enabled: Boolean(json.enabled),
+      supported: json.supported ?? json.providers?.length ?? OPTIONAL_COUNCIL_PROVIDERS.length,
+      configured: json.configured ?? 0,
+      mode: json.mode ?? "parallel_weighted_consensus",
+      providers: Array.isArray(json.providers) && json.providers.length ? json.providers : OPTIONAL_COUNCIL_PROVIDERS,
+    };
+  } catch {
+    return { enabled: true, supported: OPTIONAL_COUNCIL_PROVIDERS.length, configured: 0, mode: "unavailable", providers: OPTIONAL_COUNCIL_PROVIDERS };
   }
 }
 
