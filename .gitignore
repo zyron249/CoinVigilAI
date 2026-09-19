@@ -1,11 +1,15 @@
 .env
 .env.local
+.env.*.local
+*.pem
+*.key
 __pycache__/
 *.py[cod]
 .pytest_cache/
 .venv/
 node_modules/
 .next/
+*.tsbuildinfo
 dist/
 coverage/
 contracts/build/

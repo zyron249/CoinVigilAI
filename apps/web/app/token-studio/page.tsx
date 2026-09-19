@@ -8,6 +8,7 @@ export default function TokenStudioPage() {
         <Link className="brand" href="/"><span className="brand-mark">V</span> CoinVigil <b>AI</b></Link>
         <div className="nav-links">
           <Link href="/">Markets</Link>
+          <Link href="/news">News</Link>
           <span>Token Studio</span>
         </div>
         <Link className="nav-cta" href="/">Open Markets</Link>
@@ -37,7 +38,7 @@ export default function TokenStudioPage() {
 
       <footer>
         <div>CoinVigil Token Studio · Smart contracts should be independently audited before production use.</div>
-        <div>v0.3.0</div>
+        <div>v0.3.1</div>
       </footer>
     </main>
   );

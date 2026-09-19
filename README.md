@@ -1,171 +1,170 @@
 # CoinVigil AI
 
-CoinVigil AI is a 24/7 crypto market intelligence platform that combines live market data, quantitative risk scoring, market radar signals, configurable news monitoring, and a multi-model AI Council.
+CoinVigil AI is a crypto market intelligence MVP: live (or fallback) market data, a transparent risk score, a market radar, an optional RSS feed, a multi-model AI Council, an interactive chart lab, and a non-custodial ERC-20 Token Studio.
+
+It is an informational research tool, not a production trading desk and not financial advice.
+
+## What works today
+
+- FastAPI market, radar, analysis, candle, news, and health endpoints
+- Next.js dashboard, asset Chart Lab, news page, and Token Studio
+- Heuristic analysis when no AI keys are configured
+- Parallel AI Council adapters when you add provider keys
+- Redis used as a short TTL cache for CoinGecko payloads (optional; API runs without it)
+- Docker Compose for API + web + PostgreSQL + Redis
+- GitHub Actions: unit tests, contract tests, image builds, and stack smoke tests
+
+## What is not done yet
+
+- PostgreSQL is started by Compose but **not used by the API**. It is reserved for later persistence.
+- There is no user accounts, alerts, WebSocket feed, or production deploy config.
+- Token factory contracts are **unaudited**. Token Studio stays disabled until you deploy a factory and set `NEXT_PUBLIC_FACTORY_*`.
+- Public CoinGecko is rate-limited. Without a key the API may show a labeled **demo snapshot** of BTC/ETH/SOL.
 
 ## AI Council
 
-CoinVigil does not rely on one model for the final AI judgment. Every configured provider receives the same canonical market and risk facts independently. Their outputs are normalized into a strict JSON contract, then combined by a weighted consensus engine.
+Every configured provider receives the same market and risk facts. Outputs are normalized to a strict JSON contract and combined by a weighted consensus engine. A single provider timeout does not fail the request. If no provider is configured or none return valid JSON, the API uses the heuristic fallback.
 
-Supported provider adapters:
+Supported adapters: OpenAI, xAI, Gemini, Anthropic, Mistral, DeepSeek, Groq, Perplexity, OpenRouter.
 
-- OpenAI / ChatGPT models
-- xAI / Grok
-- Google Gemini
-- Anthropic Claude
-- Mistral
-- DeepSeek
-- Groq-hosted models
-- Perplexity
-- OpenRouter for additional model families
-
-The council runs configured providers in parallel. A provider timeout or failure does not crash the full analysis. Successful opinions are combined using provider weight and the model's stated confidence. The response exposes vote counts, weighted agreement, dissenting models, individual provider results, and the final consensus. If no external AI provider is configured or available, CoinVigil falls back to deterministic heuristic analysis.
-
-No API keys belong in GitHub. All credentials stay in the local or deployment environment and `.env` remains ignored by Git.
-
-## MVP capabilities
-
-- Live crypto prices and market metrics
-- Multi-model AI Council analysis per asset
-- Deterministic heuristic fallback
-- Transparent risk score with drivers
-- Market radar for unusual movers
-- Configurable RSS intelligence feed
-- Per-provider failure isolation and request timeouts
-- Weighted consensus, agreement score, and dissent visibility
-- Dockerized API + web app + PostgreSQL + Redis
-- Health checks and graceful fallbacks when providers are unavailable
-- GitHub Actions full-stack build and smoke testing
+No API keys belong in GitHub. Copy `.env.example` to `.env` and keep `.env` local.
 
 ## Architecture
 
 ```text
-                        +--> OpenAI --------+
-                        +--> xAI / Grok ----+
-                        +--> Gemini --------+
-                        +--> Claude --------+
-Market APIs --> Risk -->+--> Mistral -------+--> AI Council --> Consensus
-     |                  +--> DeepSeek ------+       |              |
-     |                  +--> Groq ----------+       |              v
-     |                  +--> Perplexity ----+       |         FastAPI response
-     |                  +--> OpenRouter ----+       |              |
-     |                                              |              v
-News/RSS --------------------------------> Intelligence       Next.js dashboard
-     |
-     +---------------------------------------------> FastAPI
+CoinGecko ──(+ Redis cache)──> Risk ──> AI Council (optional) ──> FastAPI
+     |                                              |
+News/RSS (optional) ───────────────────────────────> FastAPI
+                                                    |
+                                               Next.js dashboard
+                                                    |
+                                         Token Studio (wallet-signed)
 
-PostgreSQL + Redis support the application stack.
+PostgreSQL is provisioned but unused. Redis is optional cache only.
 ```
 
-## Quick start
+## Quick start (Docker)
 
-1. Copy the environment file:
+1. Copy the environment file (or run `make env`):
 
 ```bash
 cp .env.example .env
 ```
 
-2. Add only the provider API keys you want to enable. You do not need all providers for the platform to run.
+2. Add only the provider keys you want. None are required to boot the stack.
 
 3. Start everything:
 
 ```bash
-docker compose up --build
+make up
+# or: docker compose up --build
 ```
 
 4. Open:
 
 - Web: `http://localhost:3000`
+- News: `http://localhost:3000/news`
+- Token Studio: `http://localhost:3000/token-studio`
 - API docs: `http://localhost:8000/docs`
 - API health: `http://localhost:8000/health`
 - AI Council status: `http://localhost:8000/api/ai/council/status`
 
+## Local run without Docker
+
+Redis and Postgres are optional for local API work. If Redis is missing, market calls skip the cache.
+
+```bash
+make setup
+# terminal 1
+make api
+# terminal 2
+make web
+```
+
+`make api` expects Python deps on `PATH` (the venv from `make setup` is `.venv`). Activate it first if `uvicorn` is not installed globally:
+
+```bash
+source .venv/bin/activate
+make api
+```
+
+## Tests
+
+```bash
+# API unit tests (no Docker, no provider keys, no live CoinGecko)
+cd apps/api && python3 -m pytest -q
+
+# Token factory / deployment policy tests (needs `cd contracts && npm install && npm run build` once)
+cd contracts && npm test
+
+# or
+make test
+```
+
 ## AI provider configuration
 
-`.env.example` contains configuration fields for all supported adapters. Important fields include:
+`.env.example` lists every adapter. Model IDs must be IDs the provider actually accepts — do not paste Cursor-internal slugs.
 
 ```text
 AI_COUNCIL_ENABLED=true
 AI_REQUEST_TIMEOUT_SECONDS=25
-AI_PROVIDER_WEIGHTS_JSON=
-
 OPENAI_API_KEY=
-XAI_API_KEY=
-GEMINI_API_KEY=
-ANTHROPIC_API_KEY=
-MISTRAL_API_KEY=
-DEEPSEEK_API_KEY=
-GROQ_API_KEY=
-PERPLEXITY_API_KEY=
-OPENROUTER_API_KEY=
+OPENAI_MODEL=gpt-4o-mini
+PERPLEXITY_MODEL=sonar
 ```
 
-Model names are environment variables too, so they can be changed without modifying source code when providers release or retire models.
+A provider is enabled only when **both** key and model are set. Perplexity and OpenRouter are easy to miss: a key without a model is ignored.
 
-Optional weighting example:
+Optional weighting:
 
 ```text
 AI_PROVIDER_WEIGHTS_JSON={"openai":1.2,"xai":1.0,"gemini":1.0,"anthropic":1.1}
 ```
 
-A weight changes how strongly that provider contributes to consensus. It does not bypass conflict handling: strong bullish/bearish disagreement can force the final council result to neutral.
-
-## Council response behavior
-
-For each configured provider the system requests only:
-
-```json
-{
-  "bias": "bullish | bearish | neutral",
-  "confidence": 0,
-  "summary": "evidence-constrained explanation"
-}
-```
-
-Providers receive market and risk facts collected by CoinVigil. Prompts explicitly prohibit inventing missing news, price targets, guarantees, or unsupported causes.
-
-The final analysis can include:
-
-- final consensus bias
-- consensus confidence
-- weighted agreement ratio
-- providers requested and providers that responded successfully
-- vote totals
-- dissenting provider opinions
-- latency and error state per provider
+Strong bullish/bearish disagreement can force the final council result to neutral.
 
 ## Main API routes
 
-- `GET /health`
-- `GET /api/market?limit=20`
+- `GET /health` — process liveness plus dependency notes (`postgres` is `reserved_unused`)
+- `GET /api/market?limit=20` — includes `source`: `coingecko` | `cache` | `demo`
 - `GET /api/assets/{coin_id}/analysis`
+- `GET /api/assets/{coin_id}/candles?days=90` — `days` is snapped to CoinGecko's 1/7/14/30/90/180/365 set
 - `GET /api/ai/council/status`
 - `GET /api/radar`
 - `GET /api/news`
 
-## CI verification
+## Token contracts
 
-Every push to `main` builds and validates the application in GitHub Actions. The workflow currently checks Python syntax, Docker Compose configuration, API image build, AI Council consensus behavior, frontend production build, full-stack startup, API health, market/radar/analysis/news/council endpoints, and the web application.
+```bash
+cd contracts
+npm install
+npm run build
+npm test
+# dry-run only; broadcasting requires CONFIRM_DEPLOY=YES and a local key
+# RPC_URL=... EXPECTED_CHAIN_ID=11155111 DEPLOYER_ADDRESS=0x... npm run deploy:factory
+```
 
-Live third-party AI requests are intentionally not executed in public CI because provider API keys must not be committed to the repository. Adapter code is exercised structurally, consensus logic is tested deterministically, and real provider calls activate when valid keys are supplied in the deployment environment.
+Factory addresses must be set at **Next.js build time** (`NEXT_PUBLIC_FACTORY_*`). Compose passes those build args from `.env`.
+
+## CI
+
+Pushes and pull requests against `main` run API unit tests, a secret-pattern scan, contract tests, image builds, and a compose smoke test. Live third-party AI calls are not made in public CI.
 
 ## Operational notes
 
-Enabling many AI providers increases token/API cost. Requests are dispatched in parallel, so total response time is normally driven by the slowest responding configured provider up to the configured timeout. For production, provider weights, timeouts, rate limits, caching, and model selection should be tuned using measured quality, latency, and cost rather than brand name alone.
+- Enabling many AI providers increases cost. Latency is usually the slowest configured provider, up to `AI_REQUEST_TIMEOUT_SECONDS`.
+- CoinGecko's keyless pool is roughly 10–30 calls/minute. Prefer `COINGECKO_API_KEY` and keep Redis up so the dashboard does not stampede the public API.
+- CORS defaults to localhost. Set `CORS_ALLOW_ORIGINS` before exposing the API.
 
 ## Product direction
 
-The platform intentionally separates source collection, quantitative scoring, AI interpretation, and consensus. The next major milestones are:
-
 1. Exchange WebSocket ingestion
-2. Historical candles + TimescaleDB
-3. On-chain and whale intelligence providers
-4. Event/entity deduplication and source-confidence scoring
-5. User accounts, watchlists, and alerts
-6. Multi-source news verification pipeline
-7. Model evaluation, calibration, and backtesting
-8. Provider cost/latency routing and automatic failover policies
-9. Production observability and deployment
+2. Persist snapshots in PostgreSQL / TimescaleDB
+3. On-chain and whale intelligence
+4. User accounts, watchlists, and alerts
+5. Model evaluation and provider routing
+6. Production observability and a real deploy path
 
 ## Disclaimer
 
-CoinVigil AI is an informational analytics product, not financial advice. Market data, source data, quantitative signals, and AI outputs can be wrong, incomplete, delayed, or contradictory. AI consensus is not a guarantee of future market behavior.
+CoinVigil AI is an informational analytics product, not financial advice. Market data, source data, quantitative signals, and AI outputs can be wrong, incomplete, delayed, or contradictory. AI consensus is not a guarantee of future market behavior. Demo market snapshots are synthetic stand-ins used only when CoinGecko is unavailable.

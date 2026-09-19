@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { RadarSignal } from "../lib/api";
 
 export function Radar({ signals }: { signals: RadarSignal[] }) {
@@ -13,7 +14,7 @@ export function Radar({ signals }: { signals: RadarSignal[] }) {
         {signals.length === 0 ? (
           <div className="empty">No elevated signals detected right now.</div>
         ) : signals.slice(0, 6).map((signal) => (
-          <div className="radar-item" key={`${signal.asset_id}-${signal.signal}`}>
+          <Link className="radar-item" key={`${signal.asset_id}-${signal.signal}`} href={`/asset/${signal.asset_id}`}>
             <div>
               <strong>{signal.symbol}</strong>
               <span>{signal.signal}</span>
@@ -22,7 +23,7 @@ export function Radar({ signals }: { signals: RadarSignal[] }) {
               <span className={signal.change_24h >= 0 ? "positive" : "negative"}>{signal.change_24h >= 0 ? "+" : ""}{signal.change_24h.toFixed(2)}%</span>
               <span className={`pill ${signal.severity}`}>{signal.severity}</span>
             </div>
-          </div>
+          </Link>
         ))}
       </div>
     </div>

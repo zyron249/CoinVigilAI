@@ -6,26 +6,29 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     app_env: str = "development"
     coingecko_base_url: str = "https://api.coingecko.com/api/v3"
+    coingecko_api_key: str = ""
     news_rss_urls: str = ""
     database_url: str = "postgresql://coinvigil:coinvigil@localhost:5432/coinvigil"
     redis_url: str = "redis://localhost:6379/0"
+    cors_allow_origins: str = "http://localhost:3000,http://127.0.0.1:3000"
+    market_cache_ttl_seconds: int = 30
 
     ai_council_enabled: bool = True
     ai_request_timeout_seconds: float = 25.0
     ai_provider_weights_json: str = ""
 
     openai_api_key: str = ""
-    openai_model: str = "gpt-5.6-luna"
+    openai_model: str = "gpt-4o-mini"
 
     xai_api_key: str = ""
-    xai_model: str = "grok-4.6"
+    xai_model: str = "grok-3"
     xai_base_url: str = "https://api.x.ai/v1"
 
     gemini_api_key: str = ""
-    gemini_model: str = "gemini-3.8-flash"
+    gemini_model: str = "gemini-2.0-flash"
 
     anthropic_api_key: str = ""
-    anthropic_model: str = "claude-sonnet-5"
+    anthropic_model: str = "claude-sonnet-4-5"
 
     mistral_api_key: str = ""
     mistral_model: str = "mistral-large-latest"
@@ -40,7 +43,7 @@ class Settings(BaseSettings):
     groq_base_url: str = "https://api.groq.com/openai/v1"
 
     perplexity_api_key: str = ""
-    perplexity_model: str = ""
+    perplexity_model: str = "sonar"
     perplexity_base_url: str = "https://api.perplexity.ai"
 
     openrouter_api_key: str = ""
@@ -52,6 +55,11 @@ class Settings(BaseSettings):
     @property
     def rss_urls(self) -> list[str]:
         return [url.strip() for url in self.news_rss_urls.split(",") if url.strip()]
+
+    @property
+    def cors_origins(self) -> list[str]:
+        origins = [origin.strip() for origin in self.cors_allow_origins.split(",") if origin.strip()]
+        return origins or ["http://localhost:3000"]
 
     @property
     def provider_weights(self) -> dict[str, float]:

@@ -36,8 +36,10 @@ export type AssetAnalysis = {
   engine: string;
   council?: {
     agreement: number;
+    providers_requested: string[];
     providers_responded: string[];
     dissent: string[];
+    votes?: Record<string, number>;
   } | null;
 };
 
@@ -51,16 +53,24 @@ export type RadarSignal = {
   risk_score: number;
 };
 
+export type NewsItem = {
+  title: string;
+  link: string;
+  source: string;
+  published_at: string;
+  summary: string;
+};
+
 const API = process.env.API_INTERNAL_URL || process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
-export async function getMarket(): Promise<MarketAsset[]> {
+export async function getMarket(): Promise<{ assets: MarketAsset[]; source: string }> {
   try {
     const response = await fetch(`${API}/api/market?limit=20`, { cache: "no-store" });
-    if (!response.ok) return [];
+    if (!response.ok) return { assets: [], source: "unavailable" };
     const json = await response.json();
-    return json.data ?? [];
+    return { assets: json.data ?? [], source: json.source ?? "unknown" };
   } catch {
-    return [];
+    return { assets: [], source: "unavailable" };
   }
 }
 
@@ -82,6 +92,21 @@ export async function getAssetAnalysis(coinId: string): Promise<AssetAnalysis | 
     return await response.json();
   } catch {
     return null;
+  }
+}
+
+export async function getNews(): Promise<{ items: NewsItem[]; message: string | null; configured: boolean }> {
+  try {
+    const response = await fetch(`${API}/api/news?limit=30`, { cache: "no-store" });
+    if (!response.ok) return { items: [], message: "News feed is unavailable.", configured: false };
+    const json = await response.json();
+    return {
+      items: json.data ?? [],
+      message: json.message ?? null,
+      configured: Boolean(json.configured),
+    };
+  } catch {
+    return { items: [], message: "News feed is unavailable.", configured: false };
   }
 }
 
