@@ -33,6 +33,7 @@ export default async function AssetPage({ params }: { params: Promise<{ id: stri
         <Link className="brand" href="/"><span className="brand-mark">V</span> CoinVigil <b>AI</b></Link>
         <div className="nav-links">
           <Link href="/">Markets</Link>
+          <Link href="/news">News</Link>
           <Link href="/token-studio">Token Studio</Link>
         </div>
         <Link className="nav-cta" href="/token-studio">Create Token</Link>
@@ -72,6 +73,15 @@ export default async function AssetPage({ params }: { params: Promise<{ id: stri
           <div className="eyebrow">AI COUNCIL VIEW</div>
           <h2>{analysis.bias.toUpperCase()} · {analysis.confidence}% confidence</h2>
           <p>{analysis.summary}</p>
+          {analysis.council ? (
+            <ul className="council-meta">
+              <li>Weighted agreement: {(analysis.council.agreement * 100).toFixed(0)}%</li>
+              <li>Responded: {analysis.council.providers_responded.join(", ") || "none"}</li>
+              {analysis.council.dissent.length > 0 ? <li>Dissent: {analysis.council.dissent.join(", ")}</li> : null}
+            </ul>
+          ) : (
+            <p className="analysis-meta">Heuristic fallback — no AI providers returned a council vote. Add provider keys in `.env` to enable the council.</p>
+          )}
           <div className="analysis-meta">Engine: {analysis.engine}</div>
         </div>
         <div className="card analysis-card">
@@ -85,7 +95,7 @@ export default async function AssetPage({ params }: { params: Promise<{ id: stri
 
       <footer>
         <div>CoinVigil AI · Interactive research workspace, not financial advice.</div>
-        <div>v0.3.0</div>
+        <div>v0.3.1</div>
       </footer>
     </main>
   );

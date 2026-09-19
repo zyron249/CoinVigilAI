@@ -4,19 +4,22 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.config import get_settings
 from app.models import AssetAnalysis, RadarSignal
 from app.services.ai import deterministic_view, provider_status, run_ai_council
-from app.services.market import get_asset, get_candles, get_markets
+from app.services.cache import redis_status
+from app.services.market import get_asset, get_candles, get_markets, get_markets_with_source
 from app.services.news import get_news
 from app.services.risk import assess_risk
 
+settings = get_settings()
+
 app = FastAPI(
     title="CoinVigil AI API",
-    version="0.3.0",
+    version="0.3.1",
     description="24/7 multi-model AI-powered crypto market intelligence API",
 )
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=settings.cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -25,7 +28,18 @@ app.add_middleware(
 
 @app.get("/health")
 async def health():
-    return {"status": "ok", "service": "coinvigil-api", "version": "0.3.0"}
+    providers = provider_status()
+    return {
+        "status": "ok",
+        "service": "coinvigil-api",
+        "version": "0.3.1",
+        "dependencies": {
+            "redis": await redis_status(),
+            "postgres": "reserved_unused",
+            "market_provider": "coingecko",
+            "ai_providers_configured": sum(1 for provider in providers if provider["configured"]),
+        },
+    }
 
 
 @app.get("/api/ai/council/status")
@@ -43,8 +57,12 @@ async def ai_council_status():
 
 @app.get("/api/market")
 async def market(limit: int = Query(20, ge=1, le=100)):
-    assets = await get_markets(limit)
-    return {"data": [asset.model_dump() for asset in assets], "count": len(assets)}
+    assets, source = await get_markets_with_source(limit)
+    return {
+        "data": [asset.model_dump() for asset in assets],
+        "count": len(assets),
+        "source": source,
+    }
 
 
 @app.get("/api/assets/{coin_id}/candles")
@@ -121,10 +139,14 @@ async def radar(limit: int = Query(30, ge=3, le=100)):
 
 @app.get("/api/news")
 async def news(limit: int = Query(20, ge=1, le=100)):
-    items = get_news(limit)
+    items = await get_news(limit)
+    configured = bool(get_settings().rss_urls)
     return {
         "data": items,
         "count": len(items),
-        "configured": bool(items),
-        "message": None if items else "Add comma-separated RSS URLs to NEWS_RSS_URLS to activate the intelligence feed.",
+        "configured": configured,
+        "message": None if items else (
+            None if configured
+            else "Add comma-separated RSS URLs to NEWS_RSS_URLS to activate the intelligence feed."
+        ),
     }

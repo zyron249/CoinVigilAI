@@ -12,7 +12,7 @@ const compact = new Intl.NumberFormat("en-US", {
   maximumFractionDigits: 2,
 });
 
-export function MarketTable({ assets }: { assets: MarketAsset[] }) {
+export function MarketTable({ assets, source = "unknown" }: { assets: MarketAsset[]; source?: string }) {
   return (
     <div className="card table-card">
       <div className="section-heading">
@@ -20,7 +20,7 @@ export function MarketTable({ assets }: { assets: MarketAsset[] }) {
           <div className="eyebrow">LIVE MARKET</div>
           <h2>Top assets</h2>
         </div>
-        <span className="live-dot">● Live</span>
+        <span className={source === "coingecko" || source === "cache" ? "live-dot" : "live-dot demo"}>{source === "coingecko" || source === "cache" ? "● Live" : "○ Demo snapshot"}</span>
       </div>
       <div className="table-wrap">
         <table>
