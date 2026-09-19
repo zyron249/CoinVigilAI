@@ -5,7 +5,7 @@ from app.config import get_settings
 from app.models import AssetAnalysis, RadarSignal
 from app.services.ai import deterministic_view, provider_status, run_ai_council
 from app.services.cache import redis_status
-from app.services.market import get_asset, get_candles, get_markets, get_markets_with_source
+from app.services.market import get_asset, get_candles, get_markets, get_markets_with_source, snap_ohlc_days
 from app.services.news import get_news
 from app.services.risk import assess_risk
 
@@ -74,7 +74,7 @@ async def asset_candles(coin_id: str, days: int = Query(90, ge=1, le=365)):
         "data": [candle.model_dump() for candle in candles],
         "count": len(candles),
         "source": source,
-        "days": days,
+        "days": snap_ohlc_days(days),
     }
 
 

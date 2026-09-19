@@ -35,6 +35,20 @@ def test_news_empty_without_rss_config():
     assert "NEWS_RSS_URLS" in body["message"]
 
 
+def test_candles_report_snapped_coingecko_days(monkeypatch):
+    async def fake_candles(coin_id: str, days: int = 90):
+        from app.models import Candle
+        return [Candle(timestamp=1, open=1, high=2, low=0.5, close=1.2)], "demo"
+
+    monkeypatch.setattr("app.main.get_candles", fake_candles)
+    response = client.get("/api/assets/bitcoin/candles?days=45")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["days"] == 30
+    assert body["source"] == "demo"
+    assert body["count"] == 1
+
+
 def test_market_source_is_exposed(monkeypatch):
     async def fake_markets(limit=20):
         return DEMO_MARKETS[:limit], "demo"
