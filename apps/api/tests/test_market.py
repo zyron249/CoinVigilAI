@@ -12,6 +12,7 @@ from app.services.market import (
     get_movers,
     get_ranked_markets,
     market_asset_from_payload,
+    peek_universe_status,
     save_last_good,
     snap_ohlc_days,
 )
@@ -37,6 +38,26 @@ def test_ohlc_days_snap_to_coingecko_enum():
     assert snap_ohlc_days(1) == 1
     assert snap_ohlc_days(400) == 365
     assert snap_ohlc_days(0) == 1
+
+
+@pytest.mark.asyncio
+async def test_peek_universe_status_never_calls_coingecko(monkeypatch):
+    monkeypatch.setattr("app.services.market.httpx.AsyncClient", _FailingClient)
+    monkeypatch.setattr("app.services.market.cache_get", _noop_cache_get)
+    empty = await peek_universe_status()
+    assert empty["observed"] is False
+    assert empty["source"] is None
+
+    await save_last_good("universe", {
+        "items": [DEMO_MARKETS[0].model_dump()],
+        "source": "coingecko",
+        "last_live_at": "2026-09-20T04:00:00Z",
+    })
+    observed = await peek_universe_status()
+    assert observed["observed"] is True
+    assert observed["source"] == "cache"
+    assert observed["stale"] is True
+    assert observed["last_live_at"] == "2026-09-20T04:00:00Z"
 
 
 def test_parses_coingecko_percentage_aliases():

@@ -360,6 +360,56 @@ def _snapshot_from_payload(payload: dict[str, Any], *, stale: bool, fallback_rea
     )
 
 
+async def peek_universe_status() -> dict[str, Any]:
+    """Last observed Live/cache/demo path. Never calls CoinGecko."""
+    empty = {
+        "source": None,
+        "stale": False,
+        "last_live_at": None,
+        "fallback_reason": None,
+        "observed": False,
+    }
+
+    def from_snapshot(snapshot: UniverseSnapshot) -> dict[str, Any]:
+        return {
+            "source": snapshot.source,
+            "stale": snapshot.stale,
+            "last_live_at": snapshot.last_live_at,
+            "fallback_reason": snapshot.fallback_reason,
+            "observed": True,
+        }
+
+    mem_row = _memory_cache.get("universe")
+    if mem_row:
+        _stamped, mem = mem_row
+        if isinstance(mem, UniverseSnapshot) and mem.assets:
+            return from_snapshot(mem)
+        if isinstance(mem, tuple) and len(mem) == 2 and mem[0]:
+            return from_snapshot(UniverseSnapshot(list(mem[0]), mem[1]))
+
+    cache_key = f"markets:v3:universe:{MARKET_UNIVERSE_LIMIT}"
+    cached = await cache_get(cache_key)
+    if isinstance(cached, dict):
+        snapshot = _snapshot_from_payload(cached, stale=False)
+        if snapshot:
+            return from_snapshot(snapshot)
+    if isinstance(cached, list) and cached:
+        return {
+            "source": "cache",
+            "stale": False,
+            "last_live_at": None,
+            "fallback_reason": None,
+            "observed": True,
+        }
+
+    last_good = await load_last_good("universe")
+    if last_good:
+        snapshot = _snapshot_from_payload(last_good, stale=True)
+        if snapshot:
+            return from_snapshot(snapshot)
+    return empty
+
+
 async def get_universe_snapshot() -> UniverseSnapshot:
     mem = _memory_get("universe")
     if isinstance(mem, UniverseSnapshot) and mem.assets:

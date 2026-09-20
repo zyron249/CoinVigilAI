@@ -8,6 +8,7 @@ const LINKS = [
   { href: "/", label: "Markets" },
   { href: "/#watchlist", label: "Watchlist" },
   { href: "/news", label: "News" },
+  { href: "/status", label: "Status" },
   { href: "/token-studio", label: "Token Studio" },
 ];
 

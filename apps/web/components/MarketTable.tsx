@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import type { MarketPage } from "../lib/api";
+import { memo } from "react";
+import type { MarketAsset, MarketPage } from "../lib/api";
 import { changeClass, formatCompact, formatCompactUsd, formatPercent, formatTimestamp, formatUsd } from "../lib/format";
 import { Sparkline } from "./Sparkline";
 import { StatusBadge } from "./StatusBadge";
@@ -19,6 +20,36 @@ const COLUMNS: { key: string; label: string; sort?: string }[] = [
   { key: "supply", label: "Circulating supply" },
   { key: "spark", label: "Last 7 days" },
 ];
+
+const MarketRow = memo(function MarketRow({ asset }: { asset: MarketAsset }) {
+  return (
+    <tr className="market-row">
+      <td>{asset.market_cap_rank ?? "—"}</td>
+      <td>
+        <Link className="asset-link" href={`/asset/${asset.id}`}>
+          <div className="asset-cell">
+            <WatchButton id={asset.id} symbol={asset.symbol} name={asset.name} compact />
+            {asset.image
+              ? <img src={asset.image} alt="" width={28} height={28} />
+              : <div className="coin-placeholder" aria-hidden="true" />}
+            <div>
+              <strong>{asset.name}</strong>
+              <span>{asset.symbol.toUpperCase()}</span>
+            </div>
+          </div>
+        </Link>
+      </td>
+      <td>{formatUsd(asset.current_price)}</td>
+      <td className={changeClass(asset.price_change_percentage_1h)}>{formatPercent(asset.price_change_percentage_1h)}</td>
+      <td className={changeClass(asset.price_change_percentage_24h)}>{formatPercent(asset.price_change_percentage_24h)}</td>
+      <td className={changeClass(asset.price_change_percentage_7d)}>{formatPercent(asset.price_change_percentage_7d)}</td>
+      <td>{formatCompactUsd(asset.market_cap)}</td>
+      <td>{formatCompactUsd(asset.total_volume)}</td>
+      <td>{formatCompact(asset.circulating_supply)} {asset.symbol.toUpperCase()}</td>
+      <td><Sparkline values={asset.sparkline_7d} /></td>
+    </tr>
+  );
+});
 
 export function MarketTable({
   pageData,
@@ -103,31 +134,7 @@ export function MarketTable({
             </thead>
             <tbody>
               {pageData.assets.map((asset) => (
-                <tr key={asset.id} className="market-row">
-                  <td>{asset.market_cap_rank ?? "—"}</td>
-                  <td>
-                    <Link className="asset-link" href={`/asset/${asset.id}`}>
-                      <div className="asset-cell">
-                        <WatchButton id={asset.id} symbol={asset.symbol} name={asset.name} compact />
-                        {asset.image
-                          ? <img src={asset.image} alt="" width={28} height={28} />
-                          : <div className="coin-placeholder" aria-hidden="true" />}
-                        <div>
-                          <strong>{asset.name}</strong>
-                          <span>{asset.symbol.toUpperCase()}</span>
-                        </div>
-                      </div>
-                    </Link>
-                  </td>
-                  <td>{formatUsd(asset.current_price)}</td>
-                  <td className={changeClass(asset.price_change_percentage_1h)}>{formatPercent(asset.price_change_percentage_1h)}</td>
-                  <td className={changeClass(asset.price_change_percentage_24h)}>{formatPercent(asset.price_change_percentage_24h)}</td>
-                  <td className={changeClass(asset.price_change_percentage_7d)}>{formatPercent(asset.price_change_percentage_7d)}</td>
-                  <td>{formatCompactUsd(asset.market_cap)}</td>
-                  <td>{formatCompactUsd(asset.total_volume)}</td>
-                  <td>{formatCompact(asset.circulating_supply)} {asset.symbol.toUpperCase()}</td>
-                  <td><Sparkline values={asset.sparkline_7d} /></td>
-                </tr>
+                <MarketRow key={asset.id} asset={asset} />
               ))}
             </tbody>
           </table>

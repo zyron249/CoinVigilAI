@@ -1,6 +1,6 @@
 # CoinVigil AI
 
-CoinVigil AI is a crypto market intelligence MVP: CoinGecko-backed rankings (CMC-style table, not a CoinMarketCap clone), global market stats, 24h gainers/losers, an optional AI Market Brief, a transparent risk score, a market radar, an optional RSS feed, a multi-model AI Council (including Grok), an interactive chart lab, and a non-custodial ERC-20 Token Studio.
+CoinVigil AI is a crypto market intelligence MVP: CoinGecko-backed rankings (CMC-style table, not a CoinMarketCap clone), global market stats, 24h gainers/losers, an optional AI Market Brief, a transparent risk score, a market radar, attributed public RSS headlines, a multi-model AI Council (including Grok), an interactive chart lab, and a non-custodial ERC-20 Token Studio.
 
 It is an informational research tool, not a production trading desk and not financial advice.
 
@@ -8,7 +8,8 @@ It is an informational research tool, not a production trading desk and not fina
 
 - FastAPI market rankings, global overview, movers, AI brief, radar, analysis, candle, news, and health endpoints
 - Next.js Markets homepage: sortable/paginated rankings, local browser watchlist, global strip, gainers/losers, AI Market Brief
-- Asset pages with CMC-like stats (1h/24h/7d, circulating supply, 24h range) plus AI analysis
+- `/status` page plus `GET /api/status` (Live/Demo path, Redis, Postgres-not-provisioned, AI keys configured — never the keys)
+- Asset pages with denser stats (1h/24h/7d, vol/mcap, circulating vs max, 24h range) plus AI analysis
 - Heuristic analysis and market brief when no AI keys are configured
 - Parallel AI Council adapters (including optional xAI Grok) when you add provider keys
 - Redis used as a short TTL cache plus a 6-hour last-live snapshot when CoinGecko rate-limits
@@ -45,50 +46,38 @@ News/RSS (optional) ────────────────────
 Postgres is not in the stack. Redis is optional cache + last-live snapshot only.
 ```
 
-## Quick start (Docker)
+## Quick start
 
-1. Copy the environment file (or run `make env`):
-
-```bash
-cp .env.example .env
-```
-
-2. Add only the provider keys you want. None are required to boot the stack.
-
-3. Start everything:
+**One command (Docker):**
 
 ```bash
-make up
-# or: docker compose up --build
+cp .env.example .env   # or: make env
+make up                # API :8000, web :3000, Redis
 ```
 
-4. Open:
+Then open `http://localhost:3000` and `http://localhost:3000/status`. No API keys are required. Optional keys go in `.env` — never in git.
 
-- Web: `http://localhost:3000`
-- News: `http://localhost:3000/news`
-- Token Studio: `http://localhost:3000/token-studio`
-- API docs: `http://localhost:8000/docs`
-- API health: `http://localhost:8000/health`
-- AI Council status: `http://localhost:8000/api/ai/council/status`
-
-## Local run without Docker
-
-Redis is optional for local API work. If Redis is missing, market calls skip the short cache and keep an in-process last-live snapshot for the life of the process.
+**Two terminals (no Docker):**
 
 ```bash
 make setup
-# terminal 1
-make api
-# terminal 2
-make web
+source .venv/bin/activate
+make api    # terminal 1
+make web    # terminal 2
 ```
 
-`make api` expects Python deps on `PATH` (the venv from `make setup` is `.venv`). Activate it first if `uvicorn` is not installed globally:
+Redis is optional. If it is down, market calls skip the short cache and keep an in-process last-live snapshot.
+
+**Check the stack:**
 
 ```bash
-source .venv/bin/activate
-make api
+make doctor
+# or: curl -s http://localhost:8000/api/status
 ```
+
+`/api/status` and `/status` show Live vs Redis vs AI-keys-configured vs news feeds. They never print secrets.
+
+Other URLs: News `/news`, Token Studio `/token-studio`, API docs `/docs`, liveness `/health`.
 
 ## Tests
 
@@ -170,6 +159,7 @@ Strong bullish/bearish disagreement can force the final council result to neutra
 ## Main API routes
 
 - `GET /health` — process liveness plus dependency notes (`postgres` is `not_provisioned`)
+- `GET /api/status` — last observed Live/cache/demo path (no CoinGecko call), Redis, Postgres-not-provisioned, AI adapters configured (never keys), news hosts
 - `GET /api/market?limit=50&page=1&sort=market_cap&order=desc` — ranked table; `source`: `coingecko` | `cache` | `demo`; includes `last_live_at`, `as_of`, `stale`, `fallback_reason`
 - `GET /api/market/global` — market cap, 24h volume, BTC/ETH dominance, optional Fear & Greed
 - `GET /api/market/movers?limit=5` — 24h gainers and losers from the ranked universe

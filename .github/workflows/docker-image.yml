@@ -106,6 +106,7 @@ jobs:
           curl -fsS "http://127.0.0.1:8000/api/assets/bitcoin/candles?days=7" > /tmp/candles.json
           curl -fsS "http://127.0.0.1:8000/api/news?limit=3" > /tmp/news.json
           curl -fsS "http://127.0.0.1:8000/api/ai/council/status" > /tmp/council-status.json
+          curl -fsS "http://127.0.0.1:8000/api/status" > /tmp/status.json
           python - <<'PY'
           import json
           from pathlib import Path
@@ -118,6 +119,8 @@ jobs:
           analysis = json.loads(Path('/tmp/analysis.json').read_text())
           candles = json.loads(Path('/tmp/candles.json').read_text())
           council_status = json.loads(Path('/tmp/council-status.json').read_text())
+          stack_status = json.loads(Path('/tmp/status.json').read_text())
+          dumped_status = json.dumps(stack_status).lower()
           assert health.get('status') == 'ok', health
           assert health.get('dependencies', {}).get('postgres') == 'not_provisioned', health
           assert isinstance(market.get('data'), list) and market['data'], market
@@ -143,7 +146,14 @@ jobs:
           assert providers['xai'].get('optional') is True, providers['xai']
           assert providers['xai'].get('configured') is False, providers['xai']
           assert providers['xai'].get('endpoint') == 'https://api.x.ai/v1/chat/completions', providers['xai']
-          print('API, markets, brief, candle and AI Council smoke tests passed')
+          assert stack_status.get('status') == 'ok', stack_status
+          assert stack_status.get('postgres') == 'not_provisioned', stack_status
+          assert stack_status.get('market', {}).get('provider') == 'coingecko', stack_status
+          assert stack_status.get('market', {}).get('observed') is True, stack_status
+          assert stack_status.get('market', {}).get('source') in allowed_sources, stack_status
+          assert 'sk-' not in dumped_status and 'api_key' not in dumped_status, stack_status
+          assert 'not financial advice' in stack_status.get('disclaimer', '').lower(), stack_status
+          print('API, markets, brief, candle, status and AI Council smoke tests passed')
           PY
 
       - name: Smoke test web application
@@ -199,6 +209,10 @@ jobs:
               sleep 2
               continue
             fi
+            if ! grep -q "Vol / Mkt cap" /tmp/bitcoin.html; then
+              sleep 2
+              continue
+            fi
             if ! curl -fsS http://127.0.0.1:3000/token-studio > /tmp/token-studio.html; then
               sleep 2
               continue
@@ -215,7 +229,23 @@ jobs:
               sleep 2
               continue
             fi
-            echo "Web, Chart Lab, Token Studio and News smoke tests passed"
+            if ! curl -fsS http://127.0.0.1:3000/status > /tmp/status.html; then
+              sleep 2
+              continue
+            fi
+            if ! grep -q "STACK STATUS" /tmp/status.html; then
+              sleep 2
+              continue
+            fi
+            if ! grep -q "Not provisioned" /tmp/status.html; then
+              sleep 2
+              continue
+            fi
+            if ! grep -q "does not call CoinGecko" /tmp/status.html && ! grep -q "never stamps the public API" /tmp/status.html; then
+              sleep 2
+              continue
+            fi
+            echo "Web, Chart Lab, Token Studio, News and Status smoke tests passed"
             exit 0
           done
           exit 1
