@@ -136,12 +136,16 @@ nav { min-height: 72px; display: flex; align-items: center; justify-content: spa
   top: var(--site-header-height);
   z-index: 11;
   display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  min-height: 0;
   gap: 6px;
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
   background: rgba(7, 16, 15, .94);
   border: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
   border-radius: 12px;
   padding: 8px;
   margin: 0 0 14px;
