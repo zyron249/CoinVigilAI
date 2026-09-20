@@ -58,7 +58,16 @@ export function LiveBoard({
       setRefreshError(result.error ?? null);
       setMarket(result);
     }
-    if (!silent) setBusy(false);
+    if (!silent) {
+      const [nextOverview, nextMovers] = await Promise.all([
+        getGlobalOverview(),
+        getMovers(5),
+      ]);
+      if (nextOverview.source !== "unavailable") setOverview(nextOverview);
+      if (nextMovers.source !== "unavailable") setMovers(nextMovers);
+      setCheckedAt(new Date().toISOString());
+      setBusy(false);
+    }
   }, []);
 
   useEffect(() => {
