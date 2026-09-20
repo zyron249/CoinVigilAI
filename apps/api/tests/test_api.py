@@ -35,6 +35,7 @@ def test_public_status_has_no_secrets_and_no_postgres():
     assert body["ai"]["configured"] == []
     assert body["ai"]["configured_count"] == 0
     assert isinstance(body["news"]["hosts"], list)
+    assert body["market"]["key_configured"] is False
 
 
 def test_public_status_reports_observed_demo_without_calling_markets(monkeypatch):
@@ -95,7 +96,7 @@ def test_candles_report_snapped_coingecko_days(monkeypatch):
 def test_tickers_endpoint_never_invents_pairs(monkeypatch):
     from app.models import AssetTickers
 
-    async def fake_tickers(coin_id: str, page: int = 1, limit: int = 25, query: str | None = None, min_volume: float | None = None):
+    async def fake_tickers(coin_id: str, page: int = 1, limit: int = 25, **_kwargs):
         return AssetTickers(
             coin_id=coin_id,
             data=[],
@@ -217,3 +218,32 @@ def test_news_configured_empty_explains_failure(monkeypatch):
     assert body["configured"] is True
     assert body["data"] == []
     assert "did not return stories" in body["message"]
+
+
+def test_compare_endpoint_caps_and_never_invents(monkeypatch):
+    from app.models import AssetCompare, MarketAsset
+
+    async def fake_compare(ids: str | None = None):
+        return AssetCompare(
+            ids=["bitcoin", "ethereum", "not-a-real-coin"],
+            data=[
+                MarketAsset(id="bitcoin", symbol="btc", name="Bitcoin", current_price=1),
+                MarketAsset(id="ethereum", symbol="eth", name="Ethereum", current_price=2),
+            ],
+            missing=["not-a-real-coin"],
+            count=2,
+            source="demo",
+            note="Missing ids are omitted rather than invented.",
+        )
+
+    monkeypatch.setattr("app.main.compare_assets", fake_compare)
+    response = client.get("/api/compare?ids=bitcoin,ethereum,not-a-real-coin,dogecoin")
+    assert response.status_code == 200
+    body = response.json()
+    assert [row["id"] for row in body["data"]] == ["bitcoin", "ethereum"]
+    assert body["missing"] == ["not-a-real-coin"]
+    assert "invent" in body["note"].lower()
+    dumped = str(body).lower()
+    assert "api_key" not in dumped
+    assert "coinmarketcap" not in dumped
+

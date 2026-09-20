@@ -203,6 +203,17 @@ export type AssetTickers = {
   venues?: string[];
   query?: string | null;
   min_volume?: number | null;
+  sort?: string;
+  order?: string;
+  source: string;
+  note: string;
+} & Freshness;
+
+export type AssetCompare = {
+  ids: string[];
+  data: MarketAsset[];
+  missing: string[];
+  count: number;
   source: string;
   note: string;
 } & Freshness;
@@ -339,7 +350,7 @@ export async function getAssetTickers(
   coinId: string,
   page = 1,
   limit = 25,
-  extras: { q?: string; minVolume?: number } = {},
+  extras: { q?: string; minVolume?: number; sort?: string; order?: string } = {},
 ): Promise<AssetTickers> {
   const empty: AssetTickers = {
     coin_id: coinId,
@@ -352,6 +363,8 @@ export async function getAssetTickers(
     venues: [],
     query: extras.q || null,
     min_volume: extras.minVolume ?? null,
+    sort: extras.sort || "volume",
+    order: extras.order || "desc",
     source: "unavailable",
     note: "Exchange listings are unavailable. CoinVigil does not scrape venues or invent pairs.",
     last_live_at: null,
@@ -363,6 +376,8 @@ export async function getAssetTickers(
     const search = new URLSearchParams({ page: String(page), limit: String(limit) });
     if (extras.q) search.set("q", extras.q);
     if (extras.minVolume && extras.minVolume > 0) search.set("min_volume", String(extras.minVolume));
+    if (extras.sort) search.set("sort", extras.sort);
+    if (extras.order) search.set("order", extras.order);
     const response = await request(`/api/assets/${encodeURIComponent(coinId)}/tickers?${search}`);
     if (!response.ok) return empty;
     const json = await response.json();
@@ -377,6 +392,41 @@ export async function getAssetTickers(
       venues: Array.isArray(json.venues) ? json.venues : [],
       query: json.query ?? extras.q ?? null,
       min_volume: json.min_volume ?? extras.minVolume ?? null,
+      sort: json.sort ?? extras.sort ?? "volume",
+      order: json.order ?? extras.order ?? "desc",
+      source: MARKET_SOURCES.has(json.source) ? json.source : "unavailable",
+      note: json.note ?? empty.note,
+      ...freshnessFrom(json),
+    };
+  } catch {
+    return empty;
+  }
+}
+
+export async function getCompare(ids: string): Promise<AssetCompare> {
+  const empty: AssetCompare = {
+    ids: ids.split(",").map((item) => item.trim().toLowerCase()).filter(Boolean).slice(0, 3),
+    data: [],
+    missing: [],
+    count: 0,
+    source: "unavailable",
+    note: "Compare is unavailable. CoinVigil does not invent assets to fill empty columns.",
+    last_live_at: null,
+    as_of: null,
+    stale: false,
+    fallback_reason: "unreachable",
+  };
+  try {
+    const search = new URLSearchParams();
+    if (ids.trim()) search.set("ids", ids.trim());
+    const response = await request(`/api/compare?${search}`);
+    if (!response.ok) return empty;
+    const json = await response.json();
+    return {
+      ids: Array.isArray(json.ids) ? json.ids : empty.ids,
+      data: Array.isArray(json.data) ? json.data : [],
+      missing: Array.isArray(json.missing) ? json.missing : [],
+      count: json.count ?? 0,
       source: MARKET_SOURCES.has(json.source) ? json.source : "unavailable",
       note: json.note ?? empty.note,
       ...freshnessFrom(json),
@@ -465,6 +515,7 @@ export type StackStatus = {
     last_live_at?: string | null;
     fallback_reason?: string | null;
     observed?: boolean;
+    key_configured?: boolean;
   };
   postgres?: string;
   news?: { feeds: number; hosts: string[]; using_defaults: boolean };

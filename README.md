@@ -127,7 +127,21 @@ COINGECKO_BASE_URL=https://api.coingecko.com/api/v3
 COINGECKO_API_KEY=
 ```
 
-`COINGECKO_API_KEY` is optional but recommended. With a Demo/Pro key the dashboard can load 1h/24h/7d changes, circulating supply, 7d sparklines, and CoinGecko `/global` without tripping the public rate limit. Every payload includes `source`: `coingecko` | `cache` | `demo`, plus `last_live_at`, `as_of`, `stale`, and `fallback_reason` (`rate_limited` or `unreachable`). A 6-hour last-live snapshot is reused before the labeled demo fallback. Demo numbers are synthetic stand-ins and are labeled as such. The Markets page polls every 30s and pauses while the tab is hidden.
+`COINGECKO_API_KEY` is optional but recommended. With a Demo or Pro key the dashboard can load 1h/24h/7d changes, circulating supply, 7d sparklines, and CoinGecko `/global` without tripping the public pool. Every payload includes `source`: `coingecko` | `cache` | `demo`, plus `last_live_at`, `as_of`, `stale`, and `fallback_reason` (`rate_limited` or `unreachable`). A 6-hour last-live snapshot is reused before the labeled demo fallback. Demo numbers are synthetic stand-ins and are labeled as such. The Markets page polls every 30s and pauses while the tab is hidden.
+
+#### Raising CoinGecko rate limits
+
+CoinGecko's keyless public pool is roughly 10–30 calls/minute. CoinVigil already retries 429/5xx up to three times with a **capped** delay so asset pages stay snappy, then continues later universe pages when one page fails (`partial: true`). Redis plus a 20s in-process universe cache absorb dashboard polling.
+
+To raise the ceiling:
+
+1. Create a CoinGecko account and a **Demo** API key (free) from [CoinGecko API pricing](https://www.coingecko.com/en/api/pricing). CoinVigil does not require a paid plan.
+2. Set `COINGECKO_API_KEY` in `.env` and restart the API. CoinVigil sends `x-cg-demo-api-key` unless `COINGECKO_BASE_URL` contains `pro-api.coingecko.com`, in which case it sends `x-cg-pro-api-key`.
+3. Confirm on `/status` and `GET /api/status`: `market.key_configured` is true or false. The key value is never returned. Status does not call CoinGecko.
+4. Optional Analyst/Pro: point `COINGECKO_BASE_URL=https://pro-api.coingecko.com/api/v3` and keep the same env var. CoinVigil does not document paid quotas — use CoinGecko's own pricing page.
+5. Keep Redis up (`MARKET_CACHE_TTL_SECONDS`, default 30) so the 30s client poll reuses the snapshot instead of stampeding.
+
+If you still see `fallback_reason: rate_limited` and a labeled Demo snapshot, the key is missing, invalid, or the plan is exhausted. CoinVigil will not scrape exchanges or invent pairs to fill the gap. `make doctor` prints `/api/status` once the API is running.
 
 Optional Fear & Greed is fetched from Alternative.me when `FEAR_GREED_URL` is set. If that request fails, the index is omitted — it is never invented.
 
@@ -160,7 +174,8 @@ Strong bullish/bearish disagreement can force the final council result to neutra
 - `GET /health` — process liveness plus dependency notes (`postgres` is `not_provisioned`)
 - `GET /api/status` — last observed Live/cache/demo path (no CoinGecko call), Redis, Postgres-not-provisioned, AI adapters configured (never keys), news hosts
 - `GET /api/market?limit=50&page=1&sort=market_cap&order=desc&q=` — ranked CoinGecko-tracked snapshot (paginated `/coins/markets`, up to 1,000 by market cap, not every coin worldwide); `partial` is true when later pages were rate-limited; `source`: `coingecko` | `cache` | `demo`
-- `GET /api/assets/{coin_id}/tickers` — CoinGecko exchange pairs (volume-sorted). Optional `q` (venue/pair) and `min_volume`. Empty rather than invented when unavailable.
+- `GET /api/assets/{coin_id}/tickers` — CoinGecko exchange pairs. Optional `q`, `min_volume`, `sort` (`volume|price|spread|exchange|pair|trust`), `order`. Empty rather than invented when unavailable. Shareable on `/asset/{id}?q=&min_volume=&sort=&order=&page=`.
+- `GET /api/compare?ids=bitcoin,ethereum` — up to 3 CoinGecko-tracked assets side-by-side. Missing ids are listed, never invented.
 - `GET /api/ai/council/status`
 - `GET /api/radar`
 - `GET /api/news`
@@ -185,7 +200,7 @@ Pushes and pull requests against `main` run API unit tests (including mocked xAI
 ## Operational notes
 
 - Enabling many AI providers increases cost. Latency is usually the slowest configured provider, up to `AI_REQUEST_TIMEOUT_SECONDS`.
-- CoinGecko's keyless pool is roughly 10–30 calls/minute. Prefer `COINGECKO_API_KEY` and keep Redis up so the dashboard does not stampede the public API. Client refresh reuses the 20s in-process universe cache.
+- CoinGecko's keyless pool is roughly 10–30 calls/minute. Prefer `COINGECKO_API_KEY` (see “Raising CoinGecko rate limits” above) and keep Redis up so the dashboard does not stampede the public API. Client refresh reuses the 20s in-process universe cache. `/status` reports `key_configured` without revealing the secret.
 - CORS defaults to localhost. Set `CORS_ALLOW_ORIGINS` before exposing the API.
 
 ## Product direction

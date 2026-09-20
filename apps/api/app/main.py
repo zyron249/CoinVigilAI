@@ -2,7 +2,7 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
-from app.models import AssetAnalysis, AssetTickers, GlobalOverview, MarketBrief, MarketMovers, RadarSignal, RankedMarkets
+from app.models import AssetAnalysis, AssetCompare, AssetTickers, GlobalOverview, MarketBrief, MarketMovers, RadarSignal, RankedMarkets
 from app.services.ai import deterministic_view, provider_status, run_ai_council
 from app.services.brief import build_market_brief
 from app.services.cache import redis_status
@@ -14,6 +14,7 @@ from app.services.market import (
     get_movers,
     get_ranked_markets,
     get_asset_tickers,
+    compare_assets,
     peek_universe_status,
     snap_ohlc_days,
 )
@@ -74,6 +75,7 @@ async def public_status():
             "last_live_at": observed["last_live_at"],
             "fallback_reason": observed["fallback_reason"],
             "observed": observed["observed"],
+            "key_configured": bool(settings.coingecko_api_key.strip()),
         },
         "postgres": "not_provisioned",
         "news": {
@@ -149,8 +151,17 @@ async def asset_tickers(
     page: int = Query(1, ge=1, le=20),
     q: str | None = Query(None, max_length=80),
     min_volume: float | None = Query(None, ge=0),
+    sort: str = Query("volume", max_length=16),
+    order: str = Query("desc", max_length=4),
 ):
-    return await get_asset_tickers(coin_id, page=page, limit=limit, query=q, min_volume=min_volume)
+    return await get_asset_tickers(
+        coin_id, page=page, limit=limit, query=q, min_volume=min_volume, sort=sort, order=order
+    )
+
+
+@app.get("/api/compare", response_model=AssetCompare)
+async def compare(ids: str = Query("", max_length=160)):
+    return await compare_assets(ids)
 
 
 @app.get("/api/assets/{coin_id}/analysis", response_model=AssetAnalysis)

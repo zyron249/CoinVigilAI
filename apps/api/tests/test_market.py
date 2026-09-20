@@ -743,3 +743,113 @@ async def test_global_rate_limit_uses_last_good(monkeypatch):
     assert overview.last_live_at == "2026-09-20T02:30:00Z"
     assert overview.total_market_cap_usd == 9
     assert overview.fear_greed_value is None
+
+
+def test_parse_compare_ids_caps_three_and_dedupes():
+    from app.services.market import parse_compare_ids
+    assert parse_compare_ids("") == []
+    assert parse_compare_ids("Bitcoin, bitcoin, ETHEREUM; solana, dogecoin") == ["bitcoin", "ethereum", "solana"]
+
+
+def test_sort_tickers_trust_price_and_missing_last():
+    from app.models import ExchangeTicker
+    from app.services.market import sort_tickers
+
+    rows = [
+        ExchangeTicker(exchange="Kraken", pair="BTC/USD", base="BTC", target="USD", volume_usd=100, price_usd=10, trust_score="red", bid_ask_spread_percentage=None),
+        ExchangeTicker(exchange="Binance", pair="BTC/USDT", base="BTC", target="USDT", volume_usd=900, price_usd=12, trust_score="green", bid_ask_spread_percentage=0.02),
+        ExchangeTicker(exchange="Coinbase", pair="BTC/USD", base="BTC", target="USD", volume_usd=400, price_usd=11, trust_score="yellow", bid_ask_spread_percentage=0.08),
+        ExchangeTicker(exchange="Unknown", pair="BTC/EUR", base="BTC", target="EUR", volume_usd=50, price_usd=None, trust_score=None, bid_ask_spread_percentage=0.01),
+    ]
+    by_trust = sort_tickers(rows, "trust", "desc")
+    assert [row.exchange for row in by_trust] == ["Binance", "Coinbase", "Kraken", "Unknown"]
+    by_spread = sort_tickers(rows, "spread", "asc")
+    assert by_spread[0].exchange == "Unknown"
+    assert by_spread[-1].exchange == "Kraken"
+    by_exchange = sort_tickers(rows, "exchange", "asc")
+    assert [row.exchange for row in by_exchange] == ["Binance", "Coinbase", "Kraken", "Unknown"]
+    by_volume = sort_tickers(rows, "bogus", "desc")
+    assert by_volume[0].exchange == "Binance"
+
+
+@pytest.mark.asyncio
+async def test_tickers_honor_sort_query_params(monkeypatch):
+    from app.services.market import get_asset_tickers
+
+    class _TickerClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            return False
+
+        async def get(self, url, params=None):
+            request = httpx.Request("GET", str(url))
+            return httpx.Response(200, json={
+                "tickers": [
+                    {
+                        "base": "BTC",
+                        "target": "USD",
+                        "market": {"name": "Coinbase Exchange", "identifier": "gdax"},
+                        "converted_last": {"usd": 63900},
+                        "converted_volume": {"usd": 100},
+                        "trust_score": "yellow",
+                        "bid_ask_spread_percentage": 0.05,
+                    },
+                    {
+                        "base": "BTC",
+                        "target": "USDT",
+                        "market": {"name": "Binance", "identifier": "binance"},
+                        "converted_last": {"usd": 64000},
+                        "converted_volume": {"usd": 900},
+                        "trust_score": "green",
+                        "bid_ask_spread_percentage": 0.01,
+                    },
+                ]
+            }, request=request)
+
+    monkeypatch.setattr("app.services.market.httpx.AsyncClient", _TickerClient)
+    monkeypatch.setattr("app.services.market.cache_get", _noop_cache_get)
+    monkeypatch.setattr("app.services.market.cache_set", _noop_cache_set)
+    by_exchange = await get_asset_tickers("bitcoin", page=1, limit=25, sort="exchange", order="asc")
+    assert [row.exchange for row in by_exchange.data] == ["Binance", "Coinbase Exchange"]
+    assert by_exchange.sort == "exchange"
+    assert by_exchange.order == "asc"
+    by_trust = await get_asset_tickers("bitcoin", page=1, limit=25, sort="trust", order="desc")
+    assert by_trust.data[0].exchange == "Binance"
+
+
+@pytest.mark.asyncio
+async def test_compare_never_invents_missing_and_skips_demo_mix(monkeypatch):
+    from app.services.market import UniverseSnapshot, compare_assets, market_asset_from_payload
+
+    async def fake_universe():
+        return UniverseSnapshot(
+            assets=[
+                market_asset_from_payload(_market_stub("bitcoin", 1)),
+                market_asset_from_payload(_market_stub("ethereum", 2)),
+            ],
+            source="coingecko",
+            last_live_at="2026-09-20T00:00:00Z",
+        )
+
+    async def fake_lookup(coin_id: str):
+        if coin_id == "solana":
+            return market_asset_from_payload(_market_stub("solana", 3)), "demo"
+        return None, "unavailable"
+
+    monkeypatch.setattr("app.services.market.get_universe_snapshot", fake_universe)
+    monkeypatch.setattr("app.services.market.get_asset_with_source", fake_lookup)
+    page = await compare_assets("bitcoin,ethereum,solana,not-a-real-coin")
+    assert page.ids == ["bitcoin", "ethereum", "solana"]
+    assert [asset.id for asset in page.data] == ["bitcoin", "ethereum"]
+    assert page.missing == ["solana"]
+    assert "invent" in page.note.lower()
+    empty = await compare_assets("")
+    assert empty.data == []
+    assert empty.missing == []
+    assert "invent" in empty.note.lower()
+

@@ -176,8 +176,23 @@ class AssetTickers(BaseModel):
     venues: list[str] = Field(default_factory=list)
     query: str | None = None
     min_volume: float | None = None
+    sort: str = "volume"
+    order: str = "desc"
     source: str
     coverage: str = "coingecko_tickers"
+    note: str
+    last_live_at: str | None = None
+    as_of: str | None = None
+    stale: bool = False
+    fallback_reason: str | None = None
+
+
+class AssetCompare(BaseModel):
+    ids: list[str] = Field(default_factory=list)
+    data: list[MarketAsset] = Field(default_factory=list)
+    missing: list[str] = Field(default_factory=list)
+    count: int = 0
+    source: str
     note: str
     last_live_at: str | None = None
     as_of: str | None = None

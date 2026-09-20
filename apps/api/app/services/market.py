@@ -9,7 +9,7 @@ from typing import Any
 import httpx
 
 from app.config import get_settings
-from app.models import AssetTickers, Candle, ExchangeTicker, GlobalOverview, MarketAsset, MarketMovers, RankedMarkets
+from app.models import AssetCompare, AssetTickers, Candle, ExchangeTicker, GlobalOverview, MarketAsset, MarketMovers, RankedMarkets
 from app.services.cache import cache_get, cache_set
 
 logger = logging.getLogger(__name__)
@@ -46,6 +46,9 @@ SORT_FIELDS = {
     "change_24h": "price_change_percentage_24h",
     "change_7d": "price_change_percentage_7d",
 }
+TICKER_SORT_FIELDS = ("volume", "price", "spread", "exchange", "pair", "trust")
+TRUST_RANK = {"green": 3, "yellow": 2, "red": 1}
+COMPARE_LIMIT = 3
 NUMERIC_SORTS = {
     "rank",
     "market_cap",
@@ -255,6 +258,57 @@ def normalize_sort(sort: str | None) -> str:
 def normalize_order(order: str | None) -> str:
     value = (order or "desc").strip().lower()
     return value if value in {"asc", "desc"} else "desc"
+
+
+def normalize_ticker_sort(sort: str | None) -> str:
+    key = (sort or "volume").strip().lower()
+    return key if key in TICKER_SORT_FIELDS else "volume"
+
+
+def parse_compare_ids(raw: str | None) -> list[str]:
+    seen: set[str] = set()
+    ids: list[str] = []
+    blob = (raw or "").replace(";", ",")
+    for token in blob.split(","):
+        needle = token.strip().lower()
+        if not needle or needle in seen:
+            continue
+        seen.add(needle)
+        ids.append(needle)
+        if len(ids) >= COMPARE_LIMIT:
+            break
+    return ids
+
+
+def sort_tickers(rows: list[ExchangeTicker], sort: str | None, order: str | None) -> list[ExchangeTicker]:
+    """Stable local sort. Unscored/missing numeric fields always sort last."""
+    sort_key = normalize_ticker_sort(sort)
+    descending = normalize_order(order) == "desc"
+
+    if sort_key in {"exchange", "pair"}:
+        def label_key(ticker: ExchangeTicker) -> tuple[str, str]:
+            if sort_key == "exchange":
+                return (ticker.exchange.lower(), ticker.pair.lower())
+            return (ticker.pair.lower(), ticker.exchange.lower())
+        return sorted(rows, key=label_key, reverse=descending)
+
+    def decorated(ticker: ExchangeTicker) -> tuple:
+        if sort_key == "trust":
+            score = (ticker.trust_score or "").lower()
+            missing = score not in TRUST_RANK
+            rank = TRUST_RANK.get(score, 0)
+            return (missing, -rank if descending else rank, ticker.exchange.lower())
+        if sort_key == "price":
+            value = ticker.price_usd if ticker.price_usd is not None else ticker.last_price
+        elif sort_key == "spread":
+            value = ticker.bid_ask_spread_percentage
+        else:
+            value = ticker.volume_usd
+        missing = value is None
+        numeric = 0.0 if missing else float(value)
+        return (missing, -numeric if descending else numeric, ticker.exchange.lower())
+
+    return sorted(rows, key=decorated)
 
 
 def _headers() -> dict[str, str]:
@@ -972,7 +1026,18 @@ def ticker_from_payload(item: dict[str, Any]) -> ExchangeTicker | None:
     )
 
 
-def _empty_tickers(coin_id: str, page: int, limit: int, source: str, reason: str | None) -> AssetTickers:
+def _empty_tickers(
+    coin_id: str,
+    page: int,
+    limit: int,
+    source: str,
+    reason: str | None,
+    *,
+    query: str | None = None,
+    min_volume: float | None = None,
+    sort: str = "volume",
+    order: str = "desc",
+) -> AssetTickers:
     note = (
         "CoinGecko returned no tickers for this asset. CoinVigil does not scrape exchange websites or invent pairs."
         if source != "demo"
@@ -989,6 +1054,10 @@ def _empty_tickers(coin_id: str, page: int, limit: int, source: str, reason: str
         total=0,
         unique_exchange_count=0,
         venues=[],
+        query=(query or "").strip() or None,
+        min_volume=min_volume if min_volume and min_volume > 0 else None,
+        sort=normalize_ticker_sort(sort),
+        order=normalize_order(order),
         source=source,
         note=note,
         stale=source == "cache",
@@ -1051,13 +1120,23 @@ async def get_asset_tickers(
     limit: int = 25,
     query: str | None = None,
     min_volume: float | None = None,
+    sort: str | None = None,
+    order: str | None = None,
 ) -> AssetTickers:
     """CoinGecko coin tickers. Never invents exchange pairs."""
     needle = coin_id.strip().lower()
     bounded_limit = max(5, min(int(limit), 100))
     bounded_page = max(1, min(int(page), 20))
+    sort_key = normalize_ticker_sort(sort)
+    order_key = normalize_order(order)
+    empty_kwargs = {
+        "query": query,
+        "min_volume": min_volume,
+        "sort": sort_key,
+        "order": order_key,
+    }
     if not needle:
-        return _empty_tickers("unknown", bounded_page, bounded_limit, "unavailable", "unreachable")
+        return _empty_tickers("unknown", bounded_page, bounded_limit, "unavailable", "unreachable", **empty_kwargs)
 
     settings = get_settings()
     cache_key = f"tickers:v2:{needle}"
@@ -1107,12 +1186,13 @@ async def get_asset_tickers(
                 stale = True
                 last_live_at = last_good.get("last_live_at")
             else:
-                return _empty_tickers(needle, bounded_page, bounded_limit, "demo" if reason else "unavailable", reason)
+                return _empty_tickers(
+                    needle, bounded_page, bounded_limit, "demo" if reason else "unavailable", reason, **empty_kwargs
+                )
 
     rows = rows or []
-    ranked = sorted(rows, key=lambda ticker: ticker.volume_usd or 0, reverse=True)
     needle_q = (query or "").strip().lower()
-    filtered = ranked
+    filtered = rows
     if needle_q:
         filtered = [
             ticker
@@ -1123,11 +1203,21 @@ async def get_asset_tickers(
         ]
     if min_volume is not None and min_volume > 0:
         filtered = [ticker for ticker in filtered if (ticker.volume_usd or 0) >= min_volume]
-    page_rows = _slice_page(filtered, bounded_page, bounded_limit)
-    unique_count, venues = _venue_summary(filtered)
+    ranked = sort_tickers(filtered, sort_key, order_key)
+    page_rows = _slice_page(ranked, bounded_page, bounded_limit)
+    unique_count, venues = _venue_summary(ranked)
+    sort_labels = {
+        "volume": "reported USD volume",
+        "price": "last USD price",
+        "spread": "bid-ask spread",
+        "exchange": "exchange name",
+        "pair": "trading pair",
+        "trust": "CoinGecko trust score (green, yellow, red, then unscored)",
+    }
     note = (
-        f"CoinGecko ticker snapshot ({len(ranked)} pairs across {_venue_summary(ranked)[0]} venues "
-        f"from up to {TICKER_SOURCE_PAGES} CoinGecko pages), sorted by reported USD volume. "
+        f"CoinGecko ticker snapshot ({len(rows)} pairs across {_venue_summary(rows)[0]} venues "
+        f"from up to {TICKER_SOURCE_PAGES} CoinGecko pages), sorted by {sort_labels.get(sort_key, sort_key)} "
+        f"({order_key}). "
         "Reported volume can be inflated on some venues; trust scores are CoinGecko's when present. "
         "Not every venue worldwide, and CoinVigil does not scrape exchanges."
     )
@@ -1136,15 +1226,17 @@ async def get_asset_tickers(
             f"{note} Filter: "
             + ", ".join(
                 part for part in (
-                    f"venue/pair contains “{query.strip()}”" if needle_q else "",
+                    f"venue/pair contains “{(query or '').strip()}”" if needle_q else "",
                     f"min 24h volume ${min_volume:,.0f}" if min_volume and min_volume > 0 else "",
                 ) if part
             )
             + "."
         )
+    if not rows:
+        return _empty_tickers(
+            needle, bounded_page, bounded_limit, source if source in VALID_SOURCES else "unavailable", reason, **empty_kwargs
+        )
     if not ranked:
-        return _empty_tickers(needle, bounded_page, bounded_limit, source if source in VALID_SOURCES else "unavailable", reason)
-    if not filtered:
         return AssetTickers(
             coin_id=needle,
             data=[],
@@ -1156,6 +1248,8 @@ async def get_asset_tickers(
             venues=[],
             query=(query or "").strip() or None,
             min_volume=min_volume if min_volume and min_volume > 0 else None,
+            sort=sort_key,
+            order=order_key,
             source=source if source in VALID_SOURCES else "cache",
             note="No CoinGecko tickers match this venue/volume filter. CoinVigil does not invent pairs.",
             last_live_at=last_live_at,
@@ -1169,15 +1263,66 @@ async def get_asset_tickers(
         count=len(page_rows),
         page=bounded_page,
         limit=bounded_limit,
-        total=len(filtered),
+        total=len(ranked),
         unique_exchange_count=unique_count,
         venues=venues,
         query=(query or "").strip() or None,
         min_volume=min_volume if min_volume and min_volume > 0 else None,
+        sort=sort_key,
+        order=order_key,
         source=source if source in VALID_SOURCES else "cache",
         note=note,
         last_live_at=last_live_at,
         as_of=last_live_at if stale else _now_iso(),
         stale=stale,
         fallback_reason=reason,
+    )
+
+
+def _pick_compared_asset(assets: list[MarketAsset], needle: str) -> MarketAsset | None:
+    for asset in assets:
+        if asset.id.lower() == needle:
+            return asset
+    for asset in assets:
+        if asset.symbol.lower() == needle:
+            return asset
+    return None
+
+
+async def compare_assets(ids: str | None) -> AssetCompare:
+    """Side-by-side snapshot of up to 3 CoinGecko-tracked assets. Never invents missing coins."""
+    requested = parse_compare_ids(ids)
+    snapshot = await get_universe_snapshot()
+    found: list[MarketAsset] = []
+    missing: list[str] = []
+    for needle in requested:
+        match = _pick_compared_asset(snapshot.assets, needle)
+        if match:
+            found.append(match)
+            continue
+        asset, lookup_source = await get_asset_with_source(needle)
+        if asset and (lookup_source != "demo" or snapshot.source == "demo"):
+            found.append(asset)
+        else:
+            missing.append(needle)
+    if not requested:
+        note = (
+            "Pick 2–3 CoinGecko ids (for example bitcoin,ethereum). "
+            "CoinVigil does not invent assets to fill empty columns."
+        )
+    else:
+        note = (
+            f"Side-by-side from the CoinGecko-tracked snapshot ({len(snapshot.assets)} assets). "
+            "Missing ids are omitted rather than invented."
+        )
+        if missing:
+            note = f"{note} Not in this snapshot: {', '.join(missing)}."
+    return AssetCompare(
+        ids=requested,
+        data=found,
+        missing=missing,
+        count=len(found),
+        source=snapshot.source if snapshot.source in VALID_SOURCES else "unavailable",
+        note=note,
+        **_freshness_fields(snapshot),
     )

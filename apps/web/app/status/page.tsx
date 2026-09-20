@@ -15,7 +15,7 @@ export default async function StatusPage() {
         <div className="eyebrow hero-tag">STACK STATUS</div>
         <h1>What this instance is actually running.</h1>
         <p>
-          No API keys are shown here. Redis and AI adapters are labeled configured or not.
+          No API keys are shown here. Redis, the CoinGecko key, and AI adapters are labeled configured or not.
           Market data is CoinGecko — never CoinMarketCap. Informational only, not financial advice.
         </p>
       </section>
@@ -32,6 +32,10 @@ export default async function StatusPage() {
             {observed
               ? `Last observed CoinGecko path${fallback ? ` (${fallback})` : ""}. This page does not call CoinGecko.`
               : "Open Markets to fetch. Status never stamps the public API."}
+            {" "}
+            {status.market?.key_configured
+              ? "A CoinGecko key is configured (value never shown)."
+              : "No CoinGecko key — public rate limits apply. See the README runbook."}
           </em>
         </article>
         <article className="card status-card">
