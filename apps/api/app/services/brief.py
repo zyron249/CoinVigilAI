@@ -23,6 +23,12 @@ def _pct(value: float | None) -> str:
     return f"{value:+.2f}%"
 
 
+def _dom(value: float | None) -> str:
+    if value is None:
+        return "n/a"
+    return f"{value:.1f}%"
+
+
 def _compact(value: float | None) -> str:
     if value is None:
         return "n/a"
@@ -119,8 +125,8 @@ def heuristic_market_brief(facts: dict[str, Any], data_source: str) -> MarketBri
     bullets = [
         f"Market cap { _compact(global_blob.get('total_market_cap_usd')) } "
         f"({_pct(mcap_change)} 24h) · 24h volume {_compact(global_blob.get('total_volume_24h_usd'))}.",
-        f"BTC dominance {global_blob.get('btc_dominance') if global_blob.get('btc_dominance') is not None else 'n/a'}% · "
-        f"ETH {global_blob.get('eth_dominance') if global_blob.get('eth_dominance') is not None else 'n/a'}%.",
+        f"BTC dominance {_dom(global_blob.get('btc_dominance'))} · "
+        f"ETH {_dom(global_blob.get('eth_dominance'))}.",
         f"24h breadth: {advancing} advancing / {int(breadth.get('declining') or 0)} declining of {tracked} assets with a change print.",
     ]
     if top_gainer:
