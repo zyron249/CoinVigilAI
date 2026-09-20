@@ -36,6 +36,10 @@ class RankedMarkets(BaseModel):
     source: str
     universe_size: int
     coverage: str = "universe"
+    last_live_at: str | None = None
+    as_of: str | None = None
+    stale: bool = False
+    fallback_reason: str | None = None
 
 
 class GlobalOverview(BaseModel):
@@ -52,6 +56,10 @@ class GlobalOverview(BaseModel):
     coverage: str
     note: str | None = None
     updated_at: int | None = None
+    last_live_at: str | None = None
+    as_of: str | None = None
+    stale: bool = False
+    fallback_reason: str | None = None
 
 
 class MarketMovers(BaseModel):
@@ -59,6 +67,10 @@ class MarketMovers(BaseModel):
     losers: list[MarketAsset]
     count: int
     source: str
+    last_live_at: str | None = None
+    as_of: str | None = None
+    stale: bool = False
+    fallback_reason: str | None = None
 
 
 class MarketBrief(BaseModel):

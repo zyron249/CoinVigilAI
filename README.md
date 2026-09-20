@@ -11,13 +11,13 @@ It is an informational research tool, not a production trading desk and not fina
 - Asset pages with CMC-like stats (1h/24h/7d, circulating supply, 24h range) plus AI analysis
 - Heuristic analysis and market brief when no AI keys are configured
 - Parallel AI Council adapters (including optional xAI Grok) when you add provider keys
-- Redis used as a short TTL cache for CoinGecko payloads (optional; API runs without it)
-- Docker Compose for API + web + PostgreSQL + Redis
+- Redis used as a short TTL cache plus a 6-hour last-live snapshot when CoinGecko rate-limits
+- Docker Compose for API + web + Redis (Postgres is not started and is not used)
 - GitHub Actions: unit tests, contract tests, image builds, and stack smoke tests
 
 ## What is not done yet
 
-- PostgreSQL is started by Compose but **not used by the API**. It is reserved for later persistence.
+- PostgreSQL is **not provisioned**. `/health` reports `postgres: not_provisioned`. Do not expect watchlists or user accounts.
 - There is no user accounts, alerts, WebSocket feed, or production deploy config.
 - Token factory contracts are **unaudited**. Token Studio stays disabled until you deploy a factory and set `NEXT_PUBLIC_FACTORY_*`.
 - Public CoinGecko is rate-limited. Without a key the API may show a labeled **demo snapshot** of a small BTC/ETH/SOL-led universe.
@@ -41,7 +41,7 @@ News/RSS (optional) ────────────────────
                                                     |
                                          Token Studio (wallet-signed)
 
-PostgreSQL is provisioned but unused. Redis is optional cache only.
+Postgres is not in the stack. Redis is optional cache + last-live snapshot only.
 ```
 
 ## Quick start (Docker)
@@ -72,7 +72,7 @@ make up
 
 ## Local run without Docker
 
-Redis and Postgres are optional for local API work. If Redis is missing, market calls skip the cache.
+Redis is optional for local API work. If Redis is missing, market calls skip the short cache and keep an in-process last-live snapshot for the life of the process.
 
 ```bash
 make setup
@@ -138,7 +138,7 @@ COINGECKO_BASE_URL=https://api.coingecko.com/api/v3
 COINGECKO_API_KEY=
 ```
 
-`COINGECKO_API_KEY` is optional but recommended. With a Demo/Pro key the dashboard can load 1h/24h/7d changes, circulating supply, 7d sparklines, and CoinGecko `/global` without tripping the public rate limit. Every payload includes `source`: `coingecko` | `cache` | `demo`. Demo numbers are synthetic stand-ins and are labeled as such.
+`COINGECKO_API_KEY` is optional but recommended. With a Demo/Pro key the dashboard can load 1h/24h/7d changes, circulating supply, 7d sparklines, and CoinGecko `/global` without tripping the public rate limit. Every payload includes `source`: `coingecko` | `cache` | `demo`, plus `last_live_at`, `as_of`, `stale`, and `fallback_reason` (`rate_limited` or `unreachable`). A 6-hour last-live snapshot is reused before the labeled demo fallback. Demo numbers are synthetic stand-ins and are labeled as such. The Markets page polls every 30s and pauses while the tab is hidden.
 
 Optional Fear & Greed is fetched from Alternative.me when `FEAR_GREED_URL` is set. If that request fails, the index is omitted — it is never invented.
 
@@ -168,8 +168,8 @@ Strong bullish/bearish disagreement can force the final council result to neutra
 
 ## Main API routes
 
-- `GET /health` — process liveness plus dependency notes (`postgres` is `reserved_unused`)
-- `GET /api/market?limit=50&page=1&sort=market_cap&order=desc` — ranked table; `source`: `coingecko` | `cache` | `demo`
+- `GET /health` — process liveness plus dependency notes (`postgres` is `not_provisioned`)
+- `GET /api/market?limit=50&page=1&sort=market_cap&order=desc` — ranked table; `source`: `coingecko` | `cache` | `demo`; includes `last_live_at`, `as_of`, `stale`, `fallback_reason`
 - `GET /api/market/global` — market cap, 24h volume, BTC/ETH dominance, optional Fear & Greed
 - `GET /api/market/movers?limit=5` — 24h gainers and losers from the ranked universe
 - `GET /api/market/brief` — optional AI Market Brief (council/Grok or heuristic fallback)
@@ -199,13 +199,13 @@ Pushes and pull requests against `main` run API unit tests (including mocked xAI
 ## Operational notes
 
 - Enabling many AI providers increases cost. Latency is usually the slowest configured provider, up to `AI_REQUEST_TIMEOUT_SECONDS`.
-- CoinGecko's keyless pool is roughly 10–30 calls/minute. Prefer `COINGECKO_API_KEY` and keep Redis up so the dashboard does not stampede the public API.
+- CoinGecko's keyless pool is roughly 10–30 calls/minute. Prefer `COINGECKO_API_KEY` and keep Redis up so the dashboard does not stampede the public API. Client refresh reuses the 20s in-process universe cache.
 - CORS defaults to localhost. Set `CORS_ALLOW_ORIGINS` before exposing the API.
 
 ## Product direction
 
 1. Exchange WebSocket ingestion
-2. Persist snapshots in PostgreSQL / TimescaleDB
+2. Optional persistence (watchlists / snapshot history) if a database is actually wired
 3. On-chain and whale intelligence
 4. User accounts, watchlists, and alerts
 5. Model evaluation and provider routing

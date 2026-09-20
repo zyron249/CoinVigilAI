@@ -12,7 +12,10 @@ export function Radar({ signals }: { signals: RadarSignal[] }) {
       </div>
       <div className="radar-list">
         {signals.length === 0 ? (
-          <div className="empty">No elevated 24h moves or risk flags in this snapshot.</div>
+          <div className="empty empty-panel">
+            <strong>No radar flags</strong>
+            <p>No elevated 24h moves or risk flags in this snapshot. Quiet markets stay blank instead of being padded.</p>
+          </div>
         ) : signals.slice(0, 6).map((signal) => (
           <Link className="radar-item" key={`${signal.asset_id}-${signal.signal}`} href={`/asset/${signal.asset_id}`}>
             <div>
