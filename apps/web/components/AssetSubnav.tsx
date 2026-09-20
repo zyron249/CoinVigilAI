@@ -24,13 +24,18 @@ export function AssetSubnav({ compareHref }: { compareHref: string }) {
     const observed = new Map<string, IntersectionObserverEntry>();
     const observer = new IntersectionObserver(
       (entries) => {
+        const hash = window.location.hash.replace(/^#/, "");
+        if (SECTIONS.some((item) => item.id === hash)) {
+          setActive(hash);
+          return;
+        }
         for (const entry of entries) observed.set(entry.target.id, entry);
         const visible = SECTIONS
           .map((item) => observed.get(item.id))
           .filter((entry): entry is IntersectionObserverEntry => Boolean(entry?.isIntersecting));
         if (visible[0]) setActive(visible[0].target.id);
       },
-      { rootMargin: "-140px 0px -55% 0px", threshold: [0, 0.15, 0.4] },
+      { rootMargin: "-160px 0px -60% 0px", threshold: [0, 0.15, 0.4] },
     );
 
     function observeMounted() {
