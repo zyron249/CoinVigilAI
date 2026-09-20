@@ -47,6 +47,21 @@ def test_heuristic_brief_does_not_claim_coingecko_when_demo():
     assert "coingecko" not in brief.summary.lower()
 
 
+def test_heuristic_brief_live_source_has_no_demo_warning():
+    brief = heuristic_market_brief(_facts("coingecko"), "coingecko")
+    assert brief.data_source == "coingecko"
+    assert brief.generated is False
+    assert not any("demo" in bullet.lower() for bullet in brief.bullets)
+    assert "not financial advice" in brief.disclaimer.lower()
+
+
+def test_heuristic_brief_cache_source_is_preserved():
+    brief = heuristic_market_brief(_facts("cache"), "cache")
+    assert brief.data_source == "cache"
+    assert brief.engine == "heuristic"
+    assert "not financial advice" in brief.disclaimer.lower()
+
+
 def test_normalize_brief_accepts_tone_and_bias_alias():
     parsed = normalize_brief_payload({
         "bias": "bullish",

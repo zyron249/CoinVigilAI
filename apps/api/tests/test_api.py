@@ -130,3 +130,20 @@ def test_brief_endpoint_is_labeled_not_advice(monkeypatch):
     assert body["engine"] == "heuristic"
     assert body["generated"] is False
     assert "not financial advice" in body["disclaimer"].lower()
+
+
+def test_news_configured_empty_explains_failure(monkeypatch):
+    async def fake_news(limit=20):
+        return []
+
+    class FakeSettings:
+        rss_urls = ["https://example.test/rss"]
+
+    monkeypatch.setattr("app.main.get_news", fake_news)
+    monkeypatch.setattr("app.main.get_settings", lambda: FakeSettings())
+    response = client.get("/api/news")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["configured"] is True
+    assert body["data"] == []
+    assert "did not return stories" in body["message"]

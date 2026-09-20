@@ -180,8 +180,15 @@ export function TokenStudio() {
 
         <div className="studio-actions">
           <button type="button" className="ghost" onClick={connectWallet}>{account ? "Wallet connected" : "Connect wallet"}</button>
-          <button type="submit" disabled={busy}>{busy ? "Waiting for wallet…" : "Deploy token"}</button>
+          <button type="submit" disabled={busy || !deploymentReady}>
+            {busy ? "Waiting for wallet…" : deploymentReady ? "Deploy token" : "Factory not configured"}
+          </button>
         </div>
+        {!deploymentReady ? (
+          <p className="studio-status warning">
+            {network.label} has no factory address yet. Deploy CoinVigilTokenFactory and set NEXT_PUBLIC_FACTORY_* at web build time. The form stays preview-only until then.
+          </p>
+        ) : null}
         <p className="studio-status">{status}</p>
         {txHash ? <code className="tx-hash">Transaction: {txHash}</code> : null}
       </form>

@@ -36,9 +36,14 @@ export function changeClass(value: number | null | undefined): string {
   return value > 0 ? "positive" : "negative";
 }
 
-export function sourceLabel(source: string | undefined): { text: string; demo: boolean } {
-  if (source === "coingecko") return { text: "● Live · CoinGecko", demo: false };
-  if (source === "cache") return { text: "● Cache · CoinGecko", demo: false };
-  if (source === "demo") return { text: "○ Demo snapshot", demo: true };
-  return { text: `○ ${source || "unknown"}`, demo: true };
+export type SourceTone = "live" | "cache" | "demo" | "down";
+
+export function sourceLabel(source: string | undefined): { text: string; tone: SourceTone; demo: boolean } {
+  if (source === "coingecko") return { text: "Live · CoinGecko", tone: "live", demo: false };
+  if (source === "cache") return { text: "Cached · CoinGecko", tone: "cache", demo: false };
+  if (source === "demo") return { text: "Demo snapshot", tone: "demo", demo: true };
+  if (!source || source === "unavailable" || source === "unknown") {
+    return { text: "Data unavailable", tone: "down", demo: false };
+  }
+  return { text: source, tone: "down", demo: false };
 }

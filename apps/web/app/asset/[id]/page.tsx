@@ -1,11 +1,11 @@
-import Link from "next/link";
-import { notFound } from "next/navigation";
-
 import { CouncilRoster } from "../../../components/CouncilRoster";
-import { Sparkline } from "../../../components/Sparkline";
+import { DemoRibbon } from "../../../components/DemoRibbon";
 import { ProChartLab } from "../../../components/ProChartLab";
+import { Sparkline } from "../../../components/Sparkline";
+import { StatusBadge } from "../../../components/StatusBadge";
 import { getAssetAnalysis, getCandles, getCouncilStatus } from "../../../lib/api";
-import { changeClass, formatCompact, formatCompactUsd, formatPercent, formatUsd, sourceLabel } from "../../../lib/format";
+import { changeClass, formatCompact, formatCompactUsd, formatPercent, formatUsd } from "../../../lib/format";
+import { notFound } from "next/navigation";
 
 export default async function AssetPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -19,7 +19,6 @@ export default async function AssetPage({ params }: { params: Promise<{ id: stri
 
   const asset = analysis.asset;
   const change = asset.price_change_percentage_24h;
-  const source = sourceLabel(analysis.data_source);
 
   const stats = [
     { label: "Rank", value: asset.market_cap_rank != null ? `#${asset.market_cap_rank}` : "—" },
@@ -35,16 +34,8 @@ export default async function AssetPage({ params }: { params: Promise<{ id: stri
   ];
 
   return (
-    <main>
-      <nav>
-        <Link className="brand" href="/"><span className="brand-mark">V</span> CoinVigil <b>AI</b></Link>
-        <div className="nav-links">
-          <Link href="/">Markets</Link>
-          <Link href="/news">News</Link>
-          <Link href="/token-studio">Token Studio</Link>
-        </div>
-        <Link className="nav-cta" href="/token-studio">Create Token</Link>
-      </nav>
+    <main id="content">
+      <DemoRibbon source={analysis.data_source} />
 
       <section className="asset-hero">
         <div className="asset-title-row">
@@ -52,7 +43,7 @@ export default async function AssetPage({ params }: { params: Promise<{ id: stri
           <div>
             <div className="eyebrow">ASSET INTELLIGENCE</div>
             <h1>{asset.name} <span>{asset.symbol.toUpperCase()}</span></h1>
-            <div className={source.demo ? "live-dot demo" : "live-dot"}>{source.text}</div>
+            <StatusBadge source={analysis.data_source} />
           </div>
         </div>
         <div className="asset-price-block">
@@ -112,11 +103,6 @@ export default async function AssetPage({ params }: { params: Promise<{ id: stri
         supported={councilStatus.supported}
         results={analysis.council?.results ?? []}
       />
-
-      <footer>
-        <div>CoinVigil AI · Interactive research workspace, not financial advice.</div>
-        <div>v0.4.0</div>
-      </footer>
     </main>
   );
 }

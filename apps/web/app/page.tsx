@@ -1,11 +1,12 @@
 import Link from "next/link";
 import { CouncilRoster } from "../components/CouncilRoster";
+import { DemoRibbon } from "../components/DemoRibbon";
 import { GlobalStrip } from "../components/GlobalStrip";
 import { MarketBriefCard } from "../components/MarketBriefCard";
 import { MarketTable } from "../components/MarketTable";
 import { Movers } from "../components/Movers";
 import { Radar } from "../components/Radar";
-import { getCouncilStatus, getGlobalOverview, getMarket, getMovers, getRadar } from "../lib/api";
+import { getCouncilStatus, getGlobalOverview, getMarket, getMarketBrief, getMovers, getRadar } from "../lib/api";
 import { sourceLabel } from "../lib/format";
 
 export default async function Home() {
@@ -16,40 +17,35 @@ export default async function Home() {
     getRadar(),
     getCouncilStatus(),
   ]);
+  const brief = council.configured === 0 ? await getMarketBrief() : null;
+  const leadAsset = market.assets[0];
+  const marketSource = sourceLabel(market.source);
 
   return (
-    <main>
-      <nav>
-        <Link className="brand" href="/"><span className="brand-mark">V</span> CoinVigil <b>AI</b></Link>
-        <div className="nav-links">
-          <a href="#markets">Markets</a>
-          <a href="#ai-brief">AI Brief</a>
-          <a href="#movers">Movers</a>
-          <a href="#radar">AI Radar</a>
-          <a href="#ai-council">AI Council</a>
-          <Link href="/news">News</Link>
-          <Link href="/token-studio">Token Studio</Link>
-        </div>
-        <Link className="nav-cta" href="/token-studio">Create Token</Link>
-      </nav>
+    <main id="content">
+      <DemoRibbon source={market.source} />
 
       <section className="markets-hero">
         <div>
           <div className="eyebrow hero-tag">CRYPTOCURRENCY RANKINGS</div>
           <h1>Markets, with an <span>AI brief</span>.</h1>
           <p>
-            Ranked prices, global stats and 24h movers from CoinGecko. Optional council/Grok brief when keys are set.
-            CoinVigil is an AI-supported research terminal — not CoinMarketCap, and not financial advice.
+            Ranked prices, 24h movers, and global stats from CoinGecko. The brief on this page is labeled
+            heuristic or AI-generated — never mixed in with the table. CoinVigil is a research terminal,
+            not CoinMarketCap, and not financial advice.
           </p>
         </div>
         <aside className="disclaimer-banner">
           <strong>Data tool, not investment advice.</strong>
-          <span>Live, cache, or demo sources are labeled. Demo prices are synthetic stand-ins used only when CoinGecko is unreachable. No TVL or RPC claims.</span>
+          <span>
+            Source is {marketSource.text}. Live and cached rows come from CoinGecko.
+            Demo prices are synthetic stand-ins used only when CoinGecko is unreachable.
+          </span>
         </aside>
       </section>
 
       <GlobalStrip overview={overview} />
-      <MarketBriefCard />
+      <MarketBriefCard initial={brief} refresh={council.configured > 0} />
 
       <section className="slice-grid" id="movers">
         <Movers gainers={movers.gainers} losers={movers.losers} source={movers.source} />
@@ -58,7 +54,8 @@ export default async function Home() {
         </div>
       </section>
       <p className="movers-footnote muted">
-        24h movers are ranked from the CoinVigil universe ({sourceLabel(movers.source).text}). Prices are never invented.
+        24h gainers are up; 24h losers are down. Ranked from the CoinVigil universe ({sourceLabel(movers.source).text}).
+        Prices are never invented.
       </p>
 
       <section id="markets" className="markets-board">
@@ -72,7 +69,7 @@ export default async function Home() {
       />
 
       <section className="feature-strip">
-        <Link className="card feature-card" href={market.assets[0] ? `/asset/${market.assets[0].id}` : "/"}>
+        <Link className="card feature-card" href={leadAsset ? `/asset/${leadAsset.id}` : "#markets"}>
           <div className="eyebrow">PRO CHART LAB</div>
           <h3>Draw, measure and analyze</h3>
           <p>Interactive candlesticks, trend lines, horizontal levels, Fibonacci, brush tools, indicators and PNG export.</p>
@@ -83,11 +80,6 @@ export default async function Home() {
           <p>Configure a standard token and sign the deployment from your own wallet on supported EVM chains.</p>
         </Link>
       </section>
-
-      <footer>
-        <div>CoinVigil AI · Intelligence and research tools, not financial advice. Market data via CoinGecko.</div>
-        <div>v0.4.0</div>
-      </footer>
     </main>
   );
 }

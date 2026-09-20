@@ -431,8 +431,15 @@ async def get_movers(limit: int = 5) -> MarketMovers:
     bounded = max(1, min(int(limit), 15))
     assets, source = await get_market_universe()
     scored = [asset for asset in assets if asset.price_change_percentage_24h is not None]
-    gainers = sorted(scored, key=lambda asset: asset.price_change_percentage_24h or 0, reverse=True)[:bounded]
-    losers = sorted(scored, key=lambda asset: asset.price_change_percentage_24h or 0)[:bounded]
+    gainers = sorted(
+        [asset for asset in scored if (asset.price_change_percentage_24h or 0) > 0],
+        key=lambda asset: asset.price_change_percentage_24h or 0,
+        reverse=True,
+    )[:bounded]
+    losers = sorted(
+        [asset for asset in scored if (asset.price_change_percentage_24h or 0) < 0],
+        key=lambda asset: asset.price_change_percentage_24h or 0,
+    )[:bounded]
     return MarketMovers(gainers=gainers, losers=losers, count=bounded, source=source)
 
 

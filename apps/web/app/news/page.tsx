@@ -1,27 +1,22 @@
-import Link from "next/link";
 import { getNews } from "../../lib/api";
+
+function formatNewsDate(value: string | null | undefined) {
+  if (!value) return "Date unknown";
+  const sliced = value.slice(0, 10);
+  return sliced || "Date unknown";
+}
 
 export default async function NewsPage() {
   const news = await getNews();
 
   return (
-    <main>
-      <nav>
-        <Link className="brand" href="/"><span className="brand-mark">V</span> CoinVigil <b>AI</b></Link>
-        <div className="nav-links">
-          <Link href="/">Markets</Link>
-          <span>News</span>
-          <Link href="/token-studio">Token Studio</Link>
-        </div>
-        <Link className="nav-cta" href="/token-studio">Create Token</Link>
-      </nav>
-
+    <main id="content">
       <section className="studio-hero">
         <div className="eyebrow hero-tag">INTELLIGENCE FEED</div>
         <h1>Source-linked headlines.<br /><span>No invented news.</span></h1>
         <p>
           CoinVigil only lists stories from RSS feeds you configure. It does not generate headlines
-          or fill gaps with model speculation.
+          or fill gaps with model speculation. Informational only — not financial advice.
         </p>
       </section>
 
@@ -39,17 +34,12 @@ export default async function NewsPage() {
                   <strong>{item.title}</strong>
                   <span>{item.source}</span>
                 </div>
-                <time>{item.published_at.slice(0, 10)}</time>
+                <time dateTime={item.published_at || undefined}>{formatNewsDate(item.published_at)}</time>
               </a>
             ))}
           </div>
         )}
       </section>
-
-      <footer>
-        <div>CoinVigil AI · Headlines are sourced, not generated.</div>
-        <div>v0.4.0</div>
-      </footer>
     </main>
   );
 }

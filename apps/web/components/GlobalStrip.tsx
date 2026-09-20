@@ -1,8 +1,8 @@
 import type { GlobalOverview } from "../lib/api";
-import { changeClass, formatCompactUsd, formatPercent, sourceLabel } from "../lib/format";
+import { changeClass, formatCompactUsd, formatPercent } from "../lib/format";
+import { StatusBadge } from "./StatusBadge";
 
 export function GlobalStrip({ overview }: { overview: GlobalOverview }) {
-  const source = sourceLabel(overview.source);
   const items = [
     {
       label: "Market cap",
@@ -24,7 +24,7 @@ export function GlobalStrip({ overview }: { overview: GlobalOverview }) {
       value: overview.fear_greed_value != null
         ? `${overview.fear_greed_value} · ${overview.fear_greed_classification}`
         : "Unavailable",
-      note: overview.fear_greed_source ? `via ${overview.fear_greed_source}` : "Omitted unless a source responds",
+      note: overview.fear_greed_source ? `via ${overview.fear_greed_source}` : "Hidden when the source is down — never invented",
     },
   ];
 
@@ -43,7 +43,7 @@ export function GlobalStrip({ overview }: { overview: GlobalOverview }) {
       ))}
       <div className="global-stat source-stat">
         <span>Data source</span>
-        <strong className={source.demo ? "warning" : "positive"}>{source.text}</strong>
+        <strong><StatusBadge source={overview.source} /></strong>
         <em>{overview.coverage === "global" ? "CoinGecko global" : overview.note || "Ranked universe"}</em>
       </div>
     </section>

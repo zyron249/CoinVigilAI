@@ -3,14 +3,22 @@
 import { useEffect, useState } from "react";
 import type { MarketBrief } from "../lib/api";
 import { getMarketBrief } from "../lib/api";
-import { sourceLabel } from "../lib/format";
+import { StatusBadge } from "./StatusBadge";
 
-export function MarketBriefCard() {
-  const [brief, setBrief] = useState<MarketBrief | null>(null);
-  const [status, setStatus] = useState<"loading" | "ready" | "empty">("loading");
+export function MarketBriefCard({
+  initial = null,
+  refresh = false,
+}: {
+  initial?: MarketBrief | null;
+  refresh?: boolean;
+}) {
+  const [brief, setBrief] = useState<MarketBrief | null>(initial);
+  const [status, setStatus] = useState<"loading" | "ready" | "empty">(initial ? "ready" : "loading");
 
   useEffect(() => {
+    if (!refresh && initial) return;
     let active = true;
+    setStatus(initial ? "ready" : "loading");
     getMarketBrief()
       .then((payload) => {
         if (!active) return;
@@ -18,20 +26,19 @@ export function MarketBriefCard() {
         setStatus(payload ? "ready" : "empty");
       })
       .catch(() => {
-        if (active) setStatus("empty");
+        if (active) setStatus(initial ? "ready" : "empty");
       });
     return () => {
       active = false;
     };
-  }, []);
+  }, [refresh, initial]);
 
-  const source = sourceLabel(brief?.data_source);
   const engineLabel = brief?.generated
     ? `AI-generated · ${brief.engine}`
     : "Heuristic fallback · no council vote yet";
 
   return (
-    <section className="card market-brief" id="ai-brief">
+    <section className="card market-brief" id="ai-brief" aria-live="polite">
       <div className="section-heading">
         <div>
           <div className="eyebrow">AI MARKET BRIEF</div>
@@ -39,15 +46,15 @@ export function MarketBriefCard() {
         </div>
         <div className="brief-meta">
           {brief ? <span className={`tone-pill ${brief.tone}`}>{brief.tone}</span> : null}
-          <span className={source.demo ? "live-dot demo" : "live-dot"}>{source.text}</span>
+          <StatusBadge source={brief?.data_source} />
         </div>
       </div>
       <div className="brief-body">
-        {status === "loading" ? (
-          <p className="muted">Loading an optional council/Grok brief… heuristic fallback if no keys are set.</p>
+        {status === "loading" && !brief ? (
+          <p className="muted">Loading the market brief. If no AI keys are set, this uses the labeled heuristic fallback — not a live model vote.</p>
         ) : null}
-        {status === "empty" ? (
-          <p className="muted">Market brief unavailable. Rankings table below still uses the labeled market source.</p>
+        {status === "empty" && !brief ? (
+          <p className="muted">Market brief unavailable. The rankings table below still uses its own labeled market source.</p>
         ) : null}
         {brief ? (
           <>

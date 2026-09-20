@@ -172,7 +172,8 @@ async def news(limit: int = Query(20, ge=1, le=100)):
         "count": len(items),
         "configured": configured,
         "message": None if items else (
-            None if configured
+            "Configured RSS feeds did not return stories. Check NEWS_RSS_URLS and try again."
+            if configured
             else "Add comma-separated RSS URLs to NEWS_RSS_URLS to activate the intelligence feed."
         ),
     }

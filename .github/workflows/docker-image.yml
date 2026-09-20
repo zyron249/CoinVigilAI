@@ -146,6 +146,10 @@ jobs:
               sleep 2
               continue
             fi
+            if ! grep -qi "not financial advice" /tmp/web.html; then
+              sleep 2
+              continue
+            fi
             if ! grep -q "AI MARKET BRIEF" /tmp/web.html; then
               sleep 2
               continue

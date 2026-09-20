@@ -1,25 +1,14 @@
-import Link from "next/link";
 import { TokenStudio } from "../../components/TokenStudio";
 
 export default function TokenStudioPage() {
   return (
-    <main>
-      <nav>
-        <Link className="brand" href="/"><span className="brand-mark">V</span> CoinVigil <b>AI</b></Link>
-        <div className="nav-links">
-          <Link href="/">Markets</Link>
-          <Link href="/news">News</Link>
-          <span>Token Studio</span>
-        </div>
-        <Link className="nav-cta" href="/">Open Markets</Link>
-      </nav>
-
+    <main id="content">
       <section className="studio-hero">
         <div className="eyebrow hero-tag">NON-CUSTODIAL TOKEN LAUNCHPAD</div>
         <h1>Create on-chain.<br /><span>Keep control.</span></h1>
         <p>
           Configure a standard token, connect your own wallet, review the permissions and sign the deployment yourself.
-          CoinVigil never receives a seed phrase or private key.
+          CoinVigil never receives a seed phrase or private key. Factory contracts are unaudited — research only, not financial advice.
         </p>
       </section>
 
@@ -35,11 +24,6 @@ export default function TokenStudioPage() {
           <span className="muted-chip">Solana adapter next</span>
         </div>
       </section>
-
-      <footer>
-        <div>CoinVigil Token Studio · Smart contracts should be independently audited before production use.</div>
-        <div>v0.4.0</div>
-      </footer>
     </main>
   );
 }
