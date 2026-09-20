@@ -40,6 +40,9 @@ jobs:
         working-directory: apps/api
         run: python -m pytest -q
 
+      - name: Check local watchlist contract
+        run: node --test apps/web/lib/watchlist-contract.test.mjs
+
       - name: Validate Python syntax
         run: python -m compileall -q apps/api/app apps/api/tests
 
@@ -75,7 +78,7 @@ jobs:
         run: docker build --pull --tag coinvigil-web:test ./apps/web
 
       - name: Start full stack
-        run: docker compose up -d --build
+        run: docker compose up -d --build --wait --wait-timeout 180
 
       - name: Wait for API health
         shell: bash
@@ -176,11 +179,19 @@ jobs:
               sleep 2
               continue
             fi
+            if ! grep -q "Saved in this browser" /tmp/web.html; then
+              sleep 2
+              continue
+            fi
             if ! curl -fsS http://127.0.0.1:3000/asset/bitcoin > /tmp/bitcoin.html; then
               sleep 2
               continue
             fi
             if ! grep -q "PRO CHART LAB" /tmp/bitcoin.html; then
+              sleep 2
+              continue
+            fi
+            if ! grep -q "No candles in this snapshot" /tmp/bitcoin.html && ! grep -q "technical workspace" /tmp/bitcoin.html; then
               sleep 2
               continue
             fi

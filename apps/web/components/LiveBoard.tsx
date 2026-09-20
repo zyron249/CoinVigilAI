@@ -8,8 +8,10 @@ import { DemoRibbon } from "./DemoRibbon";
 import { GlobalStrip } from "./GlobalStrip";
 import { MarketTable } from "./MarketTable";
 import { Movers } from "./Movers";
+import { WatchlistStrip } from "./WatchlistStrip";
 
 const POLL_MS = 30_000;
+const MIN_TICK_MS = 8_000;
 
 export function LiveBoard({
   initialMarket,
@@ -40,6 +42,7 @@ export function LiveBoard({
   });
   const assetsRef = useRef(initialMarket.assets);
   const ticketRef = useRef(0);
+  const lastTickRef = useRef(0);
   assetsRef.current = market.assets;
 
   const loadMarket = useCallback(async (
@@ -63,9 +66,11 @@ export function LiveBoard({
         getGlobalOverview(),
         getMovers(5),
       ]);
+      if (ticket !== ticketRef.current) return;
       if (nextOverview.source !== "unavailable") setOverview(nextOverview);
       if (nextMovers.source !== "unavailable") setMovers(nextMovers);
       setCheckedAt(new Date().toISOString());
+      lastTickRef.current = Date.now();
       setBusy(false);
     }
   }, []);
@@ -73,8 +78,10 @@ export function LiveBoard({
   useEffect(() => {
     let cancelled = false;
 
-    async function tick() {
+    async function tick(force = false) {
       if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
+      if (!force && Date.now() - lastTickRef.current < MIN_TICK_MS) return;
+      lastTickRef.current = Date.now();
       const [nextOverview, nextMovers] = await Promise.all([
         getGlobalOverview(),
         getMovers(5),
@@ -90,11 +97,14 @@ export function LiveBoard({
     const onVis = () => {
       if (document.visibilityState === "visible") void tick();
     };
+    const onOnline = () => { void tick(true); };
     document.addEventListener("visibilitychange", onVis);
+    window.addEventListener("online", onOnline);
     return () => {
       cancelled = true;
       window.clearInterval(id);
       document.removeEventListener("visibilitychange", onVis);
+      window.removeEventListener("online", onOnline);
     };
   }, [loadMarket]);
 
@@ -109,6 +119,7 @@ export function LiveBoard({
       {hero}
       <GlobalStrip overview={overview} checkedAt={checkedAt} />
       {brief}
+      <WatchlistStrip assets={[...market.assets, ...movers.gainers, ...movers.losers]} />
       <section className="slice-grid" id="movers">
         <Movers gainers={movers.gainers} losers={movers.losers} source={movers.source} stale={movers.stale} />
         <div id="radar">{radar}</div>
