@@ -16,6 +16,12 @@ export type MarketAsset = {
   total_supply?: number | null;
   max_supply?: number | null;
   fully_diluted_valuation?: number | null;
+  ath?: number | null;
+  ath_change_percentage?: number | null;
+  ath_date?: string | null;
+  atl?: number | null;
+  atl_change_percentage?: number | null;
+  atl_date?: string | null;
   sparkline_7d?: number[];
   last_updated?: string | null;
 };
@@ -36,6 +42,8 @@ export type MarketPage = {
   sort: string;
   order: string;
   universe_size: number;
+  query?: string | null;
+  coverage_note?: string | null;
   error?: string | null;
 } & Freshness;
 
@@ -164,7 +172,36 @@ export type MarketQuery = {
   page?: number;
   sort?: string;
   order?: string;
+  q?: string;
 };
+
+export type ExchangeTicker = {
+  exchange: string;
+  exchange_id?: string | null;
+  pair: string;
+  base: string;
+  target: string;
+  price_usd?: number | null;
+  last_price?: number | null;
+  volume_usd?: number | null;
+  trust_score?: string | null;
+  bid_ask_spread_percentage?: number | null;
+  trade_url?: string | null;
+  last_traded_at?: string | null;
+};
+
+export type AssetTickers = {
+  coin_id: string;
+  data: ExchangeTicker[];
+  count: number;
+  page: number;
+  limit: number;
+  total: number;
+  unique_exchange_count?: number;
+  venues?: string[];
+  source: string;
+  note: string;
+} & Freshness;
 
 const FETCH_MS = 12_000;
 const MARKET_SOURCES = new Set(["coingecko", "cache", "demo"]);
@@ -207,6 +244,7 @@ export async function getMarket(query: MarketQuery = {}): Promise<MarketPage> {
   const page = query.page ?? 1;
   const sort = query.sort ?? "market_cap";
   const order = query.order ?? "desc";
+  const q = (query.q ?? "").trim();
   const empty: MarketPage = {
     assets: [],
     source: "unavailable",
@@ -216,6 +254,8 @@ export async function getMarket(query: MarketQuery = {}): Promise<MarketPage> {
     sort,
     order,
     universe_size: 0,
+    query: q || null,
+    coverage_note: "CoinGecko-tracked snapshot by market cap — not every coin on every exchange.",
     error: "Rankings are unavailable.",
     last_live_at: null,
     as_of: null,
@@ -229,6 +269,7 @@ export async function getMarket(query: MarketQuery = {}): Promise<MarketPage> {
       sort,
       order,
     });
+    if (q) search.set("q", q);
     const response = await request(`/api/market?${search}`);
     if (!response.ok) return empty;
     const json = await response.json();
@@ -241,6 +282,8 @@ export async function getMarket(query: MarketQuery = {}): Promise<MarketPage> {
       sort: json.sort ?? sort,
       order: json.order ?? order,
       universe_size: json.universe_size ?? json.total ?? 0,
+      query: json.query ?? (q || null),
+      coverage_note: json.coverage_note ?? empty.coverage_note,
       error: null,
       ...freshnessFrom(json),
     };
@@ -282,6 +325,45 @@ export async function getMarketBrief(): Promise<MarketBrief | null> {
 export async function getRadar(): Promise<RadarSignal[]> {
   const json = await readJson<{ data?: RadarSignal[] }>("/api/radar?limit=30", {});
   return json.data ?? [];
+}
+
+export async function getAssetTickers(coinId: string, page = 1, limit = 25): Promise<AssetTickers> {
+  const empty: AssetTickers = {
+    coin_id: coinId,
+    data: [],
+    count: 0,
+    page,
+    limit,
+    total: 0,
+    unique_exchange_count: 0,
+    venues: [],
+    source: "unavailable",
+    note: "Exchange listings are unavailable. CoinVigil does not scrape venues or invent pairs.",
+    last_live_at: null,
+    as_of: null,
+    stale: false,
+    fallback_reason: "unreachable",
+  };
+  try {
+    const response = await request(`/api/assets/${encodeURIComponent(coinId)}/tickers?page=${page}&limit=${limit}`);
+    if (!response.ok) return empty;
+    const json = await response.json();
+    return {
+      coin_id: json.coin_id ?? coinId,
+      data: Array.isArray(json.data) ? json.data : [],
+      count: json.count ?? 0,
+      page: json.page ?? page,
+      limit: json.limit ?? limit,
+      total: json.total ?? 0,
+      unique_exchange_count: json.unique_exchange_count ?? 0,
+      venues: Array.isArray(json.venues) ? json.venues : [],
+      source: MARKET_SOURCES.has(json.source) ? json.source : "unavailable",
+      note: json.note ?? empty.note,
+      ...freshnessFrom(json),
+    };
+  } catch {
+    return empty;
+  }
 }
 
 export async function getAssetAnalysis(coinId: string): Promise<AssetAnalysis | null> {

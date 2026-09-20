@@ -104,6 +104,7 @@ jobs:
           curl -fsS "http://127.0.0.1:8000/api/radar?limit=3" > /tmp/radar.json
           curl -fsS "http://127.0.0.1:8000/api/assets/bitcoin/analysis" > /tmp/analysis.json
           curl -fsS "http://127.0.0.1:8000/api/assets/bitcoin/candles?days=7" > /tmp/candles.json
+          curl -fsS "http://127.0.0.1:8000/api/assets/bitcoin/tickers?limit=5" > /tmp/tickers.json
           curl -fsS "http://127.0.0.1:8000/api/news?limit=3" > /tmp/news.json
           curl -fsS "http://127.0.0.1:8000/api/ai/council/status" > /tmp/council-status.json
           curl -fsS "http://127.0.0.1:8000/api/status" > /tmp/status.json
@@ -118,6 +119,7 @@ jobs:
           brief = json.loads(Path('/tmp/brief.json').read_text())
           analysis = json.loads(Path('/tmp/analysis.json').read_text())
           candles = json.loads(Path('/tmp/candles.json').read_text())
+          tickers = json.loads(Path('/tmp/tickers.json').read_text())
           council_status = json.loads(Path('/tmp/council-status.json').read_text())
           stack_status = json.loads(Path('/tmp/status.json').read_text())
           dumped_status = json.dumps(stack_status).lower()
@@ -126,6 +128,8 @@ jobs:
           assert isinstance(market.get('data'), list) and market['data'], market
           assert market.get('source') in allowed_sources, market
           assert 'stale' in market and 'last_live_at' in market and 'fallback_reason' in market, market
+          assert 'coverage_note' in market, market
+          assert 'coinmarketcap' in market.get('coverage_note', '').lower(), market
           assert global_overview.get('source') in allowed_sources, global_overview
           assert 'stale' in global_overview, global_overview
           assert movers.get('source') in allowed_sources, movers
@@ -137,6 +141,12 @@ jobs:
           assert isinstance(candles.get('data'), list) and candles['data'], candles
           candle = candles['data'][0]
           assert all(key in candle for key in ('timestamp','open','high','low','close')), candle
+          assert tickers.get('source') in allowed_sources, tickers
+          assert isinstance(tickers.get('data'), list), tickers
+          assert isinstance(tickers.get('unique_exchange_count'), int), tickers
+          assert 'invent' in tickers.get('note', '').lower() or 'scrape' in tickers.get('note', '').lower() or tickers['data'], tickers
+          dumped_tickers = json.dumps(tickers).lower()
+          assert 'api_key' not in dumped_tickers, tickers
           assert council_status.get('enabled') is True, council_status
           assert council_status.get('supported', 0) >= 9, council_status
           providers = {item['provider']: item for item in council_status.get('providers', [])}
@@ -181,6 +191,10 @@ jobs:
               sleep 2
               continue
             fi
+            if ! grep -q "Search name, symbol, or id" /tmp/web.html && ! grep -q "market-search" /tmp/web.html; then
+              sleep 2
+              continue
+            fi
             if ! grep -q "Last updated" /tmp/web.html && ! grep -q "Last live" /tmp/web.html; then
               sleep 2
               continue
@@ -197,11 +211,11 @@ jobs:
               sleep 2
               continue
             fi
-            if ! grep -q "PRO CHART LAB" /tmp/bitcoin.html; then
+            if ! grep -q "EXCHANGE MARKETS" /tmp/bitcoin.html; then
               sleep 2
               continue
             fi
-            if ! grep -q "No candles in this snapshot" /tmp/bitcoin.html && ! grep -q "technical workspace" /tmp/bitcoin.html; then
+            if ! grep -q "does not scrape" /tmp/bitcoin.html && ! grep -q "pairs on CoinGecko" /tmp/bitcoin.html; then
               sleep 2
               continue
             fi
@@ -210,6 +224,10 @@ jobs:
               continue
             fi
             if ! grep -q "Vol / Mkt cap" /tmp/bitcoin.html; then
+              sleep 2
+              continue
+            fi
+            if ! grep -q ">ATH<" /tmp/bitcoin.html && ! grep -q "ATH" /tmp/bitcoin.html; then
               sleep 2
               continue
             fi

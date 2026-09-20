@@ -39,6 +39,7 @@ export function LiveBoard({
     limit: initialMarket.limit,
     sort: initialMarket.sort,
     order: initialMarket.order,
+    q: initialMarket.query || "",
   });
   const assetsRef = useRef(initialMarket.assets);
   const ticketRef = useRef(0);
@@ -46,7 +47,7 @@ export function LiveBoard({
   assetsRef.current = market.assets;
 
   const loadMarket = useCallback(async (
-    next: Partial<{ page: number; limit: number; sort: string; order: string }> = {},
+    next: Partial<{ page: number; limit: number; sort: string; order: string; q: string }> = {},
     silent = false,
   ) => {
     const query = { ...queryRef.current, ...next };
