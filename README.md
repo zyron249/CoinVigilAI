@@ -1,15 +1,16 @@
 # CoinVigil AI
 
-CoinVigil AI is a crypto market intelligence MVP: live (or fallback) market data, a transparent risk score, a market radar, an optional RSS feed, a multi-model AI Council, an interactive chart lab, and a non-custodial ERC-20 Token Studio.
+CoinVigil AI is a crypto market intelligence MVP: CoinGecko-backed rankings (CMC-style table, not a CoinMarketCap clone), global market stats, 24h gainers/losers, an optional AI Market Brief, a transparent risk score, a market radar, an optional RSS feed, a multi-model AI Council (including Grok), an interactive chart lab, and a non-custodial ERC-20 Token Studio.
 
 It is an informational research tool, not a production trading desk and not financial advice.
 
 ## What works today
 
-- FastAPI market, radar, analysis, candle, news, and health endpoints
-- Next.js dashboard, asset Chart Lab, news page, and Token Studio
-- Heuristic analysis when no AI keys are configured
-- Parallel AI Council adapters when you add provider keys
+- FastAPI market rankings, global overview, movers, AI brief, radar, analysis, candle, news, and health endpoints
+- Next.js Markets homepage: sortable/paginated rankings, global strip, gainers/losers, AI Market Brief
+- Asset pages with CMC-like stats (1h/24h/7d, circulating supply, 24h range) plus AI analysis
+- Heuristic analysis and market brief when no AI keys are configured
+- Parallel AI Council adapters (including optional xAI Grok) when you add provider keys
 - Redis used as a short TTL cache for CoinGecko payloads (optional; API runs without it)
 - Docker Compose for API + web + PostgreSQL + Redis
 - GitHub Actions: unit tests, contract tests, image builds, and stack smoke tests
@@ -19,7 +20,7 @@ It is an informational research tool, not a production trading desk and not fina
 - PostgreSQL is started by Compose but **not used by the API**. It is reserved for later persistence.
 - There is no user accounts, alerts, WebSocket feed, or production deploy config.
 - Token factory contracts are **unaudited**. Token Studio stays disabled until you deploy a factory and set `NEXT_PUBLIC_FACTORY_*`.
-- Public CoinGecko is rate-limited. Without a key the API may show a labeled **demo snapshot** of BTC/ETH/SOL.
+- Public CoinGecko is rate-limited. Without a key the API may show a labeled **demo snapshot** of a small BTC/ETH/SOL-led universe.
 
 ## AI Council
 
@@ -126,7 +127,34 @@ CoinVigil calls the official xAI Chat Completions API when `XAI_API_KEY` is set.
 - API keys: [xAI console](https://console.x.ai/)
 - Docs: [Chat Completions](https://docs.x.ai/developers/model-capabilities/legacy/chat-completions) and [Models](https://docs.x.ai/developers/models)
 
-If `XAI_API_KEY` is empty, Grok is omitted from the parallel council dispatch and the rest of the stack continues. With no providers configured, analysis falls back to the deterministic heuristic engine so demo mode keeps working.
+If `XAI_API_KEY` is empty, Grok is omitted from the parallel council dispatch and the rest of the stack continues. With no providers configured, per-asset analysis and the homepage AI Market Brief fall back to the deterministic heuristic engine so demo mode keeps working.
+
+### CoinGecko (default market path)
+
+The Markets homepage and `/api/market*` routes use CoinGecko only. A paid CoinMarketCap key is not required and is not wired.
+
+```text
+COINGECKO_BASE_URL=https://api.coingecko.com/api/v3
+COINGECKO_API_KEY=
+```
+
+`COINGECKO_API_KEY` is optional but recommended. With a Demo/Pro key the dashboard can load 1h/24h/7d changes, circulating supply, 7d sparklines, and CoinGecko `/global` without tripping the public rate limit. Every payload includes `source`: `coingecko` | `cache` | `demo`. Demo numbers are synthetic stand-ins and are labeled as such.
+
+Optional Fear & Greed is fetched from Alternative.me when `FEAR_GREED_URL` is set. If that request fails, the index is omitted — it is never invented.
+
+```text
+FEAR_GREED_URL=https://api.alternative.me/fng/?limit=1
+```
+
+To enable the AI Market Brief (council/Grok instead of the heuristic):
+
+```text
+XAI_API_KEY=your_xai_key
+XAI_MODEL=grok-4.6
+# or any other council key+model pair in .env.example
+```
+
+The brief is clearly labeled AI-generated (or heuristic) and is not financial advice.
 
 xAI also publishes a newer Responses API. CoinVigil uses Chat Completions so Grok shares the same OpenAI-compatible adapter contract as Mistral, DeepSeek, Groq, Perplexity, and OpenRouter.
 
@@ -141,8 +169,11 @@ Strong bullish/bearish disagreement can force the final council result to neutra
 ## Main API routes
 
 - `GET /health` — process liveness plus dependency notes (`postgres` is `reserved_unused`)
-- `GET /api/market?limit=20` — includes `source`: `coingecko` | `cache` | `demo`
-- `GET /api/assets/{coin_id}/analysis`
+- `GET /api/market?limit=50&page=1&sort=market_cap&order=desc` — ranked table; `source`: `coingecko` | `cache` | `demo`
+- `GET /api/market/global` — market cap, 24h volume, BTC/ETH dominance, optional Fear & Greed
+- `GET /api/market/movers?limit=5` — 24h gainers and losers from the ranked universe
+- `GET /api/market/brief` — optional AI Market Brief (council/Grok or heuristic fallback)
+- `GET /api/assets/{coin_id}/analysis` — includes `data_source` and an advice disclaimer
 - `GET /api/assets/{coin_id}/candles?days=90` — `days` is snapped to CoinGecko's 1/7/14/30/90/180/365 set
 - `GET /api/ai/council/status`
 - `GET /api/radar`

@@ -10,6 +10,60 @@ export type MarketAsset = {
   high_24h?: number | null;
   low_24h?: number | null;
   price_change_percentage_24h?: number | null;
+  price_change_percentage_1h?: number | null;
+  price_change_percentage_7d?: number | null;
+  circulating_supply?: number | null;
+  total_supply?: number | null;
+  max_supply?: number | null;
+  fully_diluted_valuation?: number | null;
+  sparkline_7d?: number[];
+  last_updated?: string | null;
+};
+
+export type MarketPage = {
+  assets: MarketAsset[];
+  source: string;
+  page: number;
+  limit: number;
+  total: number;
+  sort: string;
+  order: string;
+  universe_size: number;
+};
+
+export type GlobalOverview = {
+  total_market_cap_usd?: number | null;
+  total_volume_24h_usd?: number | null;
+  market_cap_change_percentage_24h_usd?: number | null;
+  btc_dominance?: number | null;
+  eth_dominance?: number | null;
+  active_cryptocurrencies?: number | null;
+  fear_greed_value?: number | null;
+  fear_greed_classification?: string | null;
+  fear_greed_source?: string | null;
+  source: string;
+  coverage: string;
+  note?: string | null;
+};
+
+export type MarketMovers = {
+  gainers: MarketAsset[];
+  losers: MarketAsset[];
+  count: number;
+  source: string;
+};
+
+export type MarketBrief = {
+  headline: string;
+  tone: string;
+  summary: string;
+  bullets: string[];
+  engine: string;
+  generated: boolean;
+  data_source: string;
+  providers_requested: string[];
+  providers_responded: string[];
+  disclaimer: string;
 };
 
 export type Candle = {
@@ -67,6 +121,8 @@ export type AssetAnalysis = {
   summary: string;
   engine: string;
   council?: CouncilDecision | null;
+  data_source?: string;
+  disclaimer?: string;
 };
 
 export type CouncilStatus = {
@@ -95,33 +151,100 @@ export type NewsItem = {
   summary: string;
 };
 
-const API = process.env.API_INTERNAL_URL || process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+export type MarketQuery = {
+  limit?: number;
+  page?: number;
+  sort?: string;
+  order?: string;
+};
 
-export async function getMarket(): Promise<{ assets: MarketAsset[]; source: string }> {
+function apiBase() {
+  if (typeof window !== "undefined") {
+    return process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+  }
+  return process.env.API_INTERNAL_URL || process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+}
+
+async function readJson<T>(path: string, fallback: T): Promise<T> {
   try {
-    const response = await fetch(`${API}/api/market?limit=20`, { cache: "no-store" });
-    if (!response.ok) return { assets: [], source: "unavailable" };
-    const json = await response.json();
-    return { assets: json.data ?? [], source: json.source ?? "unknown" };
+    const response = await fetch(`${apiBase()}${path}`, { cache: "no-store" });
+    if (!response.ok) return fallback;
+    return await response.json();
   } catch {
-    return { assets: [], source: "unavailable" };
+    return fallback;
   }
 }
 
-export async function getRadar(): Promise<RadarSignal[]> {
+export async function getMarket(query: MarketQuery = {}): Promise<MarketPage> {
+  const limit = query.limit ?? 50;
+  const page = query.page ?? 1;
+  const sort = query.sort ?? "market_cap";
+  const order = query.order ?? "desc";
+  const empty: MarketPage = {
+    assets: [],
+    source: "unavailable",
+    page,
+    limit,
+    total: 0,
+    sort,
+    order,
+    universe_size: 0,
+  };
   try {
-    const response = await fetch(`${API}/api/radar?limit=30`, { cache: "no-store" });
-    if (!response.ok) return [];
+    const search = new URLSearchParams({
+      limit: String(limit),
+      page: String(page),
+      sort,
+      order,
+    });
+    const response = await fetch(`${apiBase()}/api/market?${search}`, { cache: "no-store" });
+    if (!response.ok) return empty;
     const json = await response.json();
-    return json.data ?? [];
+    return {
+      assets: json.data ?? [],
+      source: json.source ?? "unknown",
+      page: json.page ?? page,
+      limit: json.limit ?? limit,
+      total: json.total ?? (json.data ?? []).length,
+      sort: json.sort ?? sort,
+      order: json.order ?? order,
+      universe_size: json.universe_size ?? json.total ?? 0,
+    };
   } catch {
-    return [];
+    return empty;
   }
+}
+
+export async function getGlobalOverview(): Promise<GlobalOverview> {
+  return readJson<GlobalOverview>("/api/market/global", {
+    source: "unavailable",
+    coverage: "unavailable",
+  });
+}
+
+export async function getMovers(limit = 5): Promise<MarketMovers> {
+  return readJson<MarketMovers>(`/api/market/movers?limit=${limit}`, {
+    gainers: [],
+    losers: [],
+    count: 0,
+    source: "unavailable",
+  });
+}
+
+export async function getMarketBrief(): Promise<MarketBrief | null> {
+  const json = await readJson<MarketBrief | Record<string, never>>("/api/market/brief", {});
+  if (!json || !("headline" in json) || !json.headline) return null;
+  return json as MarketBrief;
+}
+
+export async function getRadar(): Promise<RadarSignal[]> {
+  const json = await readJson<{ data?: RadarSignal[] }>("/api/radar?limit=30", {});
+  return json.data ?? [];
 }
 
 export async function getAssetAnalysis(coinId: string): Promise<AssetAnalysis | null> {
   try {
-    const response = await fetch(`${API}/api/assets/${encodeURIComponent(coinId)}/analysis`, { cache: "no-store" });
+    const response = await fetch(`${apiBase()}/api/assets/${encodeURIComponent(coinId)}/analysis`, { cache: "no-store" });
     if (!response.ok) return null;
     return await response.json();
   } catch {
@@ -143,7 +266,7 @@ export const OPTIONAL_COUNCIL_PROVIDERS: CouncilProvider[] = [
 
 export async function getCouncilStatus(): Promise<CouncilStatus> {
   try {
-    const response = await fetch(`${API}/api/ai/council/status`, { cache: "no-store" });
+    const response = await fetch(`${apiBase()}/api/ai/council/status`, { cache: "no-store" });
     if (!response.ok) {
       return { enabled: true, supported: OPTIONAL_COUNCIL_PROVIDERS.length, configured: 0, mode: "unavailable", providers: OPTIONAL_COUNCIL_PROVIDERS };
     }
@@ -162,7 +285,7 @@ export async function getCouncilStatus(): Promise<CouncilStatus> {
 
 export async function getNews(): Promise<{ items: NewsItem[]; message: string | null; configured: boolean }> {
   try {
-    const response = await fetch(`${API}/api/news?limit=30`, { cache: "no-store" });
+    const response = await fetch(`${apiBase()}/api/news?limit=30`, { cache: "no-store" });
     if (!response.ok) return { items: [], message: "News feed is unavailable.", configured: false };
     const json = await response.json();
     return {
@@ -177,7 +300,7 @@ export async function getNews(): Promise<{ items: NewsItem[]; message: string | 
 
 export async function getCandles(coinId: string, days = 90): Promise<{ data: Candle[]; source: string }> {
   try {
-    const response = await fetch(`${API}/api/assets/${encodeURIComponent(coinId)}/candles?days=${days}`, { cache: "no-store" });
+    const response = await fetch(`${apiBase()}/api/assets/${encodeURIComponent(coinId)}/candles?days=${days}`, { cache: "no-store" });
     if (!response.ok) return { data: [], source: "unavailable" };
     const json = await response.json();
     return { data: json.data ?? [], source: json.source ?? "unknown" };

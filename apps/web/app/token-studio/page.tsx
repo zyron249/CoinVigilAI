@@ -38,7 +38,7 @@ export default function TokenStudioPage() {
 
       <footer>
         <div>CoinVigil Token Studio · Smart contracts should be independently audited before production use.</div>
-        <div>v0.3.1</div>
+        <div>v0.4.0</div>
       </footer>
     </main>
   );

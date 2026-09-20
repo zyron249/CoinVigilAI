@@ -2,19 +2,10 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { CouncilRoster } from "../../../components/CouncilRoster";
+import { Sparkline } from "../../../components/Sparkline";
 import { ProChartLab } from "../../../components/ProChartLab";
 import { getAssetAnalysis, getCandles, getCouncilStatus } from "../../../lib/api";
-
-const usd = new Intl.NumberFormat("en-US", {
-  style: "currency",
-  currency: "USD",
-  maximumFractionDigits: 6,
-});
-
-const compact = new Intl.NumberFormat("en-US", {
-  notation: "compact",
-  maximumFractionDigits: 2,
-});
+import { changeClass, formatCompact, formatCompactUsd, formatPercent, formatUsd, sourceLabel } from "../../../lib/format";
 
 export default async function AssetPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -27,7 +18,21 @@ export default async function AssetPage({ params }: { params: Promise<{ id: stri
   if (!analysis) notFound();
 
   const asset = analysis.asset;
-  const change = asset.price_change_percentage_24h ?? 0;
+  const change = asset.price_change_percentage_24h;
+  const source = sourceLabel(analysis.data_source);
+
+  const stats = [
+    { label: "Rank", value: asset.market_cap_rank != null ? `#${asset.market_cap_rank}` : "—" },
+    { label: "Market cap", value: formatCompactUsd(asset.market_cap) },
+    { label: "Fully diluted", value: formatCompactUsd(asset.fully_diluted_valuation) },
+    { label: "24h volume", value: formatCompactUsd(asset.total_volume) },
+    { label: "Circulating", value: `${formatCompact(asset.circulating_supply)} ${asset.symbol.toUpperCase()}` },
+    { label: "24h high", value: formatUsd(asset.high_24h) },
+    { label: "24h low", value: formatUsd(asset.low_24h) },
+    { label: "1h", value: formatPercent(asset.price_change_percentage_1h), className: changeClass(asset.price_change_percentage_1h) },
+    { label: "7d", value: formatPercent(asset.price_change_percentage_7d), className: changeClass(asset.price_change_percentage_7d) },
+    { label: "Risk", value: `${analysis.risk.score}/100 · ${analysis.risk.level}` },
+  ];
 
   return (
     <main>
@@ -47,20 +52,23 @@ export default async function AssetPage({ params }: { params: Promise<{ id: stri
           <div>
             <div className="eyebrow">ASSET INTELLIGENCE</div>
             <h1>{asset.name} <span>{asset.symbol.toUpperCase()}</span></h1>
+            <div className={source.demo ? "live-dot demo" : "live-dot"}>{source.text}</div>
           </div>
         </div>
         <div className="asset-price-block">
-          <strong>{usd.format(asset.current_price ?? 0)}</strong>
-          <span className={change >= 0 ? "positive" : "negative"}>{change >= 0 ? "+" : ""}{change.toFixed(2)}% 24h</span>
+          <strong>{formatUsd(asset.current_price)}</strong>
+          <span className={changeClass(change)}>{formatPercent(change)} 24h</span>
+          <Sparkline values={asset.sparkline_7d} width={160} height={40} />
         </div>
       </section>
 
-      <section className="asset-metrics">
-        <div className="card mini-metric"><span>Market cap</span><strong>${compact.format(asset.market_cap ?? 0)}</strong></div>
-        <div className="card mini-metric"><span>24h volume</span><strong>${compact.format(asset.total_volume ?? 0)}</strong></div>
-        <div className="card mini-metric"><span>AI bias</span><strong className="capitalize">{analysis.bias}</strong></div>
-        <div className="card mini-metric"><span>AI confidence</span><strong>{analysis.confidence}%</strong></div>
-        <div className="card mini-metric"><span>Risk</span><strong>{analysis.risk.score}/100 · {analysis.risk.level}</strong></div>
+      <section className="asset-metrics asset-metrics-wide">
+        {stats.map((stat) => (
+          <div className="card mini-metric" key={stat.label}>
+            <span>{stat.label}</span>
+            <strong className={stat.className}>{stat.value}</strong>
+          </div>
+        ))}
       </section>
 
       <ProChartLab
@@ -72,7 +80,7 @@ export default async function AssetPage({ params }: { params: Promise<{ id: stri
 
       <section className="analysis-grid">
         <div className="card analysis-card">
-          <div className="eyebrow">AI COUNCIL VIEW</div>
+          <div className="eyebrow">AI ANALYSIS</div>
           <h2>{analysis.bias.toUpperCase()} · {analysis.confidence}% confidence</h2>
           <p>{analysis.summary}</p>
           {analysis.council ? (
@@ -87,6 +95,7 @@ export default async function AssetPage({ params }: { params: Promise<{ id: stri
             </p>
           )}
           {analysis.council ? <div className="analysis-meta">Engine: {analysis.engine}</div> : null}
+          <p className="brief-disclaimer">{analysis.disclaimer || "AI output is informational research, not financial advice."}</p>
         </div>
         <div className="card analysis-card">
           <div className="eyebrow">RISK DRIVERS</div>
@@ -106,7 +115,7 @@ export default async function AssetPage({ params }: { params: Promise<{ id: stri
 
       <footer>
         <div>CoinVigil AI · Interactive research workspace, not financial advice.</div>
-        <div>v0.3.1</div>
+        <div>v0.4.0</div>
       </footer>
     </main>
   );

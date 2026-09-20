@@ -2,10 +2,19 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
-from app.models import AssetAnalysis, RadarSignal
+from app.models import AssetAnalysis, GlobalOverview, MarketBrief, MarketMovers, RadarSignal, RankedMarkets
 from app.services.ai import deterministic_view, provider_status, run_ai_council
+from app.services.brief import build_market_brief
 from app.services.cache import redis_status
-from app.services.market import get_asset, get_candles, get_markets, get_markets_with_source, snap_ohlc_days
+from app.services.market import (
+    get_asset_with_source,
+    get_candles,
+    get_global_overview,
+    get_markets,
+    get_movers,
+    get_ranked_markets,
+    snap_ohlc_days,
+)
 from app.services.news import get_news
 from app.services.risk import assess_risk
 
@@ -13,8 +22,8 @@ settings = get_settings()
 
 app = FastAPI(
     title="CoinVigil AI API",
-    version="0.3.1",
-    description="24/7 multi-model AI-powered crypto market intelligence API",
+    version="0.4.0",
+    description="AI-supported crypto market intelligence — CoinGecko rankings, not a CoinMarketCap clone.",
 )
 
 app.add_middleware(
@@ -32,7 +41,7 @@ async def health():
     return {
         "status": "ok",
         "service": "coinvigil-api",
-        "version": "0.3.1",
+        "version": "0.4.0",
         "dependencies": {
             "redis": await redis_status(),
             "postgres": "reserved_unused",
@@ -55,14 +64,29 @@ async def ai_council_status():
     }
 
 
-@app.get("/api/market")
-async def market(limit: int = Query(20, ge=1, le=100)):
-    assets, source = await get_markets_with_source(limit)
-    return {
-        "data": [asset.model_dump() for asset in assets],
-        "count": len(assets),
-        "source": source,
-    }
+@app.get("/api/market", response_model=RankedMarkets)
+async def market(
+    limit: int = Query(50, ge=1, le=100),
+    page: int = Query(1, ge=1, le=50),
+    sort: str = Query("market_cap"),
+    order: str = Query("desc"),
+):
+    return await get_ranked_markets(limit=limit, page=page, sort=sort, order=order)
+
+
+@app.get("/api/market/global", response_model=GlobalOverview)
+async def market_global():
+    return await get_global_overview()
+
+
+@app.get("/api/market/movers", response_model=MarketMovers)
+async def market_movers(limit: int = Query(5, ge=1, le=15)):
+    return await get_movers(limit)
+
+
+@app.get("/api/market/brief", response_model=MarketBrief)
+async def market_brief():
+    return await build_market_brief()
 
 
 @app.get("/api/assets/{coin_id}/candles")
@@ -80,7 +104,7 @@ async def asset_candles(coin_id: str, days: int = Query(90, ge=1, le=365)):
 
 @app.get("/api/assets/{coin_id}/analysis", response_model=AssetAnalysis)
 async def asset_analysis(coin_id: str):
-    asset = await get_asset(coin_id)
+    asset, data_source = await get_asset_with_source(coin_id)
     if not asset:
         raise HTTPException(status_code=404, detail="Asset not found")
 
@@ -97,6 +121,7 @@ async def asset_analysis(coin_id: str):
             summary=council.summary,
             engine=f"ai-council:{len(council.providers_responded)}",
             council=council,
+            data_source=data_source,
         )
 
     return AssetAnalysis(
@@ -107,6 +132,7 @@ async def asset_analysis(coin_id: str):
         summary=fallback_summary,
         engine="heuristic",
         council=None,
+        data_source=data_source,
     )
 
 

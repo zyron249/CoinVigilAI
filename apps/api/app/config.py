@@ -12,6 +12,9 @@ class Settings(BaseSettings):
     redis_url: str = "redis://localhost:6379/0"
     cors_allow_origins: str = "http://localhost:3000,http://127.0.0.1:3000"
     market_cache_ttl_seconds: int = 30
+    # Optional Fear & Greed source (Alternative.me). Empty disables the lookup.
+    # CoinVigil does not scrape CoinMarketCap and does not invent an index value.
+    fear_greed_url: str = "https://api.alternative.me/fng/?limit=1"
 
     ai_council_enabled: bool = True
     ai_request_timeout_seconds: float = 25.0
