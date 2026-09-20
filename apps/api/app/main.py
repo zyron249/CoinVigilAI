@@ -2,7 +2,7 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
-from app.models import AssetAnalysis, AssetCompare, AssetTickers, GlobalOverview, MarketBrief, MarketMovers, RadarSignal, RankedMarkets
+from app.models import AssetAnalysis, AssetCompare, AssetProfile, AssetTickers, GlobalOverview, MarketBrief, MarketMovers, RadarSignal, RankedMarkets
 from app.services.ai import deterministic_view, provider_status, run_ai_council
 from app.services.brief import build_market_brief
 from app.services.cache import redis_status
@@ -19,6 +19,7 @@ from app.services.market import (
     snap_ohlc_days,
 )
 from app.services.news import get_news
+from app.services.project import get_asset_profile
 from app.services.risk import assess_risk
 
 settings = get_settings()
@@ -142,6 +143,11 @@ async def asset_candles(coin_id: str, days: int = Query(90, ge=1, le=365)):
         "source": source,
         "days": snap_ohlc_days(days),
     }
+
+
+@app.get("/api/assets/{coin_id}/profile", response_model=AssetProfile)
+async def asset_profile(coin_id: str):
+    return await get_asset_profile(coin_id)
 
 
 @app.get("/api/assets/{coin_id}/tickers", response_model=AssetTickers)

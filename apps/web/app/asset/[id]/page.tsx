@@ -1,11 +1,12 @@
 import { AssetWorkspace } from "../../../components/AssetWorkspace";
 import { CouncilRoster } from "../../../components/CouncilRoster";
 import { DemoRibbon } from "../../../components/DemoRibbon";
+import { ProjectLinks } from "../../../components/ProjectLinks";
 import { Sparkline } from "../../../components/Sparkline";
 import { RangeBar, SupplyBar } from "../../../components/StatBars";
 import { StatusBadge } from "../../../components/StatusBadge";
 import { WatchButton } from "../../../components/WatchButton";
-import { getAssetAnalysis, getAssetTickers, getCandles, getCouncilStatus } from "../../../lib/api";
+import { getAssetAnalysis, getAssetProfile, getAssetTickers, getCandles, getCouncilStatus } from "../../../lib/api";
 import { changeClass, formatCompact, formatCompactUsd, formatDate, formatPercent, formatTimestamp, formatUsd } from "../../../lib/format";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -30,11 +31,12 @@ export default async function AssetPage({
   const page = Number(firstParam(query.page) || "1") || 1;
   const minVolume = Number(firstParam(query.min_volume) || "0") || 0;
   const companion = id.toLowerCase() === "ethereum" ? "bitcoin" : "ethereum";
-  const [analysis, candleResponse, councilStatus, tickers] = await Promise.all([
+  const [analysis, candleResponse, councilStatus, tickers, profile] = await Promise.all([
     getAssetAnalysis(id),
     getCandles(id, 90),
     getCouncilStatus(),
     getAssetTickers(id, page, 25, { q, minVolume, sort, order: order || undefined }),
+    getAssetProfile(id),
   ]);
 
   if (!analysis) notFound();
@@ -115,6 +117,8 @@ export default async function AssetPage({
           <SupplyBar circulating={asset.circulating_supply} max={asset.max_supply} />
         </div>
       </section>
+
+      <ProjectLinks profile={profile} />
 
       <AssetWorkspace
         coinId={asset.id}

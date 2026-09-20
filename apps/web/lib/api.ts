@@ -218,6 +218,21 @@ export type AssetCompare = {
   note: string;
 } & Freshness;
 
+export type ProjectLink = {
+  kind: string;
+  label: string;
+  url: string;
+};
+
+export type AssetProfile = {
+  coin_id: string;
+  links: ProjectLink[];
+  categories: string[];
+  description?: string | null;
+  source: string;
+  note: string;
+} & Freshness;
+
 const FETCH_MS = 12_000;
 const MARKET_SOURCES = new Set(["coingecko", "cache", "demo"]);
 
@@ -394,6 +409,49 @@ export async function getAssetTickers(
       min_volume: json.min_volume ?? extras.minVolume ?? null,
       sort: json.sort ?? extras.sort ?? "volume",
       order: json.order ?? extras.order ?? "desc",
+      source: MARKET_SOURCES.has(json.source) ? json.source : "unavailable",
+      note: json.note ?? empty.note,
+      ...freshnessFrom(json),
+    };
+  } catch {
+    return empty;
+  }
+}
+
+export async function getAssetProfile(coinId: string): Promise<AssetProfile> {
+  const empty: AssetProfile = {
+    coin_id: coinId,
+    links: [],
+    categories: [],
+    description: null,
+    source: "unavailable",
+    note: "Project links are unavailable. CoinVigil does not invent URLs or scrape social networks.",
+    last_live_at: null,
+    as_of: null,
+    stale: false,
+    fallback_reason: "unreachable",
+  };
+  try {
+    const response = await request(`/api/assets/${encodeURIComponent(coinId)}/profile`);
+    if (!response.ok) return empty;
+    const json = await response.json();
+    const links = Array.isArray(json.links)
+      ? json.links.filter((item: ProjectLink) => {
+          const url = typeof item?.url === "string" ? item.url.trim() : "";
+          return url.startsWith("http://") || url.startsWith("https://");
+        }).map((item: ProjectLink) => ({
+          kind: String(item.kind || "link"),
+          label: String(item.label || "Link"),
+          url: item.url.trim(),
+        }))
+      : [];
+    return {
+      coin_id: json.coin_id ?? coinId,
+      links,
+      categories: Array.isArray(json.categories)
+        ? json.categories.map((item: unknown) => String(item || "").trim()).filter(Boolean).slice(0, 8)
+        : [],
+      description: typeof json.description === "string" ? json.description : null,
       source: MARKET_SOURCES.has(json.source) ? json.source : "unavailable",
       note: json.note ?? empty.note,
       ...freshnessFrom(json),
