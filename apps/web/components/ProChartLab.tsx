@@ -210,12 +210,13 @@ export function ProChartLab({ coinId, symbol, candles, source }: ProChartLabProp
         />
       )}
       <div className="chart-footnote">
-        {empty
-          ? "Empty chart is intentional — missing data is never filled with synthetic live candles."
-          : drawing
-            ? `${drawing} is armed. Click the plot to place points. Escape cancels the overlay.`
-            : "Drawings are interactive and editable. Market data source: "}
-        {empty ? null : <strong>{sourceLabel(source).text}</strong>}
+        {empty ? (
+          "Empty chart is intentional — missing data is never filled with synthetic live candles."
+        ) : drawing ? (
+          <>{drawing} is armed. Click the plot to place points. Escape cancels the overlay. Source: <strong>{sourceLabel(source).text}</strong>.</>
+        ) : (
+          <>Drawings are interactive and editable. Market data source: <strong>{sourceLabel(source).text}</strong>.</>
+        )}
       </div>
     </section>
   );
