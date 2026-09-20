@@ -313,7 +313,38 @@ def chain_label(platform_id: str) -> str | None:
     return slug.replace("-", " ").replace("_", " ").title()
 
 
-def contracts_from_payload(platforms: Any, detail_platforms: Any = None) -> list[AssetContract]:
+def explorer_url_for_address(address: str | None, explorer_urls: Any) -> str | None:
+    """Return a CoinGecko explorer URL only when it already contains this address. Never synthesize hosts or /token/ paths."""
+    needle = sanitize_contract_address(address)
+    if not needle:
+        return None
+    lowered = needle.lower()
+    if isinstance(explorer_urls, str):
+        candidates = [explorer_urls]
+    elif isinstance(explorer_urls, (list, tuple)):
+        candidates = list(explorer_urls)
+    else:
+        return None
+    for item in candidates:
+        url = sanitize_http_url(item if isinstance(item, str) else None)
+        if not url:
+            continue
+        if lowered in url.lower():
+            return url
+    return None
+
+
+def explorer_urls_from_payload(links: Any) -> list[str]:
+    if not isinstance(links, dict):
+        return []
+    return _strings(links.get("blockchain_site"), 8)
+
+
+def contracts_from_payload(
+    platforms: Any,
+    detail_platforms: Any = None,
+    explorer_urls: Any = None,
+) -> list[AssetContract]:
     """Map CoinGecko platforms / detail_platforms. Empty native keys are omitted — never invented."""
     rows: list[AssetContract] = []
     seen: set[str] = set()
@@ -329,7 +360,14 @@ def contracts_from_payload(platforms: Any, detail_platforms: Any = None) -> list
         if key in seen:
             return
         seen.add(key)
-        rows.append(AssetContract(platform=platform_id.strip().lower(), label=label, address=clean))
+        rows.append(
+            AssetContract(
+                platform=platform_id.strip().lower(),
+                label=label,
+                address=clean,
+                explorer_url=explorer_url_for_address(clean, explorer_urls),
+            )
+        )
 
     if isinstance(detail_platforms, dict):
         for platform_id, payload in detail_platforms.items():
@@ -414,7 +452,15 @@ def _contracts_from_envelope(raw: Any) -> list[AssetContract]:
         if key in seen:
             continue
         seen.add(key)
-        rows.append(AssetContract(platform=platform[:40], label=label, address=address))
+        raw_explorer = item.get("explorer_url") if isinstance(item.get("explorer_url"), str) else None
+        rows.append(
+            AssetContract(
+                platform=platform[:40],
+                label=label,
+                address=address,
+                explorer_url=explorer_url_for_address(address, [raw_explorer] if raw_explorer else []),
+            )
+        )
         if len(rows) >= MAX_CONTRACTS:
             break
     return rows
@@ -454,7 +500,7 @@ async def get_asset_profile(coin_id: str) -> AssetProfile:
         return _empty_profile("unknown", "unavailable", "unreachable")
 
     settings = get_settings()
-    cache_key = f"profile:v3:{needle}"
+    cache_key = f"profile:v4:{needle}"
     mem = _memory_get(cache_key)
     if isinstance(mem, dict):
         return _profile_from_envelope(needle, mem, stale=bool(mem.get("stale")), reason=mem.get("fallback_reason"))
@@ -482,6 +528,8 @@ async def get_asset_profile(coin_id: str) -> AssetProfile:
         if not isinstance(payload, dict) or not payload.get("id"):
             return _empty_profile(needle, "unavailable", None)
         links = project_links_from_payload(payload.get("links"))
+        explorer_urls = explorer_urls_from_payload(payload.get("links"))
+        explorer_urls.extend(link.url for link in links if link.kind == "explorer" and link.url not in explorer_urls)
         description_map = payload.get("description") if isinstance(payload.get("description"), dict) else {}
         description = _clean_description(description_map.get("en") if isinstance(description_map.get("en"), str) else None)
         fetched_at = _now_iso()
@@ -490,7 +538,14 @@ async def get_asset_profile(coin_id: str) -> AssetProfile:
             "categories": categories_from_payload(payload.get("categories")),
             "description": description,
             "genesis_date": genesis_date_from_payload(payload.get("genesis_date")),
-            "contracts": [item.model_dump() for item in contracts_from_payload(payload.get("platforms"), payload.get("detail_platforms"))],
+            "contracts": [
+                item.model_dump()
+                for item in contracts_from_payload(
+                    payload.get("platforms"),
+                    payload.get("detail_platforms"),
+                    explorer_urls,
+                )
+            ],
             "source": "coingecko",
             "note": (
                 "Public links from CoinGecko /coins/{id}. Missing fields are omitted — CoinVigil does not invent URLs."

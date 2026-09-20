@@ -55,6 +55,7 @@ export function WatchlistStrip({ assets }: { assets: MarketAsset[] }) {
                   <span className={changeClass(live?.price_change_percentage_24h)}>
                     {live ? formatPercent(live.price_change_percentage_24h) : "Open asset"}
                   </span>
+                  <Link className="trade-link" href={`/asset/${item.id}#contracts`}>Contracts</Link>
                   <Link className="trade-link" href={`/compare?ids=${item.id},${companionId(item.id)}`}>
                     Compare
                   </Link>

@@ -1,5 +1,5 @@
 import type { AssetContract, AssetProfile, ProjectLink } from "../lib/api";
-import { formatDate } from "../lib/format";
+import { formatDate, truncateAddress } from "../lib/format";
 import { CopyButton } from "./CopyButton";
 import { StatusBadge } from "./StatusBadge";
 
@@ -44,6 +44,13 @@ function visibleLinks(links: ProjectLink[]): ProjectLink[] {
   return rows;
 }
 
+function contractExplorerHref(item: AssetContract): string | null {
+  const href = publicHref(item.explorer_url);
+  if (!href) return null;
+  if (!href.toLowerCase().includes(item.address.toLowerCase())) return null;
+  return href;
+}
+
 function ChipList({ links }: { links: ProjectLink[] }) {
   if (!links.length) return null;
   return (
@@ -80,34 +87,32 @@ export function ProjectLinks({ profile }: { profile: AssetProfile }) {
 
   return (
     <div className="asset-overview-grid">
-      {hasOverview ? (
-        <section className="card project-links" id="overview" aria-labelledby="asset-overview-title">
-          <div className="section-heading project-links-head">
-            <div>
-              <div className="eyebrow">ABOUT</div>
-              <h2 id="asset-overview-title">Overview</h2>
-            </div>
-            <StatusBadge source={profile.source} stale={profile.stale} />
+      <section className="card project-links" id="overview" aria-labelledby="asset-overview-title">
+        <div className="section-heading project-links-head">
+          <div>
+            <div className="eyebrow">ABOUT</div>
+            <h2 id="asset-overview-title">Overview</h2>
           </div>
-          {description ? <p className="project-description">{description}</p> : null}
-          {genesis ? (
-            <p className="project-genesis">
-              Genesis date: <strong>{genesis}</strong>
-              <span className="muted"> CoinGecko listing — omitted when not published.</span>
-            </p>
-          ) : null}
-          {contracts.length === 0 ? (
-            <p className="project-empty">Contract addresses: Not listed. CoinGecko published no platform contracts for this asset.</p>
-          ) : null}
-          {categories.length ? (
-            <ul className="project-categories">
-              {categories.map((category) => (
-                <li key={category}>{category}</li>
-              ))}
-            </ul>
-          ) : null}
-        </section>
-      ) : null}
+          <StatusBadge source={profile.source} stale={profile.stale} />
+        </div>
+        {description ? <p className="project-description">{description}</p> : null}
+        {genesis ? (
+          <p className="project-genesis">
+            Genesis date: <strong>{genesis}</strong>
+            <span className="muted"> CoinGecko listing — omitted when not published.</span>
+          </p>
+        ) : null}
+        {categories.length ? (
+          <ul className="project-categories">
+            {categories.map((category) => (
+              <li key={category}>{category}</li>
+            ))}
+          </ul>
+        ) : null}
+        {hasOverview ? null : (
+          <p className="project-empty">Not listed. CoinGecko published no English overview, categories, or genesis date for this asset.</p>
+        )}
+      </section>
 
       <section className="card project-links" id="community" aria-labelledby="project-links-title">
         <div className="section-heading project-links-head">
@@ -115,7 +120,6 @@ export function ProjectLinks({ profile }: { profile: AssetProfile }) {
             <div className="eyebrow">LINKS / COMMUNITY</div>
             <h2 id="project-links-title">Official website & socials</h2>
           </div>
-          {hasOverview ? null : <StatusBadge source={profile.source} stale={profile.stale} />}
         </div>
         {links.length ? (
           <>
@@ -155,7 +159,7 @@ export function ProjectLinks({ profile }: { profile: AssetProfile }) {
         )}
         <p className="project-note">{profile.note} Not financial advice. CoinVigil does not scrape social networks.</p>
       </section>
-      {contracts.length ? <ContractList contracts={contracts} /> : null}
+      <ContractList contracts={contracts} />
     </div>
   );
 }
@@ -169,16 +173,38 @@ function ContractList({ contracts }: { contracts: AssetContract[] }) {
           <h2 id="contracts-title">Listed platforms</h2>
         </div>
       </div>
-      <p className="project-empty">CoinGecko-listed token addresses only. CoinVigil does not invent contracts or explorer URLs.</p>
-      <ul className="contract-rows">
-        {contracts.map((item) => (
-          <li key={`${item.platform}-${item.address}`}>
-            <strong>{item.label}</strong>
-            <code>{item.address}</code>
-            <CopyButton value={item.address} label="Copy" />
-          </li>
-        ))}
-      </ul>
+      {contracts.length ? (
+        <>
+          <p className="project-empty">CoinGecko-listed token addresses only. CoinVigil does not invent contracts or explorer URLs. Copy uses the full address; explorer opens only when CoinGecko already published a URL that contains it.</p>
+          <ul className="contract-rows">
+            {contracts.map((item) => {
+              const explorer = contractExplorerHref(item);
+              const display = truncateAddress(item.address);
+              return (
+                <li key={`${item.platform}-${item.address}`}>
+                  <strong>{item.label}</strong>
+                  <code className="contract-address" title={item.address}>{display}</code>
+                  <div className="contract-actions">
+                    {explorer ? (
+                      <a
+                        className="contract-explorer"
+                        href={explorer}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        Explorer
+                      </a>
+                    ) : null}
+                    <CopyButton value={item.address} label="Copy" />
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </>
+      ) : (
+        <p className="project-empty">Not listed. CoinGecko published no platform contracts for this asset. CoinVigil does not invent addresses or explorer URLs.</p>
+      )}
     </section>
   );
 }

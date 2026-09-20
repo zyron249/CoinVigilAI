@@ -26,18 +26,22 @@ const MarketRow = memo(function MarketRow({ asset }: { asset: MarketAsset }) {
     <tr className="market-row">
       <td>{asset.market_cap_rank ?? "—"}</td>
       <td>
-        <Link className="asset-link" href={`/asset/${asset.id}`}>
-          <div className="asset-cell">
-            <WatchButton id={asset.id} symbol={asset.symbol} name={asset.name} compact />
-            {asset.image
-              ? <img src={asset.image} alt="" width={28} height={28} />
-              : <div className="coin-placeholder" aria-hidden="true" />}
-            <div>
+        <div className="asset-cell">
+          <WatchButton id={asset.id} symbol={asset.symbol} name={asset.name} compact />
+          {asset.image
+            ? <img src={asset.image} alt="" width={28} height={28} />
+            : <div className="coin-placeholder" aria-hidden="true" />}
+          <div>
+            <Link className="asset-link" href={`/asset/${asset.id}`}>
               <strong>{asset.name}</strong>
               <span>{asset.symbol.toUpperCase()}</span>
-            </div>
+            </Link>
+            <nav className="asset-row-jumps" aria-label={`${asset.name} sections`}>
+              <Link href={`/asset/${asset.id}#overview`}>Overview</Link>
+              <Link href={`/asset/${asset.id}#contracts`}>Contracts</Link>
+            </nav>
           </div>
-        </Link>
+        </div>
       </td>
       <td>{formatUsd(asset.current_price)}</td>
       <td className={changeClass(asset.price_change_percentage_1h)}>{formatPercent(asset.price_change_percentage_1h)}</td>

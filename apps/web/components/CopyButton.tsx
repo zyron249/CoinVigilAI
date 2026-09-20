@@ -18,7 +18,14 @@ export function CopyButton({ value, label }: { value?: string; label: string }) 
   }
 
   return (
-    <button type="button" className="ghost tool-button copy-button" onClick={() => { void copy(); }}>
+    <button
+      type="button"
+      className={`ghost tool-button copy-button${copied ? " is-copied" : ""}`}
+      onClick={() => { void copy(); }}
+      aria-live="polite"
+      aria-atomic="true"
+      title={copied ? "Copied to clipboard" : label}
+    >
       {copied ? "Copied" : label}
     </button>
   );

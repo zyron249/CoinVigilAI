@@ -210,6 +210,7 @@ class AssetContract(BaseModel):
     platform: str
     label: str
     address: str
+    explorer_url: str | None = None
 
 
 class AssetProfile(BaseModel):

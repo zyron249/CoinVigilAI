@@ -47,3 +47,32 @@ test("contract addresses reject urls and empty native keys", () => {
   assert.equal(addressOk.test("javascript:alert(1)"), false);
   assert.equal(addressOk.test(""), false);
 });
+
+function truncateAddress(address, head = 8, tail = 6) {
+  const text = String(address || "").trim();
+  if (text.length <= 18) return text;
+  return `${text.slice(0, head)}…${text.slice(-tail)}`;
+}
+
+test("truncate long contract addresses and keep short ones whole", () => {
+  assert.equal(truncateAddress("shortaddr"), "shortaddr");
+  assert.equal(
+    truncateAddress("0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"),
+    "0xa0b869…06eb48",
+  );
+});
+
+function explorerHref(address, explorerUrl) {
+  const url = typeof explorerUrl === "string" ? explorerUrl.trim() : "";
+  if (!url.startsWith("http://") && !url.startsWith("https://")) return null;
+  if (!url.toLowerCase().includes(String(address || "").toLowerCase())) return null;
+  return url;
+}
+
+test("explorer deep-link only when CoinGecko URL already contains the address", () => {
+  const addr = "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48";
+  assert.equal(explorerHref(addr, "https://etherscan.io/"), null);
+  assert.equal(explorerHref(addr, `https://etherscan.io/token/${addr}`), `https://etherscan.io/token/${addr}`);
+  assert.equal(explorerHref(addr, "javascript:alert(1)"), null);
+  assert.equal(explorerHref(addr, "https://etherscan.io/token/0xdeadbeefdeadbeef"), null);
+});

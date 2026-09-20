@@ -228,6 +228,7 @@ export type AssetContract = {
   platform: string;
   label: string;
   address: string;
+  explorer_url?: string | null;
 };
 
 export type AssetProfile = {
@@ -475,7 +476,11 @@ export async function getAssetProfile(coinId: string): Promise<AssetProfile> {
               return [];
             }
             if (!/^[0-9A-Za-z:._-]{8,128}$/.test(address)) return [];
-            return [{ platform, label, address }];
+            const rawExplorer = typeof item?.explorer_url === "string" ? item.explorer_url.trim() : "";
+            const explorerOk = (rawExplorer.startsWith("http://") || rawExplorer.startsWith("https://"))
+              && rawExplorer.toLowerCase().includes(address.toLowerCase())
+              && !rawExplorer.toLowerCase().startsWith("javascript:");
+            return [{ platform, label, address, explorer_url: explorerOk ? rawExplorer : null }];
           }).slice(0, 10)
         : [],
       source: MARKET_SOURCES.has(json.source) ? json.source : "unavailable",
