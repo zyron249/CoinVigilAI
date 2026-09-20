@@ -1,22 +1,117 @@
 import logging
 import math
 import time
+from typing import Any
 
 import httpx
 
 from app.config import get_settings
-from app.models import Candle, MarketAsset
+from app.models import Candle, GlobalOverview, MarketAsset, MarketMovers, RankedMarkets
 from app.services.cache import cache_get, cache_set
 
 logger = logging.getLogger(__name__)
 
 # CoinGecko's public OHLC endpoint only accepts this closed set.
 COINGECKO_OHLC_DAYS = (1, 7, 14, 30, 90, 180, 365)
+MARKET_UNIVERSE_LIMIT = 100
+VALID_SOURCES = {"coingecko", "cache", "demo"}
+SORT_FIELDS = {
+    "rank": "market_cap_rank",
+    "market_cap": "market_cap",
+    "volume": "total_volume",
+    "price": "current_price",
+    "name": "name",
+    "change_1h": "price_change_percentage_1h",
+    "change_24h": "price_change_percentage_24h",
+    "change_7d": "price_change_percentage_7d",
+}
+NUMERIC_SORTS = {
+    "rank",
+    "market_cap",
+    "volume",
+    "price",
+    "change_1h",
+    "change_24h",
+    "change_7d",
+}
 
+
+def _demo_sparkline(anchor: float, change_7d: float) -> list[float]:
+    start = max(float(anchor) / (1 + change_7d / 100.0), 1e-12)
+    points: list[float] = []
+    for index in range(48):
+        progress = index / 47
+        wave = 1 + math.sin(index / 5.2) * 0.018
+        value = start * (1 + progress * (change_7d / 100.0)) * wave
+        points.append(round(value, 8))
+    return points
+
+
+def _demo_asset(**kwargs: Any) -> MarketAsset:
+    price = float(kwargs.get("current_price") or 1)
+    change_7d = float(kwargs.get("price_change_percentage_7d") or 0)
+    kwargs.setdefault("sparkline_7d", _demo_sparkline(price, change_7d))
+    return MarketAsset(**kwargs)
+
+
+# Labeled synthetic stand-in used only when CoinGecko is unreachable.
 DEMO_MARKETS = [
-    MarketAsset(id="bitcoin", symbol="btc", name="Bitcoin", current_price=63420, market_cap=1250000000000, market_cap_rank=1, total_volume=38000000000, high_24h=64600, low_24h=61200, price_change_percentage_24h=2.8),
-    MarketAsset(id="ethereum", symbol="eth", name="Ethereum", current_price=3240, market_cap=389000000000, market_cap_rank=2, total_volume=17000000000, high_24h=3310, low_24h=3110, price_change_percentage_24h=1.7),
-    MarketAsset(id="solana", symbol="sol", name="Solana", current_price=148, market_cap=69000000000, market_cap_rank=5, total_volume=4300000000, high_24h=154, low_24h=139, price_change_percentage_24h=5.9),
+    _demo_asset(
+        id="bitcoin", symbol="btc", name="Bitcoin", current_price=63420, market_cap=1_250_000_000_000,
+        market_cap_rank=1, total_volume=38_000_000_000, high_24h=64600, low_24h=61200,
+        price_change_percentage_24h=2.8, price_change_percentage_1h=0.4, price_change_percentage_7d=4.1,
+        circulating_supply=19_700_000, total_supply=19_700_000, max_supply=21_000_000,
+        fully_diluted_valuation=1_332_000_000_000,
+    ),
+    _demo_asset(
+        id="ethereum", symbol="eth", name="Ethereum", current_price=3240, market_cap=389_000_000_000,
+        market_cap_rank=2, total_volume=17_000_000_000, high_24h=3310, low_24h=3110,
+        price_change_percentage_24h=1.7, price_change_percentage_1h=-0.2, price_change_percentage_7d=2.4,
+        circulating_supply=120_400_000, total_supply=120_400_000,
+        fully_diluted_valuation=389_000_000_000,
+    ),
+    _demo_asset(
+        id="solana", symbol="sol", name="Solana", current_price=148, market_cap=69_000_000_000,
+        market_cap_rank=5, total_volume=4_300_000_000, high_24h=154, low_24h=139,
+        price_change_percentage_24h=5.9, price_change_percentage_1h=1.1, price_change_percentage_7d=8.2,
+        circulating_supply=466_000_000, total_supply=580_000_000,
+        fully_diluted_valuation=85_800_000_000,
+    ),
+    _demo_asset(
+        id="binancecoin", symbol="bnb", name="BNB", current_price=580, market_cap=84_000_000_000,
+        market_cap_rank=4, total_volume=1_800_000_000, high_24h=588, low_24h=571,
+        price_change_percentage_24h=0.4, price_change_percentage_1h=0.1, price_change_percentage_7d=-1.3,
+        circulating_supply=145_000_000, total_supply=145_000_000, max_supply=200_000_000,
+        fully_diluted_valuation=116_000_000_000,
+    ),
+    _demo_asset(
+        id="ripple", symbol="xrp", name="XRP", current_price=0.52, market_cap=29_000_000_000,
+        market_cap_rank=6, total_volume=1_200_000_000, high_24h=0.54, low_24h=0.50,
+        price_change_percentage_24h=-1.2, price_change_percentage_1h=-0.6, price_change_percentage_7d=-3.8,
+        circulating_supply=56_000_000_000, total_supply=99_900_000_000, max_supply=100_000_000_000,
+        fully_diluted_valuation=52_000_000_000,
+    ),
+    _demo_asset(
+        id="cardano", symbol="ada", name="Cardano", current_price=0.38, market_cap=13_400_000_000,
+        market_cap_rank=9, total_volume=420_000_000, high_24h=0.40, low_24h=0.36,
+        price_change_percentage_24h=3.1, price_change_percentage_1h=0.8, price_change_percentage_7d=5.0,
+        circulating_supply=35_200_000_000, total_supply=45_000_000_000, max_supply=45_000_000_000,
+        fully_diluted_valuation=17_100_000_000,
+    ),
+    _demo_asset(
+        id="dogecoin", symbol="doge", name="Dogecoin", current_price=0.12, market_cap=17_600_000_000,
+        market_cap_rank=8, total_volume=980_000_000, high_24h=0.13, low_24h=0.11,
+        price_change_percentage_24h=-4.5, price_change_percentage_1h=-1.4, price_change_percentage_7d=-6.2,
+        circulating_supply=146_000_000_000, total_supply=146_000_000_000,
+        fully_diluted_valuation=17_600_000_000,
+    ),
+    _demo_asset(
+        id="avalanche-2", symbol="avax", name="Avalanche", current_price=28, market_cap=11_400_000_000,
+        market_cap_rank=11, total_volume=610_000_000, high_24h=30, low_24h=26,
+        price_change_percentage_24h=6.8, price_change_percentage_1h=1.8, price_change_percentage_7d=11.4,
+        circulating_supply=407_000_000, total_supply=449_000_000, max_supply=720_000_000,
+        fully_diluted_valuation=20_200_000_000,
+    ),
 ]
 
 
@@ -25,9 +120,19 @@ def snap_ohlc_days(days: int) -> int:
     return min(COINGECKO_OHLC_DAYS, key=lambda allowed: (abs(allowed - requested), allowed))
 
 
+def normalize_sort(sort: str | None) -> str:
+    key = (sort or "market_cap").strip().lower()
+    return key if key in SORT_FIELDS else "market_cap"
+
+
+def normalize_order(order: str | None) -> str:
+    value = (order or "desc").strip().lower()
+    return value if value in {"asc", "desc"} else "desc"
+
+
 def _headers() -> dict[str, str]:
     settings = get_settings()
-    headers = {"User-Agent": "CoinVigilAI/0.3", "Accept": "application/json"}
+    headers = {"User-Agent": "CoinVigilAI/0.4", "Accept": "application/json"}
     key = settings.coingecko_api_key.strip()
     if not key:
         return headers
@@ -41,6 +146,74 @@ def _headers() -> dict[str, str]:
 def _match_asset(asset: MarketAsset, coin_id: str) -> bool:
     needle = coin_id.lower()
     return asset.id.lower() == needle or asset.symbol.lower() == needle
+
+
+def _as_float(value: Any) -> float | None:
+    if value is None or value == "":
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _as_int(value: Any) -> int | None:
+    if value is None or value == "":
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _sparkline_points(raw: Any) -> list[float]:
+    if isinstance(raw, dict):
+        raw = raw.get("price")
+    if not isinstance(raw, list):
+        return []
+    points: list[float] = []
+    for item in raw:
+        number = _as_float(item)
+        if number is not None:
+            points.append(number)
+    return points
+
+
+def market_asset_from_payload(item: dict[str, Any]) -> MarketAsset:
+    """Map a CoinGecko markets row (or a cached dump) onto MarketAsset."""
+    return MarketAsset(
+        id=str(item.get("id") or ""),
+        symbol=str(item.get("symbol") or ""),
+        name=str(item.get("name") or item.get("id") or "unknown"),
+        image=item.get("image"),
+        current_price=_as_float(item.get("current_price")),
+        market_cap=_as_float(item.get("market_cap")),
+        market_cap_rank=_as_int(item.get("market_cap_rank")),
+        total_volume=_as_float(item.get("total_volume")),
+        high_24h=_as_float(item.get("high_24h")),
+        low_24h=_as_float(item.get("low_24h")),
+        price_change_percentage_24h=_as_float(
+            item.get("price_change_percentage_24h_in_currency")
+            if item.get("price_change_percentage_24h_in_currency") is not None
+            else item.get("price_change_percentage_24h")
+        ),
+        price_change_percentage_1h=_as_float(
+            item.get("price_change_percentage_1h")
+            if item.get("price_change_percentage_1h") is not None
+            else item.get("price_change_percentage_1h_in_currency")
+        ),
+        price_change_percentage_7d=_as_float(
+            item.get("price_change_percentage_7d")
+            if item.get("price_change_percentage_7d") is not None
+            else item.get("price_change_percentage_7d_in_currency")
+        ),
+        circulating_supply=_as_float(item.get("circulating_supply")),
+        total_supply=_as_float(item.get("total_supply")),
+        max_supply=_as_float(item.get("max_supply")),
+        fully_diluted_valuation=_as_float(item.get("fully_diluted_valuation")),
+        sparkline_7d=_sparkline_points(item.get("sparkline_7d") or item.get("sparkline_in_7d")),
+        last_updated=str(item["last_updated"]) if item.get("last_updated") else None,
+    )
 
 
 def _demo_candles(asset: MarketAsset, days: int) -> list[Candle]:
@@ -73,28 +246,47 @@ def _demo_candles(asset: MarketAsset, days: int) -> list[Candle]:
     return candles
 
 
-async def get_markets_with_source(limit: int = 20) -> tuple[list[MarketAsset], str]:
+def _sort_assets(assets: list[MarketAsset], sort: str, order: str) -> list[MarketAsset]:
+    field = SORT_FIELDS[normalize_sort(sort)]
+    descending = normalize_order(order) == "desc"
+
+    def key(asset: MarketAsset) -> tuple[int, Any]:
+        value = getattr(asset, field, None)
+        if value is None:
+            return (1, 0)
+        if field == "name":
+            return (0, str(value).lower())
+        return (0, value)
+
+    return sorted(assets, key=key, reverse=descending)
+
+
+def _slice_page(assets: list[MarketAsset], page: int, limit: int) -> list[MarketAsset]:
+    start = max(0, (page - 1) * limit)
+    return assets[start:start + limit]
+
+
+async def get_market_universe() -> tuple[list[MarketAsset], str]:
     settings = get_settings()
-    bounded = max(1, min(limit, 100))
-    cache_key = f"markets:{bounded}"
+    cache_key = f"markets:v2:universe:{MARKET_UNIVERSE_LIMIT}"
     cached = await cache_get(cache_key)
     if isinstance(cached, list) and cached:
-        return [MarketAsset(**item) for item in cached], "cache"
+        return [market_asset_from_payload(item) for item in cached if item.get("id")], "cache"
 
     params = {
         "vs_currency": "usd",
         "order": "market_cap_desc",
-        "per_page": bounded,
+        "per_page": MARKET_UNIVERSE_LIMIT,
         "page": 1,
-        "sparkline": "false",
-        "price_change_percentage": "24h",
+        "sparkline": "true",
+        "price_change_percentage": "1h,24h,7d",
     }
     try:
-        async with httpx.AsyncClient(timeout=10.0, headers=_headers()) as client:
+        async with httpx.AsyncClient(timeout=12.0, headers=_headers()) as client:
             response = await client.get(f"{settings.coingecko_base_url}/coins/markets", params=params)
             response.raise_for_status()
             payload = response.json()
-            assets = [MarketAsset(**item) for item in payload]
+            assets = [market_asset_from_payload(item) for item in payload if isinstance(item, dict) and item.get("id")]
             if assets:
                 await cache_set(cache_key, [asset.model_dump() for asset in assets], settings.market_cache_ttl_seconds)
                 return assets, "coingecko"
@@ -102,7 +294,12 @@ async def get_markets_with_source(limit: int = 20) -> tuple[list[MarketAsset], s
     except Exception as exc:
         logger.warning("CoinGecko markets unavailable (%s); using demo snapshot", type(exc).__name__)
 
-    return DEMO_MARKETS[:bounded], "demo"
+    return list(DEMO_MARKETS), "demo"
+
+
+async def get_markets_with_source(limit: int = 20) -> tuple[list[MarketAsset], str]:
+    ranked = await get_ranked_markets(limit=limit, page=1, sort="market_cap", order="desc")
+    return ranked.data, ranked.source
 
 
 async def get_markets(limit: int = 20) -> list[MarketAsset]:
@@ -110,16 +307,145 @@ async def get_markets(limit: int = 20) -> list[MarketAsset]:
     return assets
 
 
-async def get_asset(coin_id: str) -> MarketAsset | None:
+async def get_ranked_markets(
+    limit: int = 50,
+    page: int = 1,
+    sort: str = "market_cap",
+    order: str = "desc",
+) -> RankedMarkets:
+    bounded_limit = max(1, min(int(limit), 100))
+    bounded_page = max(1, min(int(page), 50))
+    sort_key = normalize_sort(sort)
+    order_key = normalize_order(order)
+    assets, source = await get_market_universe()
+    ranked = _sort_assets(assets, sort_key, order_key)
+    page_rows = _slice_page(ranked, bounded_page, bounded_limit)
+    return RankedMarkets(
+        data=page_rows,
+        count=len(page_rows),
+        page=bounded_page,
+        limit=bounded_limit,
+        total=len(ranked),
+        sort=sort_key,
+        order=order_key,
+        source=source,
+        universe_size=len(ranked),
+        coverage="universe",
+    )
+
+
+def _overview_from_assets(assets: list[MarketAsset], source: str) -> GlobalOverview:
+    total_cap = sum(asset.market_cap or 0 for asset in assets)
+    total_volume = sum(asset.total_volume or 0 for asset in assets)
+    btc = next((asset for asset in assets if asset.id == "bitcoin"), None)
+    eth = next((asset for asset in assets if asset.id == "ethereum"), None)
+    btc_dom = ((btc.market_cap or 0) / total_cap * 100) if btc and total_cap else None
+    eth_dom = ((eth.market_cap or 0) / total_cap * 100) if eth and total_cap else None
+    note = (
+        "Demo snapshot totals across the labeled fallback universe, not live global market cap."
+        if source == "demo"
+        else f"Derived from the ranked CoinVigil universe ({len(assets)} assets), not CoinGecko /global."
+    )
+    return GlobalOverview(
+        total_market_cap_usd=total_cap or None,
+        total_volume_24h_usd=total_volume or None,
+        market_cap_change_percentage_24h_usd=None,
+        btc_dominance=round(btc_dom, 2) if btc_dom is not None else None,
+        eth_dominance=round(eth_dom, 2) if eth_dom is not None else None,
+        active_cryptocurrencies=len(assets),
+        source=source,
+        coverage="universe",
+        note=note,
+    )
+
+
+async def _fear_greed() -> tuple[int, str, str] | None:
+    settings = get_settings()
+    url = settings.fear_greed_url.strip()
+    if not url:
+        return None
+    try:
+        async with httpx.AsyncClient(timeout=6.0, headers={"User-Agent": "CoinVigilAI/0.4", "Accept": "application/json"}) as client:
+            response = await client.get(url)
+            response.raise_for_status()
+            payload = response.json()
+        rows = payload.get("data") if isinstance(payload, dict) else None
+        if not isinstance(rows, list) or not rows:
+            return None
+        row = rows[0]
+        value = _as_int(row.get("value"))
+        classification = str(row.get("value_classification") or "").strip()
+        if value is None or not classification:
+            return None
+        return value, classification, "alternative.me"
+    except Exception as exc:
+        logger.info("Fear & Greed unavailable (%s); omitting index", type(exc).__name__)
+        return None
+
+
+async def get_global_overview() -> GlobalOverview:
+    settings = get_settings()
+    cache_key = "markets:v2:global"
+    cached = await cache_get(cache_key)
+    if isinstance(cached, dict) and cached.get("source") in VALID_SOURCES:
+        return GlobalOverview(**cached)
+
+    fear = await _fear_greed()
+    try:
+        async with httpx.AsyncClient(timeout=10.0, headers=_headers()) as client:
+            response = await client.get(f"{settings.coingecko_base_url}/global")
+            response.raise_for_status()
+            payload = response.json()
+        blob = payload.get("data") if isinstance(payload, dict) else None
+        if isinstance(blob, dict):
+            caps = blob.get("total_market_cap") or {}
+            volumes = blob.get("total_volume") or {}
+            dominance = blob.get("market_cap_percentage") or {}
+            overview = GlobalOverview(
+                total_market_cap_usd=_as_float(caps.get("usd") if isinstance(caps, dict) else None),
+                total_volume_24h_usd=_as_float(volumes.get("usd") if isinstance(volumes, dict) else None),
+                market_cap_change_percentage_24h_usd=_as_float(blob.get("market_cap_change_percentage_24h_usd")),
+                btc_dominance=_as_float(dominance.get("btc") if isinstance(dominance, dict) else None),
+                eth_dominance=_as_float(dominance.get("eth") if isinstance(dominance, dict) else None),
+                active_cryptocurrencies=_as_int(blob.get("active_cryptocurrencies")),
+                source="coingecko",
+                coverage="global",
+                note="CoinGecko /global snapshot. Not CoinMarketCap.",
+                updated_at=_as_int(blob.get("updated_at")),
+            )
+            if fear:
+                overview.fear_greed_value, overview.fear_greed_classification, overview.fear_greed_source = fear
+            await cache_set(cache_key, overview.model_dump(), settings.market_cache_ttl_seconds)
+            return overview
+    except Exception as exc:
+        logger.warning("CoinGecko global unavailable (%s); deriving from ranked universe", type(exc).__name__)
+
+    assets, source = await get_market_universe()
+    overview = _overview_from_assets(assets, source)
+    if fear:
+        overview.fear_greed_value, overview.fear_greed_classification, overview.fear_greed_source = fear
+    return overview
+
+
+async def get_movers(limit: int = 5) -> MarketMovers:
+    bounded = max(1, min(int(limit), 15))
+    assets, source = await get_market_universe()
+    scored = [asset for asset in assets if asset.price_change_percentage_24h is not None]
+    gainers = sorted(scored, key=lambda asset: asset.price_change_percentage_24h or 0, reverse=True)[:bounded]
+    losers = sorted(scored, key=lambda asset: asset.price_change_percentage_24h or 0)[:bounded]
+    return MarketMovers(gainers=gainers, losers=losers, count=bounded, source=source)
+
+
+async def get_asset_with_source(coin_id: str) -> tuple[MarketAsset | None, str]:
     settings = get_settings()
     needle = coin_id.strip().lower()
     if not needle:
-        return None
+        return None, "unavailable"
 
-    cache_key = f"asset:{needle}"
+    cache_key = f"asset:v2:{needle}"
     cached = await cache_get(cache_key)
-    if isinstance(cached, dict):
-        return MarketAsset(**cached)
+    if isinstance(cached, dict) and cached.get("id"):
+        return market_asset_from_payload(cached), "cache"
 
     try:
         async with httpx.AsyncClient(timeout=10.0, headers=_headers()) as client:
@@ -130,28 +456,33 @@ async def get_asset(coin_id: str) -> MarketAsset | None:
                     "ids": needle,
                     "per_page": 1,
                     "page": 1,
-                    "sparkline": "false",
-                    "price_change_percentage": "24h",
+                    "sparkline": "true",
+                    "price_change_percentage": "1h,24h,7d",
                 },
             )
             response.raise_for_status()
             payload = response.json()
             if payload:
-                asset = MarketAsset(**payload[0])
+                asset = market_asset_from_payload(payload[0])
                 await cache_set(cache_key, asset.model_dump(), settings.market_cache_ttl_seconds)
-                return asset
+                return asset, "coingecko"
     except Exception as exc:
         logger.warning("CoinGecko asset lookup failed for %s (%s)", needle, type(exc).__name__)
 
-    markets, _source = await get_markets_with_source(100)
+    markets, source = await get_market_universe()
     for asset in markets:
         if _match_asset(asset, needle):
-            return asset
+            return asset, source
 
     for asset in DEMO_MARKETS:
         if _match_asset(asset, needle):
-            return asset
-    return None
+            return asset, "demo"
+    return None, "unavailable"
+
+
+async def get_asset(coin_id: str) -> MarketAsset | None:
+    asset, _source = await get_asset_with_source(coin_id)
+    return asset
 
 
 async def get_candles(coin_id: str, days: int = 90) -> tuple[list[Candle], str]:

@@ -89,6 +89,9 @@ jobs:
         run: |
           set -euo pipefail
           curl -fsS "http://127.0.0.1:8000/api/market?limit=3" > /tmp/market.json
+          curl -fsS "http://127.0.0.1:8000/api/market/global" > /tmp/global.json
+          curl -fsS "http://127.0.0.1:8000/api/market/movers?limit=3" > /tmp/movers.json
+          curl -fsS "http://127.0.0.1:8000/api/market/brief" > /tmp/brief.json
           curl -fsS "http://127.0.0.1:8000/api/radar?limit=3" > /tmp/radar.json
           curl -fsS "http://127.0.0.1:8000/api/assets/bitcoin/analysis" > /tmp/analysis.json
           curl -fsS "http://127.0.0.1:8000/api/assets/bitcoin/candles?days=7" > /tmp/candles.json
@@ -97,14 +100,24 @@ jobs:
           python - <<'PY'
           import json
           from pathlib import Path
+          allowed_sources = {'coingecko', 'cache', 'demo'}
           health = json.loads(Path('/tmp/health.json').read_text())
           market = json.loads(Path('/tmp/market.json').read_text())
+          global_overview = json.loads(Path('/tmp/global.json').read_text())
+          movers = json.loads(Path('/tmp/movers.json').read_text())
+          brief = json.loads(Path('/tmp/brief.json').read_text())
           analysis = json.loads(Path('/tmp/analysis.json').read_text())
           candles = json.loads(Path('/tmp/candles.json').read_text())
           council_status = json.loads(Path('/tmp/council-status.json').read_text())
           assert health.get('status') == 'ok', health
           assert isinstance(market.get('data'), list) and market['data'], market
+          assert market.get('source') in allowed_sources, market
+          assert global_overview.get('source') in allowed_sources, global_overview
+          assert movers.get('source') in allowed_sources, movers
+          assert brief.get('data_source') in allowed_sources, brief
+          assert 'not financial advice' in brief.get('disclaimer', '').lower(), brief
           assert analysis.get('asset', {}).get('id') == 'bitcoin', analysis
+          assert analysis.get('data_source') in allowed_sources, analysis
           assert isinstance(candles.get('data'), list) and candles['data'], candles
           candle = candles['data'][0]
           assert all(key in candle for key in ('timestamp','open','high','low','close')), candle
@@ -117,7 +130,7 @@ jobs:
           assert providers['xai'].get('optional') is True, providers['xai']
           assert providers['xai'].get('configured') is False, providers['xai']
           assert providers['xai'].get('endpoint') == 'https://api.x.ai/v1/chat/completions', providers['xai']
-          print('API, candle and AI Council smoke tests passed')
+          print('API, markets, brief, candle and AI Council smoke tests passed')
           PY
 
       - name: Smoke test web application
@@ -133,6 +146,14 @@ jobs:
               sleep 2
               continue
             fi
+            if ! grep -q "AI MARKET BRIEF" /tmp/web.html; then
+              sleep 2
+              continue
+            fi
+            if ! grep -q "CRYPTOCURRENCY RANKINGS" /tmp/web.html; then
+              sleep 2
+              continue
+            fi
             if ! grep -q "xAI Grok" /tmp/web.html; then
               sleep 2
               continue
@@ -142,6 +163,10 @@ jobs:
               continue
             fi
             if ! grep -q "PRO CHART LAB" /tmp/bitcoin.html; then
+              sleep 2
+              continue
+            fi
+            if ! grep -q "Circulating" /tmp/bitcoin.html; then
               sleep 2
               continue
             fi

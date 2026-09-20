@@ -1,54 +1,68 @@
 import Link from "next/link";
 import { CouncilRoster } from "../components/CouncilRoster";
+import { GlobalStrip } from "../components/GlobalStrip";
+import { MarketBriefCard } from "../components/MarketBriefCard";
 import { MarketTable } from "../components/MarketTable";
-import { MetricCard } from "../components/MetricCard";
+import { Movers } from "../components/Movers";
 import { Radar } from "../components/Radar";
-import { getCouncilStatus, getMarket, getRadar } from "../lib/api";
+import { getCouncilStatus, getGlobalOverview, getMarket, getMovers, getRadar } from "../lib/api";
+import { sourceLabel } from "../lib/format";
 
 export default async function Home() {
-  const [{ assets, source }, radar, council] = await Promise.all([getMarket(), getRadar(), getCouncilStatus()]);
-  const marketCap = assets.reduce((sum, asset) => sum + (asset.market_cap ?? 0), 0);
-  const volume = assets.reduce((sum, asset) => sum + (asset.total_volume ?? 0), 0);
-  const gainers = assets.filter((asset) => (asset.price_change_percentage_24h ?? 0) > 0).length;
-
-  const compact = new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 2 });
+  const [market, overview, movers, radar, council] = await Promise.all([
+    getMarket({ limit: 50, page: 1, sort: "market_cap", order: "desc" }),
+    getGlobalOverview(),
+    getMovers(5),
+    getRadar(),
+    getCouncilStatus(),
+  ]);
 
   return (
     <main>
       <nav>
         <Link className="brand" href="/"><span className="brand-mark">V</span> CoinVigil <b>AI</b></Link>
         <div className="nav-links">
-          <a href="#markets">Markets</a><a href="#radar">AI Radar</a><a href="#ai-council">AI Council</a><Link href="/news">News</Link><Link href="/token-studio">Token Studio</Link>
+          <a href="#markets">Markets</a>
+          <a href="#ai-brief">AI Brief</a>
+          <a href="#movers">Movers</a>
+          <a href="#radar">AI Radar</a>
+          <a href="#ai-council">AI Council</a>
+          <Link href="/news">News</Link>
+          <Link href="/token-studio">Token Studio</Link>
         </div>
         <Link className="nav-cta" href="/token-studio">Create Token</Link>
       </nav>
 
-      <section className="hero">
-        <div className="hero-copy">
-          <div className="eyebrow hero-tag">ALWAYS-ON CRYPTO INTELLIGENCE</div>
-          <h1>The market never sleeps.<br /><span>Neither does CoinVigil.</span></h1>
-          <p>Live prices, multi-model AI analysis including optional xAI Grok, professional chart research, risk scoring and a non-custodial token launchpad in one terminal.</p>
-          <div className="hero-actions">
-            <a className="button-link" href="#markets">Explore Markets</a>
-            <a className="button-link ghost" href="#ai-council">AI Council</a>
-            <Link className="button-link ghost" href="/token-studio">Open Token Studio</Link>
-          </div>
+      <section className="markets-hero">
+        <div>
+          <div className="eyebrow hero-tag">CRYPTOCURRENCY RANKINGS</div>
+          <h1>Markets, with an <span>AI brief</span>.</h1>
+          <p>
+            Ranked prices, global stats and 24h movers from CoinGecko. Optional council/Grok brief when keys are set.
+            CoinVigil is an AI-supported research terminal — not CoinMarketCap, and not financial advice.
+          </p>
         </div>
-        <div className="orb-wrap"><div className="orb"><div className="orb-core">AI</div></div></div>
+        <aside className="disclaimer-banner">
+          <strong>Data tool, not investment advice.</strong>
+          <span>Live, cache, or demo sources are labeled. Demo prices are synthetic stand-ins used only when CoinGecko is unreachable. No TVL or RPC claims.</span>
+        </aside>
       </section>
 
-      <section className="metrics-grid">
-        <MetricCard label="TRACKED NOW" value={`${assets.length || 0} assets`} note="Click any asset for Pro Chart Lab" />
-        <MetricCard label="MARKET CAP" value={`$${compact.format(marketCap)}`} note="Across visible assets" />
-        <MetricCard label="24H VOLUME" value={`$${compact.format(volume)}`} note="Live provider snapshot" />
-        <MetricCard label="POSITIVE 24H" value={`${gainers}/${assets.length || 0}`} note="Current breadth" />
-      </section>
+      <GlobalStrip overview={overview} />
+      <MarketBriefCard />
 
-      <section id="markets" className="dashboard-grid">
-        <MarketTable assets={assets} source={source} />
+      <section className="slice-grid" id="movers">
+        <Movers gainers={movers.gainers} losers={movers.losers} source={movers.source} />
         <div id="radar">
           <Radar signals={radar} />
         </div>
+      </section>
+      <p className="movers-footnote muted">
+        24h movers are ranked from the CoinVigil universe ({sourceLabel(movers.source).text}). Prices are never invented.
+      </p>
+
+      <section id="markets" className="markets-board">
+        <MarketTable initial={market} />
       </section>
 
       <CouncilRoster
@@ -58,7 +72,7 @@ export default async function Home() {
       />
 
       <section className="feature-strip">
-        <Link className="card feature-card" href={assets[0] ? `/asset/${assets[0].id}` : "/"}>
+        <Link className="card feature-card" href={market.assets[0] ? `/asset/${market.assets[0].id}` : "/"}>
           <div className="eyebrow">PRO CHART LAB</div>
           <h3>Draw, measure and analyze</h3>
           <p>Interactive candlesticks, trend lines, horizontal levels, Fibonacci, brush tools, indicators and PNG export.</p>
@@ -71,8 +85,8 @@ export default async function Home() {
       </section>
 
       <footer>
-        <div>CoinVigil AI · Intelligence and research tools, not financial advice.</div>
-        <div>v0.3.1</div>
+        <div>CoinVigil AI · Intelligence and research tools, not financial advice. Market data via CoinGecko.</div>
+        <div>v0.4.0</div>
       </footer>
     </main>
   );

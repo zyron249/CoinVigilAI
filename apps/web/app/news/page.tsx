@@ -48,7 +48,7 @@ export default async function NewsPage() {
 
       <footer>
         <div>CoinVigil AI · Headlines are sourced, not generated.</div>
-        <div>v0.3.1</div>
+        <div>v0.4.0</div>
       </footer>
     </main>
   );
