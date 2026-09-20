@@ -30,9 +30,9 @@ export default async function Home() {
               <div className="eyebrow hero-tag">CRYPTOCURRENCY RANKINGS</div>
               <h1>Markets, with an <span>AI brief</span>.</h1>
               <p>
-                Ranked prices, 24h movers, and global stats from CoinGecko. The brief on this page is labeled
-                heuristic or AI-generated — never mixed in with the table. CoinVigil is a research terminal,
-                not CoinMarketCap, and not financial advice.
+                Ranked CoinGecko-tracked assets (top snapshot by market cap), 24h movers, and global stats.
+                Search finds names in this snapshot — CoinVigil does not claim every coin on earth.
+                The brief is labeled heuristic or AI-generated. Not CoinMarketCap, and not financial advice.
               </p>
             </div>
             <aside className="disclaimer-banner">

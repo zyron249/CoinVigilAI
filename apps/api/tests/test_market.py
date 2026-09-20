@@ -82,6 +82,101 @@ def test_parses_coingecko_percentage_aliases():
     assert asset.sparkline_7d == [1.0, 1.1, 1.05]
 
 
+def test_parses_ath_fields():
+    asset = market_asset_from_payload({
+        "id": "bitcoin",
+        "symbol": "btc",
+        "name": "Bitcoin",
+        "ath": 69000,
+        "ath_change_percentage": -12.5,
+        "ath_date": "2021-11-10T14:00:00.000Z",
+        "atl": 67,
+        "atl_change_percentage": 90000,
+        "atl_date": "2013-07-05T00:00:00.000Z",
+    })
+    assert asset.ath == 69000
+    assert asset.ath_change_percentage == -12.5
+    assert asset.atl == 67
+
+
+def test_ticker_payload_requires_exchange_and_pair():
+    from app.services.market import ticker_from_payload
+    assert ticker_from_payload({}) is None
+    ticker = ticker_from_payload({
+        "base": "btc",
+        "target": "usdt",
+        "market": {"name": "Binance", "identifier": "binance"},
+        "converted_last": {"usd": 64000},
+        "converted_volume": {"usd": 1_000_000},
+        "trust_score": "green",
+        "trade_url": "https://www.binance.com/en/trade/BTC_USDT",
+    })
+    assert ticker is not None
+    assert ticker.exchange == "Binance"
+    assert ticker.pair == "BTC/USDT"
+    assert ticker.volume_usd == 1_000_000
+    assert ticker.trade_url.startswith("https://")
+
+
+@pytest.mark.asyncio
+async def test_tickers_do_not_invent_pairs_when_offline(monkeypatch):
+    from app.services.market import get_asset_tickers
+    monkeypatch.setattr("app.services.market.httpx.AsyncClient", _FailingClient)
+    monkeypatch.setattr("app.services.market.cache_get", _noop_cache_get)
+    page = await get_asset_tickers("bitcoin", page=1, limit=25)
+    assert page.data == []
+    assert page.source in {"demo", "unavailable"}
+    assert "invent" in page.note.lower()
+
+
+@pytest.mark.asyncio
+async def test_tickers_sort_by_volume_and_keep_source(monkeypatch):
+    from app.services.market import get_asset_tickers
+
+    class _TickerClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            return False
+
+        async def get(self, url, params=None):
+            request = httpx.Request("GET", str(url))
+            return httpx.Response(200, json={
+                "tickers": [
+                    {
+                        "base": "BTC",
+                        "target": "USD",
+                        "market": {"name": "Coinbase Exchange", "identifier": "gdax"},
+                        "converted_last": {"usd": 63900},
+                        "converted_volume": {"usd": 100},
+                        "trust_score": "green",
+                        "trade_url": "https://www.coinbase.com",
+                    },
+                    {
+                        "base": "BTC",
+                        "target": "USDT",
+                        "market": {"name": "Binance", "identifier": "binance"},
+                        "converted_last": {"usd": 64000},
+                        "converted_volume": {"usd": 900},
+                        "trust_score": "green",
+                        "trade_url": "https://www.binance.com/en/trade/BTC_USDT",
+                    },
+                ]
+            }, request=request)
+
+    monkeypatch.setattr("app.services.market.httpx.AsyncClient", _TickerClient)
+    monkeypatch.setattr("app.services.market.cache_get", _noop_cache_get)
+    monkeypatch.setattr("app.services.market.cache_set", _noop_cache_set)
+    page = await get_asset_tickers("bitcoin", page=1, limit=25)
+    assert page.source == "coingecko"
+    assert [row.exchange for row in page.data] == ["Binance", "Coinbase Exchange"]
+    assert "scrape" in page.note.lower()
+
+
 @pytest.mark.asyncio
 async def test_markets_fall_back_to_demo(monkeypatch):
     monkeypatch.setattr("app.services.market.httpx.AsyncClient", _FailingClient)
@@ -106,6 +201,16 @@ async def test_ranked_markets_sort_and_paginate_demo(monkeypatch):
     assert page_two.source == "demo"
     assert page_two.data
     assert {asset.id for asset in page.data}.isdisjoint({asset.id for asset in page_two.data})
+
+
+@pytest.mark.asyncio
+async def test_ranked_search_filters_demo_universe(monkeypatch):
+    monkeypatch.setattr("app.services.market.httpx.AsyncClient", _FailingClient)
+    page = await get_ranked_markets(limit=10, page=1, sort="market_cap", order="desc", query="bit")
+    assert page.query == "bit"
+    assert page.data
+    assert all("bit" in asset.id or "bit" in asset.symbol.lower() or "bit" in asset.name.lower() for asset in page.data)
+    assert "coingecko-tracked" in page.coverage_note.lower()
 
 
 @pytest.mark.asyncio

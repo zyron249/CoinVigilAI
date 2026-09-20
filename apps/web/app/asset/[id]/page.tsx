@@ -1,20 +1,21 @@
+import { AssetWorkspace } from "../../../components/AssetWorkspace";
 import { CouncilRoster } from "../../../components/CouncilRoster";
 import { DemoRibbon } from "../../../components/DemoRibbon";
-import { ProChartLab } from "../../../components/ProChartLab";
 import { Sparkline } from "../../../components/Sparkline";
 import { RangeBar, SupplyBar } from "../../../components/StatBars";
 import { StatusBadge } from "../../../components/StatusBadge";
 import { WatchButton } from "../../../components/WatchButton";
-import { getAssetAnalysis, getCandles, getCouncilStatus } from "../../../lib/api";
+import { getAssetAnalysis, getAssetTickers, getCandles, getCouncilStatus } from "../../../lib/api";
 import { changeClass, formatCompact, formatCompactUsd, formatPercent, formatTimestamp, formatUsd } from "../../../lib/format";
 import { notFound } from "next/navigation";
 
 export default async function AssetPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const [analysis, candleResponse, councilStatus] = await Promise.all([
+  const [analysis, candleResponse, councilStatus, tickers] = await Promise.all([
     getAssetAnalysis(id),
     getCandles(id, 90),
     getCouncilStatus(),
+    getAssetTickers(id, 1, 25),
   ]);
 
   if (!analysis) notFound();
@@ -38,6 +39,9 @@ export default async function AssetPage({ params }: { params: Promise<{ id: stri
     { label: "1h", value: formatPercent(asset.price_change_percentage_1h), className: changeClass(asset.price_change_percentage_1h) },
     { label: "24h", value: formatPercent(asset.price_change_percentage_24h), className: changeClass(asset.price_change_percentage_24h) },
     { label: "7d", value: formatPercent(asset.price_change_percentage_7d), className: changeClass(asset.price_change_percentage_7d) },
+    { label: "ATH", value: formatUsd(asset.ath) },
+    { label: "ATH change", value: formatPercent(asset.ath_change_percentage), className: changeClass(asset.ath_change_percentage) },
+    { label: "ATL", value: formatUsd(asset.atl) },
     { label: "Risk", value: `${analysis.risk.score}/100 · ${analysis.risk.level}` },
   ];
 
@@ -90,11 +94,12 @@ export default async function AssetPage({ params }: { params: Promise<{ id: stri
         </div>
       </section>
 
-      <ProChartLab
+      <AssetWorkspace
         coinId={asset.id}
         symbol={asset.symbol}
+        tickers={tickers}
         candles={candleResponse.data}
-        source={candleResponse.source}
+        candleSource={candleResponse.source}
       />
 
       <section className="analysis-grid">

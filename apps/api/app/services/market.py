@@ -8,14 +8,16 @@ from typing import Any
 import httpx
 
 from app.config import get_settings
-from app.models import Candle, GlobalOverview, MarketAsset, MarketMovers, RankedMarkets
+from app.models import AssetTickers, Candle, ExchangeTicker, GlobalOverview, MarketAsset, MarketMovers, RankedMarkets
 from app.services.cache import cache_get, cache_set
 
 logger = logging.getLogger(__name__)
 
 # CoinGecko's public OHLC endpoint only accepts this closed set.
 COINGECKO_OHLC_DAYS = (1, 7, 14, 30, 90, 180, 365)
-MARKET_UNIVERSE_LIMIT = 100
+# CoinGecko public/demo `/coins/markets` allows per_page up to 250. This is a
+# CoinGecko-tracked snapshot, not every coin on every exchange.
+MARKET_UNIVERSE_LIMIT = 250
 VALID_SOURCES = {"coingecko", "cache", "demo"}
 # Short process cache so one dashboard render does not stampede CoinGecko
 # when Redis is down. Tests clear this via clear_market_memory_cache().
@@ -285,6 +287,12 @@ def market_asset_from_payload(item: dict[str, Any]) -> MarketAsset:
         total_supply=_as_float(item.get("total_supply")),
         max_supply=_as_float(item.get("max_supply")),
         fully_diluted_valuation=_as_float(item.get("fully_diluted_valuation")),
+        ath=_as_float(item.get("ath")),
+        ath_change_percentage=_as_float(item.get("ath_change_percentage")),
+        ath_date=str(item["ath_date"]) if item.get("ath_date") else None,
+        atl=_as_float(item.get("atl")),
+        atl_change_percentage=_as_float(item.get("atl_change_percentage")),
+        atl_date=str(item["atl_date"]) if item.get("atl_date") else None,
         sparkline_7d=_sparkline_points(item.get("sparkline_7d") or item.get("sparkline_in_7d")),
         last_updated=str(item["last_updated"]) if item.get("last_updated") else None,
     )
@@ -387,7 +395,7 @@ async def peek_universe_status() -> dict[str, Any]:
         if isinstance(mem, tuple) and len(mem) == 2 and mem[0]:
             return from_snapshot(UniverseSnapshot(list(mem[0]), mem[1]))
 
-    cache_key = f"markets:v3:universe:{MARKET_UNIVERSE_LIMIT}"
+    cache_key = f"markets:v4:universe:{MARKET_UNIVERSE_LIMIT}"
     cached = await cache_get(cache_key)
     if isinstance(cached, dict):
         snapshot = _snapshot_from_payload(cached, stale=False)
@@ -418,7 +426,7 @@ async def get_universe_snapshot() -> UniverseSnapshot:
         return UniverseSnapshot(list(mem[0]), mem[1])
 
     settings = get_settings()
-    cache_key = f"markets:v3:universe:{MARKET_UNIVERSE_LIMIT}"
+    cache_key = f"markets:v4:universe:{MARKET_UNIVERSE_LIMIT}"
     cached = await cache_get(cache_key)
     if isinstance(cached, dict):
         snapshot = _snapshot_from_payload(cached, stale=False)
@@ -499,18 +507,51 @@ def _freshness_fields(snapshot: UniverseSnapshot) -> dict[str, Any]:
     }
 
 
+def _filter_assets(assets: list[MarketAsset], query: str | None) -> list[MarketAsset]:
+    needle = (query or "").strip().lower()
+    if not needle:
+        return assets
+    return [
+        asset
+        for asset in assets
+        if needle in asset.id.lower()
+        or needle in asset.symbol.lower()
+        or needle in asset.name.lower()
+    ]
+
+
+COVERAGE_NOTE = (
+    f"CoinGecko-tracked snapshot of the top {MARKET_UNIVERSE_LIMIT} assets by market cap — "
+    "not every coin on every exchange, and not a CoinMarketCap clone."
+)
+
+
 async def get_ranked_markets(
     limit: int = 50,
     page: int = 1,
     sort: str = "market_cap",
     order: str = "desc",
+    query: str | None = None,
 ) -> RankedMarkets:
     bounded_limit = max(1, min(int(limit), 100))
     bounded_page = max(1, min(int(page), 50))
     sort_key = normalize_sort(sort)
     order_key = normalize_order(order)
     snapshot = await get_universe_snapshot()
-    ranked = _sort_assets(snapshot.assets, sort_key, order_key)
+    filtered = _filter_assets(snapshot.assets, query)
+    if query and query.strip() and not filtered:
+        extra, extra_source = await get_asset_with_source(query.strip())
+        if extra:
+            filtered = [extra]
+            if extra_source in VALID_SOURCES and snapshot.source != extra_source and extra_source != "demo":
+                snapshot = UniverseSnapshot(
+                    list(snapshot.assets),
+                    extra_source,
+                    snapshot.last_live_at,
+                    snapshot.stale,
+                    snapshot.fallback_reason,
+                )
+    ranked = _sort_assets(filtered, sort_key, order_key)
     page_rows = _slice_page(ranked, bounded_page, bounded_limit)
     return RankedMarkets(
         data=page_rows,
@@ -521,8 +562,10 @@ async def get_ranked_markets(
         sort=sort_key,
         order=order_key,
         source=snapshot.source,
-        universe_size=len(ranked),
+        universe_size=len(snapshot.assets),
         coverage="universe",
+        query=(query or "").strip() or None,
+        coverage_note=COVERAGE_NOTE,
         **_freshness_fields(snapshot),
     )
 
@@ -777,3 +820,153 @@ async def get_candles(coin_id: str, days: int = 90) -> tuple[list[Candle], str]:
     if not asset:
         return [], "unavailable"
     return _demo_candles(asset, normalized_days), "demo"
+
+
+def ticker_from_payload(item: dict[str, Any]) -> ExchangeTicker | None:
+    if not isinstance(item, dict):
+        return None
+    market = item.get("market") if isinstance(item.get("market"), dict) else {}
+    exchange = str(market.get("name") or "").strip()
+    base = str(item.get("base") or "").strip().upper()
+    target = str(item.get("target") or "").strip().upper()
+    if not exchange or not base or not target:
+        return None
+    converted_last = item.get("converted_last") if isinstance(item.get("converted_last"), dict) else {}
+    converted_volume = item.get("converted_volume") if isinstance(item.get("converted_volume"), dict) else {}
+    trade_url = item.get("trade_url")
+    if trade_url and not str(trade_url).startswith(("http://", "https://")):
+        trade_url = None
+    trust = item.get("trust_score")
+    trust_score = str(trust).strip().lower() if trust else None
+    if trust_score not in {"green", "yellow", "red"}:
+        trust_score = None
+    return ExchangeTicker(
+        exchange=exchange,
+        exchange_id=str(market.get("identifier") or "") or None,
+        pair=f"{base}/{target}",
+        base=base,
+        target=target,
+        price_usd=_as_float(converted_last.get("usd")),
+        last_price=_as_float(item.get("last")),
+        volume_usd=_as_float(converted_volume.get("usd")),
+        trust_score=trust_score,
+        bid_ask_spread_percentage=_as_float(item.get("bid_ask_spread_percentage")),
+        trade_url=str(trade_url) if trade_url else None,
+        last_traded_at=str(item["last_traded_at"]) if item.get("last_traded_at") else None,
+    )
+
+
+def _empty_tickers(coin_id: str, page: int, limit: int, source: str, reason: str | None) -> AssetTickers:
+    note = (
+        "CoinGecko returned no tickers for this asset. CoinVigil does not scrape exchange websites or invent pairs."
+        if source != "demo"
+        else "Exchange listings are hidden in the labeled demo snapshot — pairs are never invented."
+    )
+    if reason == "rate_limited":
+        note = "CoinGecko rate-limited ticker lookup. CoinVigil does not scrape exchanges or invent pairs."
+    return AssetTickers(
+        coin_id=coin_id,
+        data=[],
+        count=0,
+        page=page,
+        limit=limit,
+        total=0,
+        source=source,
+        note=note,
+        stale=source == "cache",
+        fallback_reason=reason,
+        last_live_at=None,
+        as_of=_now_iso(),
+    )
+
+
+async def get_asset_tickers(coin_id: str, page: int = 1, limit: int = 25) -> AssetTickers:
+    """CoinGecko coin tickers. Never invents exchange pairs."""
+    needle = coin_id.strip().lower()
+    bounded_limit = max(5, min(int(limit), 100))
+    bounded_page = max(1, min(int(page), 20))
+    if not needle:
+        return _empty_tickers("unknown", bounded_page, bounded_limit, "unavailable", "unreachable")
+
+    settings = get_settings()
+    cache_key = f"tickers:v1:{needle}"
+    mem = _memory_get(cache_key)
+    rows: list[ExchangeTicker] | None = None
+    source = "cache"
+    last_live_at: str | None = None
+    stale = False
+    reason: str | None = None
+
+    if isinstance(mem, dict) and isinstance(mem.get("items"), list):
+        rows = [ExchangeTicker(**item) for item in mem["items"] if isinstance(item, dict)]
+        source = str(mem.get("source") or "cache")
+        last_live_at = mem.get("last_live_at")
+        stale = bool(mem.get("stale"))
+
+    if rows is None:
+        cached = await cache_get(cache_key)
+        if isinstance(cached, dict) and isinstance(cached.get("items"), list):
+            rows = [ExchangeTicker(**item) for item in cached["items"] if isinstance(item, dict)]
+            source = str(cached.get("source") or "cache")
+            last_live_at = cached.get("last_live_at")
+            envelope = {**cached, "stale": False}
+            _memory_set(cache_key, envelope)
+
+    if rows is None:
+        try:
+            async with httpx.AsyncClient(timeout=12.0, headers=_headers()) as client:
+                response = await client.get(
+                    f"{settings.coingecko_base_url}/coins/{needle}/tickers",
+                    params={"page": 1, "order": "volume_desc", "include_exchange_logo": "false"},
+                )
+                response.raise_for_status()
+                payload = response.json()
+            raw = payload.get("tickers") if isinstance(payload, dict) else None
+            parsed = [ticker_from_payload(item) for item in raw if isinstance(item, dict)] if isinstance(raw, list) else []
+            rows = [ticker for ticker in parsed if ticker]
+            fetched_at = _now_iso()
+            source = "coingecko"
+            last_live_at = fetched_at
+            envelope = {
+                "items": [ticker.model_dump() for ticker in rows],
+                "source": "coingecko",
+                "last_live_at": fetched_at,
+            }
+            await cache_set(cache_key, envelope, settings.market_cache_ttl_seconds)
+            await save_last_good(f"tickers:{needle}", envelope)
+            _memory_set(cache_key, envelope)
+        except Exception as exc:
+            reason = _fallback_reason(exc)
+            logger.warning("CoinGecko tickers unavailable for %s (%s)", needle, type(exc).__name__)
+            last_good = await load_last_good(f"tickers:{needle}")
+            if last_good and isinstance(last_good.get("items"), list):
+                rows = [ExchangeTicker(**item) for item in last_good["items"] if isinstance(item, dict)]
+                source = "cache"
+                stale = True
+                last_live_at = last_good.get("last_live_at")
+            else:
+                return _empty_tickers(needle, bounded_page, bounded_limit, "demo" if reason else "unavailable", reason)
+
+    rows = rows or []
+    ranked = sorted(rows, key=lambda ticker: ticker.volume_usd or 0, reverse=True)
+    page_rows = _slice_page(ranked, bounded_page, bounded_limit)
+    note = (
+        f"CoinGecko ticker snapshot (up to {len(ranked)} pairs from the first CoinGecko page), "
+        "sorted by USD volume. Not every venue worldwide, and CoinVigil does not scrape exchanges."
+    )
+    if not ranked:
+        return _empty_tickers(needle, bounded_page, bounded_limit, source if source in VALID_SOURCES else "unavailable", reason)
+    return AssetTickers(
+        coin_id=needle,
+        data=page_rows,
+        count=len(page_rows),
+        page=bounded_page,
+        limit=bounded_limit,
+        total=len(ranked),
+        source=source if source in VALID_SOURCES else "cache",
+        note=note,
+        last_live_at=last_live_at,
+        as_of=last_live_at if stale else _now_iso(),
+        stale=stale,
+        fallback_reason=reason,
+    )

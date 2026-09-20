@@ -92,8 +92,34 @@ def test_candles_report_snapped_coingecko_days(monkeypatch):
     assert body["count"] == 1
 
 
+def test_tickers_endpoint_never_invents_pairs(monkeypatch):
+    from app.models import AssetTickers
+
+    async def fake_tickers(coin_id: str, page: int = 1, limit: int = 25):
+        return AssetTickers(
+            coin_id=coin_id,
+            data=[],
+            count=0,
+            page=page,
+            limit=limit,
+            total=0,
+            source="demo",
+            note="Exchange listings are hidden in the labeled demo snapshot — pairs are never invented.",
+        )
+
+    monkeypatch.setattr("app.main.get_asset_tickers", fake_tickers)
+    response = client.get("/api/assets/bitcoin/tickers")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["data"] == []
+    assert body["source"] == "demo"
+    assert "invent" in body["note"].lower()
+    dumped = str(body).lower()
+    assert "api_key" not in dumped
+
+
 def test_market_source_is_exposed(monkeypatch):
-    async def fake_ranked(limit=50, page=1, sort="market_cap", order="desc"):
+    async def fake_ranked(limit=50, page=1, sort="market_cap", order="desc", query=None):
         rows = DEMO_MARKETS[:limit]
         return RankedMarkets(
             data=rows,

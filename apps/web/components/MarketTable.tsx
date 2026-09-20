@@ -62,7 +62,7 @@ export function MarketTable({
   busy?: boolean;
   refreshError?: string | null;
   checkedAt?: string | null;
-  onQuery: (next: { page?: number; limit?: number; sort?: string; order?: string }) => void;
+  onQuery: (next: { page?: number; limit?: number; sort?: string; order?: string; q?: string }) => void;
 }) {
   function toggleSort(sort: string) {
     if (pageData.sort === sort) {
@@ -85,7 +85,29 @@ export function MarketTable({
           <div className="eyebrow">MARKET SNAPSHOT</div>
           <h2>Cryptocurrency rankings</h2>
         </div>
-        <StatusBadge source={pageData.source} stale={pageData.stale} />
+        <div className="table-tools">
+          <form
+            className="market-search"
+            onSubmit={(event) => {
+              event.preventDefault();
+              const value = new FormData(event.currentTarget).get("q");
+              onQuery({ q: String(value || ""), page: 1 });
+            }}
+          >
+            <label className="sr-only" htmlFor="market-search">Search CoinGecko-tracked assets</label>
+            <input
+              id="market-search"
+              name="q"
+              type="search"
+              defaultValue={pageData.query || ""}
+              placeholder="Search name, symbol, or id"
+              autoComplete="off"
+              disabled={busy}
+            />
+            <button type="submit" className="ghost tool-button" disabled={busy}>Search</button>
+          </form>
+          <StatusBadge source={pageData.source} stale={pageData.stale} />
+        </div>
       </div>
       {refreshError ? (
         <p className="table-banner" role="status">{refreshError}</p>
@@ -144,7 +166,8 @@ export function MarketTable({
       <p className="table-swipe muted">Swipe sideways on small screens to see 1h/24h/7d, volume, supply, and 7d sparkline.</p>
       <div className="table-footer">
         <div className="muted">
-          Showing {pageData.assets.length} of {pageData.total} ranked assets
+          Showing {pageData.assets.length} of {pageData.total} matching assets
+          {pageData.universe_size ? ` · snapshot ${pageData.universe_size}` : ""}
           {pageData.stale && lastLive ? ` · last live ${lastLive}` : asOf ? ` · last updated ${asOf}` : ""}
           {checked && checked !== asOf ? ` · checked ${checked}` : ""}
           {busy ? " · updating…" : ""}
@@ -167,6 +190,7 @@ export function MarketTable({
           </button>
         </div>
       </div>
+      {pageData.coverage_note ? <p className="coverage-note muted">{pageData.coverage_note}</p> : null}
     </div>
   );
 }

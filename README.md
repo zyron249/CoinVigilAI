@@ -7,9 +7,8 @@ It is an informational research tool, not a production trading desk and not fina
 ## What works today
 
 - FastAPI market rankings, global overview, movers, AI brief, radar, analysis, candle, news, and health endpoints
-- Next.js Markets homepage: sortable/paginated rankings, local browser watchlist, global strip, gainers/losers, AI Market Brief
-- `/status` page plus `GET /api/status` (Live/Demo path, Redis, Postgres-not-provisioned, AI keys configured — never the keys)
-- Asset pages with denser stats (1h/24h/7d, vol/mcap, circulating vs max, 24h range) plus AI analysis
+- Next.js Markets homepage: sortable/paginated/searchable rankings of the CoinGecko top-250 snapshot, local browser watchlist, global strip, gainers/losers, AI Market Brief
+- Asset pages with denser stats (ATH/ATL, vol/mcap, circulating vs max, 24h range), a Markets tab of CoinGecko exchange tickers, Chart Lab, and AI analysis
 - Heuristic analysis and market brief when no AI keys are configured
 - Parallel AI Council adapters (including optional xAI Grok) when you add provider keys
 - Redis used as a short TTL cache plus a 6-hour last-live snapshot when CoinGecko rate-limits
@@ -160,12 +159,13 @@ Strong bullish/bearish disagreement can force the final council result to neutra
 
 - `GET /health` — process liveness plus dependency notes (`postgres` is `not_provisioned`)
 - `GET /api/status` — last observed Live/cache/demo path (no CoinGecko call), Redis, Postgres-not-provisioned, AI adapters configured (never keys), news hosts
-- `GET /api/market?limit=50&page=1&sort=market_cap&order=desc` — ranked table; `source`: `coingecko` | `cache` | `demo`; includes `last_live_at`, `as_of`, `stale`, `fallback_reason`
+- `GET /api/market?limit=50&page=1&sort=market_cap&order=desc&q=` — ranked CoinGecko-tracked snapshot (top 250 by market cap, not every coin worldwide); `source`: `coingecko` | `cache` | `demo`
 - `GET /api/market/global` — market cap, 24h volume, BTC/ETH dominance, optional Fear & Greed
 - `GET /api/market/movers?limit=5` — 24h gainers and losers from the ranked universe
 - `GET /api/market/brief` — optional AI Market Brief (council/Grok or heuristic fallback)
 - `GET /api/assets/{coin_id}/analysis` — includes `data_source` and an advice disclaimer
 - `GET /api/assets/{coin_id}/candles?days=90` — `days` is snapped to CoinGecko's 1/7/14/30/90/180/365 set
+- `GET /api/assets/{coin_id}/tickers` — CoinGecko exchange pairs (volume-sorted). Empty rather than invented when unavailable.
 - `GET /api/ai/council/status`
 - `GET /api/radar`
 - `GET /api/news`

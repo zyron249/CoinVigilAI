@@ -2,7 +2,7 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
-from app.models import AssetAnalysis, GlobalOverview, MarketBrief, MarketMovers, RadarSignal, RankedMarkets
+from app.models import AssetAnalysis, AssetTickers, GlobalOverview, MarketBrief, MarketMovers, RadarSignal, RankedMarkets
 from app.services.ai import deterministic_view, provider_status, run_ai_council
 from app.services.brief import build_market_brief
 from app.services.cache import redis_status
@@ -13,6 +13,7 @@ from app.services.market import (
     get_markets,
     get_movers,
     get_ranked_markets,
+    get_asset_tickers,
     peek_universe_status,
     snap_ohlc_days,
 )
@@ -108,8 +109,9 @@ async def market(
     page: int = Query(1, ge=1, le=50),
     sort: str = Query("market_cap"),
     order: str = Query("desc"),
+    q: str = Query("", max_length=64),
 ):
-    return await get_ranked_markets(limit=limit, page=page, sort=sort, order=order)
+    return await get_ranked_markets(limit=limit, page=page, sort=sort, order=order, query=q)
 
 
 @app.get("/api/market/global", response_model=GlobalOverview)
@@ -138,6 +140,15 @@ async def asset_candles(coin_id: str, days: int = Query(90, ge=1, le=365)):
         "source": source,
         "days": snap_ohlc_days(days),
     }
+
+
+@app.get("/api/assets/{coin_id}/tickers", response_model=AssetTickers)
+async def asset_tickers(
+    coin_id: str,
+    limit: int = Query(25, ge=5, le=100),
+    page: int = Query(1, ge=1, le=20),
+):
+    return await get_asset_tickers(coin_id, page=page, limit=limit)
 
 
 @app.get("/api/assets/{coin_id}/analysis", response_model=AssetAnalysis)

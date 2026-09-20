@@ -21,6 +21,12 @@ class MarketAsset(BaseModel):
     total_supply: float | None = None
     max_supply: float | None = None
     fully_diluted_valuation: float | None = None
+    ath: float | None = None
+    ath_change_percentage: float | None = None
+    ath_date: str | None = None
+    atl: float | None = None
+    atl_change_percentage: float | None = None
+    atl_date: str | None = None
     sparkline_7d: list[float] = Field(default_factory=list)
     last_updated: str | None = None
 
@@ -36,6 +42,10 @@ class RankedMarkets(BaseModel):
     source: str
     universe_size: int
     coverage: str = "universe"
+    query: str | None = None
+    coverage_note: str = (
+        "CoinGecko-tracked snapshot by market cap — not every coin on every exchange."
+    )
     last_live_at: str | None = None
     as_of: str | None = None
     stale: bool = False
@@ -136,6 +146,37 @@ class AssetAnalysis(BaseModel):
     council: AICouncilDecision | None = None
     data_source: str = "unknown"
     disclaimer: str = "AI output is informational research, not financial advice."
+
+
+class ExchangeTicker(BaseModel):
+    exchange: str
+    exchange_id: str | None = None
+    pair: str
+    base: str
+    target: str
+    price_usd: float | None = None
+    last_price: float | None = None
+    volume_usd: float | None = None
+    trust_score: str | None = None
+    bid_ask_spread_percentage: float | None = None
+    trade_url: str | None = None
+    last_traded_at: str | None = None
+
+
+class AssetTickers(BaseModel):
+    coin_id: str
+    data: list[ExchangeTicker]
+    count: int
+    page: int
+    limit: int
+    total: int
+    source: str
+    coverage: str = "coingecko_tickers"
+    note: str
+    last_live_at: str | None = None
+    as_of: str | None = None
+    stale: bool = False
+    fallback_reason: str | None = None
 
 
 class RadarSignal(BaseModel):
