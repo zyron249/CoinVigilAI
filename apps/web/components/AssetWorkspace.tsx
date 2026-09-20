@@ -28,13 +28,25 @@ export function AssetWorkspace({
 
   useEffect(() => {
     function applyHash() {
-      const next = tabFromHash(window.location.hash);
-      setTab(next);
+      setTab(tabFromHash(window.location.hash));
     }
     applyHash();
     window.addEventListener("hashchange", applyHash);
     return () => window.removeEventListener("hashchange", applyHash);
   }, []);
+
+  useEffect(() => {
+    const hash = typeof window === "undefined" ? "" : window.location.hash.replace(/^#/, "");
+    const target = hash === "chart" || hash === "chart-lab"
+      ? "chart-lab"
+      : hash === "markets-tab"
+        ? "markets-tab"
+        : "";
+    if (!target) return;
+    requestAnimationFrame(() => {
+      document.getElementById(target)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }, [tab]);
 
   function selectTab(next: "markets" | "chart") {
     setTab(next);
