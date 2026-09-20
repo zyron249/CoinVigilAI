@@ -98,6 +98,7 @@ export function MarketTable({
               event.preventDefault();
               const value = new FormData(event.currentTarget).get("q");
               onQuery({ q: String(value || ""), page: 1 });
+              document.getElementById("markets")?.scrollIntoView({ behavior: "smooth", block: "start" });
             }}
           >
             <label className="sr-only" htmlFor="market-search">Search CoinGecko-tracked assets</label>
@@ -129,6 +130,11 @@ export function MarketTable({
           <StatusBadge source={pageData.source} stale={pageData.stale} />
         </div>
       </div>
+      {pageData.query ? (
+        <p className="table-banner" role="status">
+          Filtered to “{pageData.query}” in this CoinGecko snapshot ({pageData.total} matches).
+        </p>
+      ) : null}
       {refreshError ? (
         <p className="table-banner" role="status">{refreshError}</p>
       ) : null}
