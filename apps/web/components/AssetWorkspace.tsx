@@ -23,7 +23,7 @@ export function AssetWorkspace({
   function selectTab(next: "markets" | "chart") {
     setTab(next);
     requestAnimationFrame(() => {
-      document.getElementById(next === "markets" ? "markets-tab" : "panel-chart")
+      document.getElementById(next === "markets" ? "markets-tab" : "chart-lab")
         ?.scrollIntoView({ behavior: "smooth", block: "start" });
     });
   }
@@ -40,7 +40,13 @@ export function AssetWorkspace({
         </div>
       ) : (
         <div role="tabpanel" id="panel-chart" aria-labelledby="tab-chart">
-          <ProChartLab coinId={coinId} symbol={symbol} candles={candles} source={candleSource} />
+          <ProChartLab
+            coinId={coinId}
+            symbol={symbol}
+            candles={candles}
+            source={candleSource}
+            tickerSource={tickers.source}
+          />
         </div>
       )}
     </section>

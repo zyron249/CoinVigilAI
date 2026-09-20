@@ -9,6 +9,7 @@ type ProChartLabProps = {
   symbol: string;
   candles: Candle[];
   source: string;
+  tickerSource?: string;
 };
 
 function pricePrecision(candles: Candle[]) {
@@ -19,7 +20,7 @@ function pricePrecision(candles: Candle[]) {
   return 8;
 }
 
-export function ProChartLab({ coinId, symbol, candles, source }: ProChartLabProps) {
+export function ProChartLab({ coinId, symbol, candles, source, tickerSource }: ProChartLabProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const chartRef = useRef<any>(null);
   const disposeRef = useRef<((container: HTMLElement) => void) | null>(null);
@@ -162,9 +163,11 @@ export function ProChartLab({ coinId, symbol, candles, source }: ProChartLabProp
   }
 
   const empty = candles.length === 0;
+  const mixed = (source === "demo" || source === "unavailable")
+    && (tickerSource === "coingecko" || tickerSource === "cache");
 
   return (
-    <section className="chart-lab card">
+    <section className="chart-lab card" id="chart-lab">
       <div className="chart-lab-head">
         <div>
           <div className="eyebrow">PRO CHART LAB</div>
@@ -172,6 +175,15 @@ export function ProChartLab({ coinId, symbol, candles, source }: ProChartLabProp
         </div>
         <span className="chart-status" role="status">{status}</span>
       </div>
+      {mixed ? (
+        <div className="source-ribbon demo-ribbon mixed-ribbon" role="status">
+          <strong>Mixed snapshot: live listings, demo candles.</strong>
+          <span>
+            {" "}Exchange Markets are {sourceLabel(tickerSource).text}. These OHLC bars are a labeled demo series
+            because CoinGecko candles were rate-limited or unavailable. This is not a live chart, and not financial advice.
+          </span>
+        </div>
+      ) : null}
 
       <div className="chart-toolbar" role="toolbar" aria-label="Drawing tools">
         <button type="button" className="tool-button" disabled={empty} onClick={() => draw("segment", "Trend line")}>Trend</button>

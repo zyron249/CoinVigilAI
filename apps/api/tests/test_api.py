@@ -95,7 +95,7 @@ def test_candles_report_snapped_coingecko_days(monkeypatch):
 def test_tickers_endpoint_never_invents_pairs(monkeypatch):
     from app.models import AssetTickers
 
-    async def fake_tickers(coin_id: str, page: int = 1, limit: int = 25):
+    async def fake_tickers(coin_id: str, page: int = 1, limit: int = 25, query: str | None = None, min_volume: float | None = None):
         return AssetTickers(
             coin_id=coin_id,
             data=[],

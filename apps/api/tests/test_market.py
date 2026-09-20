@@ -227,6 +227,131 @@ async def test_markets_concatenates_paginated_coingecko_pages(monkeypatch):
     assert page.universe_size == 3
     assert "paginated /coins/markets" in page.coverage_note
     assert "coingecko-tracked" in page.coverage_note.lower()
+    assert page.partial is True
+    assert page.coverage_target == 6
+
+
+@pytest.mark.asyncio
+async def test_markets_retry_rate_limit_then_fill_pages(monkeypatch):
+    from app.services.market import get_ranked_markets
+
+    class _RetryClient:
+        def __init__(self, *args, **kwargs):
+            self.hits: dict[int, int] = {}
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            return False
+
+        async def get(self, url, params=None):
+            page = int((params or {}).get("page") or 1)
+            self.hits[page] = self.hits.get(page, 0) + 1
+            request = httpx.Request("GET", str(url))
+            if page == 2 and self.hits[page] == 1:
+                return httpx.Response(429, headers={"Retry-After": "0"}, request=request)
+            payload = {
+                1: [_market_stub("bitcoin", 1), _market_stub("ethereum", 2)],
+                2: [_market_stub("solana", 3), _market_stub("ripple", 4)],
+                3: [_market_stub("cardano", 5), _market_stub("dogecoin", 6)],
+            }.get(page, [])
+            return httpx.Response(200, json=payload, request=request)
+
+    monkeypatch.setattr("app.services.market.MARKET_UNIVERSE_LIMIT", 2)
+    monkeypatch.setattr("app.services.market.MARKET_UNIVERSE_PAGES", 3)
+    monkeypatch.setattr("app.services.market.httpx.AsyncClient", _RetryClient)
+    monkeypatch.setattr("app.services.market.cache_get", _noop_cache_get)
+    monkeypatch.setattr("app.services.market.cache_set", _noop_cache_set)
+    page = await get_ranked_markets(limit=10, page=1, sort="market_cap", order="desc")
+    assert page.source == "coingecko"
+    assert page.universe_size == 6
+    assert page.partial is False
+    assert [asset.id for asset in page.data] == ["bitcoin", "ethereum", "solana", "ripple", "cardano", "dogecoin"]
+
+
+@pytest.mark.asyncio
+async def test_markets_skip_failed_page_and_mark_partial(monkeypatch):
+    from app.services.market import get_ranked_markets
+
+    class _SkipPageClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            return False
+
+        async def get(self, url, params=None):
+            page = int((params or {}).get("page") or 1)
+            request = httpx.Request("GET", str(url))
+            if page == 2:
+                return httpx.Response(429, request=request)
+            payload = {
+                1: [_market_stub("bitcoin", 1), _market_stub("ethereum", 2)],
+                3: [_market_stub("cardano", 5), _market_stub("dogecoin", 6)],
+            }.get(page, [])
+            return httpx.Response(200, json=payload, request=request)
+
+    monkeypatch.setattr("app.services.market.MARKET_UNIVERSE_LIMIT", 2)
+    monkeypatch.setattr("app.services.market.MARKET_UNIVERSE_PAGES", 3)
+    monkeypatch.setattr("app.services.market.httpx.AsyncClient", _SkipPageClient)
+    monkeypatch.setattr("app.services.market.cache_get", _noop_cache_get)
+    monkeypatch.setattr("app.services.market.cache_set", _noop_cache_set)
+    page = await get_ranked_markets(limit=10, page=1, sort="market_cap", order="desc")
+    assert page.source == "coingecko"
+    assert [asset.id for asset in page.data] == ["bitcoin", "ethereum", "cardano", "dogecoin"]
+    assert page.partial is True
+    assert "partial" in page.coverage_note.lower()
+
+
+@pytest.mark.asyncio
+async def test_tickers_filter_by_exchange_and_min_volume(monkeypatch):
+    from app.services.market import get_asset_tickers
+
+    class _TickerClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            return False
+
+        async def get(self, url, params=None):
+            request = httpx.Request("GET", str(url))
+            return httpx.Response(200, json={
+                "tickers": [
+                    {
+                        "base": "BTC",
+                        "target": "USDT",
+                        "market": {"name": "Binance", "identifier": "binance"},
+                        "converted_last": {"usd": 64000},
+                        "converted_volume": {"usd": 900},
+                    },
+                    {
+                        "base": "BTC",
+                        "target": "USD",
+                        "market": {"name": "Coinbase Exchange", "identifier": "gdax"},
+                        "converted_last": {"usd": 63900},
+                        "converted_volume": {"usd": 100},
+                    },
+                ]
+            }, request=request)
+
+    monkeypatch.setattr("app.services.market.httpx.AsyncClient", _TickerClient)
+    monkeypatch.setattr("app.services.market.cache_get", _noop_cache_get)
+    monkeypatch.setattr("app.services.market.cache_set", _noop_cache_set)
+    page = await get_asset_tickers("bitcoin", page=1, limit=25, query="binance", min_volume=500)
+    assert [row.exchange for row in page.data] == ["Binance"]
+    assert page.total == 1
+    assert page.query == "binance"
+    empty = await get_asset_tickers("bitcoin", page=1, limit=25, query="kraken")
+    assert empty.data == []
+    assert "invent" in empty.note.lower()
 
 
 @pytest.mark.asyncio
@@ -510,7 +635,7 @@ async def test_universe_memory_cache_avoids_second_http(monkeypatch):
     second_assets, second_source = await get_market_universe()
     assert first_source == second_source == "demo"
     assert [asset.id for asset in first_assets] == [asset.id for asset in second_assets]
-    assert calls["n"] == 1
+    assert calls["n"] == 3
 
 
 class _RateLimitClient:

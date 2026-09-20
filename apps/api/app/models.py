@@ -46,6 +46,8 @@ class RankedMarkets(BaseModel):
     coverage_note: str = (
         "CoinGecko-tracked snapshot by market cap — not every coin on every exchange."
     )
+    partial: bool = False
+    coverage_target: int = 1000
     last_live_at: str | None = None
     as_of: str | None = None
     stale: bool = False
@@ -172,6 +174,8 @@ class AssetTickers(BaseModel):
     total: int
     unique_exchange_count: int = 0
     venues: list[str] = Field(default_factory=list)
+    query: str | None = None
+    min_volume: float | None = None
     source: str
     coverage: str = "coingecko_tickers"
     note: str
