@@ -6,13 +6,13 @@ export function Radar({ signals }: { signals: RadarSignal[] }) {
     <div className="card radar-card">
       <div className="section-heading">
         <div>
-          <div className="eyebrow">AI RADAR</div>
-          <h2>Market signals</h2>
+          <div className="eyebrow">MARKET RADAR</div>
+          <h2>Momentum &amp; risk flags</h2>
         </div>
       </div>
       <div className="radar-list">
         {signals.length === 0 ? (
-          <div className="empty">No elevated signals detected right now.</div>
+          <div className="empty">No elevated 24h moves or risk flags in this snapshot.</div>
         ) : signals.slice(0, 6).map((signal) => (
           <Link className="radar-item" key={`${signal.asset_id}-${signal.signal}`} href={`/asset/${signal.asset_id}`}>
             <div>
@@ -26,6 +26,7 @@ export function Radar({ signals }: { signals: RadarSignal[] }) {
           </Link>
         ))}
       </div>
+      <p className="radar-footnote muted">Heuristic flags from 24h change and the risk score — not an AI model vote.</p>
     </div>
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { sourceLabel } from "../lib/format";
 import type { Candle } from "../lib/api";
 
 type ProChartLabProps = {
@@ -22,7 +23,7 @@ export function ProChartLab({ coinId, symbol, candles, source }: ProChartLabProp
   const containerRef = useRef<HTMLDivElement | null>(null);
   const chartRef = useRef<any>(null);
   const disposeRef = useRef<((container: HTMLElement) => void) | null>(null);
-  const [status, setStatus] = useState("Chart ready");
+  const [status, setStatus] = useState(candles.length ? "Loading chart…" : "No candles in this snapshot");
 
   useEffect(() => {
     let active = true;
@@ -64,7 +65,7 @@ export function ProChartLab({ coinId, symbol, candles, source }: ProChartLabProp
 
       chartRef.current = chart;
       disposeRef.current = lib.dispose;
-      setStatus(`${symbol.toUpperCase()} · ${candles.length} candles · ${source}`);
+      setStatus(`${symbol.toUpperCase()} · ${candles.length} candles · ${sourceLabel(source).text}`);
     })().catch((error) => {
       setStatus(`Chart error: ${error instanceof Error ? error.message : "unknown"}`);
     });
@@ -147,26 +148,30 @@ export function ProChartLab({ coinId, symbol, candles, source }: ProChartLabProp
       </div>
 
       <div className="chart-toolbar" aria-label="Drawing tools">
-        <button className="tool-button" onClick={() => draw("segment", "Trend line")}>Trend</button>
-        <button className="tool-button" onClick={() => draw("horizontalStraightLine", "Horizontal level")}>H-Level</button>
-        <button className="tool-button" onClick={() => draw("fibonacciLine", "Fibonacci")}>Fibonacci</button>
-        <button className="tool-button" onClick={() => draw("brush", "Brush")}>Brush</button>
-        <button className="tool-button" onClick={() => draw("priceLine", "Price line")}>Price line</button>
+        <button type="button" className="tool-button" disabled={!candles.length} onClick={() => draw("segment", "Trend line")}>Trend</button>
+        <button type="button" className="tool-button" disabled={!candles.length} onClick={() => draw("horizontalStraightLine", "Horizontal level")}>H-Level</button>
+        <button type="button" className="tool-button" disabled={!candles.length} onClick={() => draw("fibonacciLine", "Fibonacci")}>Fibonacci</button>
+        <button type="button" className="tool-button" disabled={!candles.length} onClick={() => draw("brush", "Brush")}>Brush</button>
+        <button type="button" className="tool-button" disabled={!candles.length} onClick={() => draw("priceLine", "Price line")}>Price line</button>
         <span className="toolbar-divider" />
-        <button className="tool-button" onClick={() => addIndicator("MA")}>MA</button>
-        <button className="tool-button" onClick={() => addIndicator("EMA")}>EMA</button>
-        <button className="tool-button" onClick={() => addIndicator("BOLL")}>BOLL</button>
-        <button className="tool-button" onClick={() => addIndicator("RSI")}>RSI</button>
-        <button className="tool-button" onClick={() => addIndicator("MACD")}>MACD</button>
+        <button type="button" className="tool-button" disabled={!candles.length} onClick={() => addIndicator("MA")}>MA</button>
+        <button type="button" className="tool-button" disabled={!candles.length} onClick={() => addIndicator("EMA")}>EMA</button>
+        <button type="button" className="tool-button" disabled={!candles.length} onClick={() => addIndicator("BOLL")}>BOLL</button>
+        <button type="button" className="tool-button" disabled={!candles.length} onClick={() => addIndicator("RSI")}>RSI</button>
+        <button type="button" className="tool-button" disabled={!candles.length} onClick={() => addIndicator("MACD")}>MACD</button>
         <span className="toolbar-divider" />
-        <button className="tool-button ghost" onClick={undoLastDrawing}>Undo drawing</button>
-        <button className="tool-button ghost" onClick={clearDrawings}>Clear</button>
-        <button className="tool-button ghost" onClick={exportPng}>Export PNG</button>
+        <button type="button" className="tool-button ghost" disabled={!candles.length} onClick={undoLastDrawing}>Undo drawing</button>
+        <button type="button" className="tool-button ghost" disabled={!candles.length} onClick={clearDrawings}>Clear</button>
+        <button type="button" className="tool-button ghost" disabled={!candles.length} onClick={exportPng}>Export PNG</button>
       </div>
 
-      <div ref={containerRef} className="chart-canvas" aria-label={`${symbol} interactive candlestick chart`} />
+      {candles.length === 0 ? (
+        <div className="empty chart-empty">No candle data for this snapshot. CoinVigil does not draw invented OHLC series as live charts.</div>
+      ) : (
+        <div ref={containerRef} className="chart-canvas" aria-label={`${symbol} interactive candlestick chart`} />
+      )}
       <div className="chart-footnote">
-        Drawings are interactive and editable on the chart. Market data source: <strong>{source}</strong>.
+        Drawings are interactive and editable on the chart. Market data source: <strong>{sourceLabel(source).text}</strong>.
       </div>
     </section>
   );

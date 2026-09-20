@@ -15,6 +15,10 @@ logger = logging.getLogger(__name__)
 COINGECKO_OHLC_DAYS = (1, 7, 14, 30, 90, 180, 365)
 MARKET_UNIVERSE_LIMIT = 100
 VALID_SOURCES = {"coingecko", "cache", "demo"}
+# Short process cache so one dashboard render does not stampede CoinGecko
+# when Redis is down. Tests clear this via clear_market_memory_cache().
+_MEMORY_TTL_SECONDS = 20.0
+_memory_cache: dict[str, tuple[float, Any]] = {}
 SORT_FIELDS = {
     "rank": "market_cap_rank",
     "market_cap": "market_cap",
@@ -34,6 +38,25 @@ NUMERIC_SORTS = {
     "change_24h",
     "change_7d",
 }
+
+
+def clear_market_memory_cache() -> None:
+    _memory_cache.clear()
+
+
+def _memory_get(key: str) -> Any | None:
+    row = _memory_cache.get(key)
+    if not row:
+        return None
+    stamped, value = row
+    if time.time() - stamped > _MEMORY_TTL_SECONDS:
+        _memory_cache.pop(key, None)
+        return None
+    return value
+
+
+def _memory_set(key: str, value: Any) -> None:
+    _memory_cache[key] = (time.time(), value)
 
 
 def _demo_sparkline(anchor: float, change_7d: float) -> list[float]:
@@ -267,11 +290,19 @@ def _slice_page(assets: list[MarketAsset], page: int, limit: int) -> list[Market
 
 
 async def get_market_universe() -> tuple[list[MarketAsset], str]:
+    mem = _memory_get("universe")
+    if isinstance(mem, tuple) and len(mem) == 2:
+        assets, source = mem
+        if isinstance(assets, list) and assets:
+            return list(assets), source
+
     settings = get_settings()
     cache_key = f"markets:v2:universe:{MARKET_UNIVERSE_LIMIT}"
     cached = await cache_get(cache_key)
     if isinstance(cached, list) and cached:
-        return [market_asset_from_payload(item) for item in cached if item.get("id")], "cache"
+        assets = [market_asset_from_payload(item) for item in cached if item.get("id")]
+        _memory_set("universe", (assets, "cache"))
+        return list(assets), "cache"
 
     params = {
         "vs_currency": "usd",
@@ -289,12 +320,15 @@ async def get_market_universe() -> tuple[list[MarketAsset], str]:
             assets = [market_asset_from_payload(item) for item in payload if isinstance(item, dict) and item.get("id")]
             if assets:
                 await cache_set(cache_key, [asset.model_dump() for asset in assets], settings.market_cache_ttl_seconds)
+                _memory_set("universe", (assets, "coingecko"))
                 return assets, "coingecko"
             logger.warning("CoinGecko markets returned an empty payload")
     except Exception as exc:
         logger.warning("CoinGecko markets unavailable (%s); using demo snapshot", type(exc).__name__)
 
-    return list(DEMO_MARKETS), "demo"
+    demo = list(DEMO_MARKETS)
+    _memory_set("universe", (demo, "demo"))
+    return demo, "demo"
 
 
 async def get_markets_with_source(limit: int = 20) -> tuple[list[MarketAsset], str]:
@@ -385,9 +419,13 @@ async def _fear_greed() -> tuple[int, str, str] | None:
 
 async def get_global_overview() -> GlobalOverview:
     settings = get_settings()
+    mem = _memory_get("global")
+    if isinstance(mem, dict) and mem.get("source") in VALID_SOURCES:
+        return GlobalOverview(**mem)
     cache_key = "markets:v2:global"
     cached = await cache_get(cache_key)
     if isinstance(cached, dict) and cached.get("source") in VALID_SOURCES:
+        _memory_set("global", cached)
         return GlobalOverview(**cached)
 
     fear = await _fear_greed()
@@ -416,6 +454,7 @@ async def get_global_overview() -> GlobalOverview:
             if fear:
                 overview.fear_greed_value, overview.fear_greed_classification, overview.fear_greed_source = fear
             await cache_set(cache_key, overview.model_dump(), settings.market_cache_ttl_seconds)
+            _memory_set("global", overview.model_dump())
             return overview
     except Exception as exc:
         logger.warning("CoinGecko global unavailable (%s); deriving from ranked universe", type(exc).__name__)
@@ -424,6 +463,7 @@ async def get_global_overview() -> GlobalOverview:
     overview = _overview_from_assets(assets, source)
     if fear:
         overview.fear_greed_value, overview.fear_greed_classification, overview.fear_greed_source = fear
+    _memory_set("global", overview.model_dump())
     return overview
 
 
@@ -431,8 +471,15 @@ async def get_movers(limit: int = 5) -> MarketMovers:
     bounded = max(1, min(int(limit), 15))
     assets, source = await get_market_universe()
     scored = [asset for asset in assets if asset.price_change_percentage_24h is not None]
-    gainers = sorted(scored, key=lambda asset: asset.price_change_percentage_24h or 0, reverse=True)[:bounded]
-    losers = sorted(scored, key=lambda asset: asset.price_change_percentage_24h or 0)[:bounded]
+    gainers = sorted(
+        [asset for asset in scored if (asset.price_change_percentage_24h or 0) > 0],
+        key=lambda asset: asset.price_change_percentage_24h or 0,
+        reverse=True,
+    )[:bounded]
+    losers = sorted(
+        [asset for asset in scored if (asset.price_change_percentage_24h or 0) < 0],
+        key=lambda asset: asset.price_change_percentage_24h or 0,
+    )[:bounded]
     return MarketMovers(gainers=gainers, losers=losers, count=bounded, source=source)
 
 

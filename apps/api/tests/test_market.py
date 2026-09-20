@@ -6,6 +6,7 @@ from app.services.market import (
     get_asset,
     get_candles,
     get_global_overview,
+    get_market_universe,
     get_markets_with_source,
     get_movers,
     get_ranked_markets,
@@ -129,6 +130,9 @@ async def test_movers_use_24h_change_and_honest_source(monkeypatch):
     loser_changes = [asset.price_change_percentage_24h or 0 for asset in movers.losers]
     assert gainer_changes == sorted(gainer_changes, reverse=True)
     assert loser_changes == sorted(loser_changes)
+    assert all(change > 0 for change in gainer_changes)
+    assert all(change < 0 for change in loser_changes)
+    assert {asset.id for asset in movers.gainers}.isdisjoint({asset.id for asset in movers.losers})
     assert movers.gainers[0].price_change_percentage_24h >= movers.losers[0].price_change_percentage_24h
 
 
@@ -162,3 +166,103 @@ def test_demo_universe_stays_small_and_labeled():
     assert len(DEMO_MARKETS) <= 10
     assert all(isinstance(asset, MarketAsset) for asset in DEMO_MARKETS)
     assert all(asset.sparkline_7d for asset in DEMO_MARKETS)
+
+
+@pytest.mark.asyncio
+async def test_ranked_markets_page_past_end_is_empty(monkeypatch):
+    monkeypatch.setattr("app.services.market.httpx.AsyncClient", _FailingClient)
+    page = await get_ranked_markets(limit=50, page=8, sort="market_cap", order="desc")
+    assert page.source == "demo"
+    assert page.total == len(DEMO_MARKETS)
+    assert page.data == []
+    assert page.page == 8
+
+
+@pytest.mark.asyncio
+async def test_ranked_markets_name_sort_is_alphabetical(monkeypatch):
+    monkeypatch.setattr("app.services.market.httpx.AsyncClient", _FailingClient)
+    page = await get_ranked_markets(limit=20, page=1, sort="name", order="asc")
+    names = [asset.name.lower() for asset in page.data]
+    assert names == sorted(names)
+    assert page.sort == "name"
+    assert page.order == "asc"
+
+
+@pytest.mark.asyncio
+async def test_movers_limit_does_not_force_flat_assets_into_losers(monkeypatch):
+    monkeypatch.setattr("app.services.market.httpx.AsyncClient", _FailingClient)
+    movers = await get_movers(5)
+    assert all((asset.price_change_percentage_24h or 0) < 0 for asset in movers.losers)
+    assert "binancecoin" not in {asset.id for asset in movers.losers}
+
+
+class _GlobalClient:
+    def __init__(self, *args, **kwargs):
+        pass
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *args):
+        return False
+
+    async def get(self, url, params=None, **kwargs):
+        class Response:
+            def raise_for_status(self):
+                return None
+
+            def json(self):
+                return {
+                    "data": {
+                        "total_market_cap": {"usd": 2_500_000_000_000},
+                        "total_volume": {"usd": 88_000_000_000},
+                        "market_cap_change_percentage_24h_usd": 1.5,
+                        "market_cap_percentage": {"btc": 53.2, "eth": 17.1},
+                        "active_cryptocurrencies": 13450,
+                        "updated_at": 1710000000,
+                    }
+                }
+
+        return Response()
+
+
+@pytest.mark.asyncio
+async def test_global_coingecko_payload_is_labeled_without_invented_fng(monkeypatch):
+    async def no_cache(_key):
+        return None
+
+    async def no_set(*_args, **_kwargs):
+        return None
+
+    monkeypatch.setattr("app.services.market.cache_get", no_cache)
+    monkeypatch.setattr("app.services.market.cache_set", no_set)
+    monkeypatch.setattr("app.services.market.httpx.AsyncClient", _GlobalClient)
+    overview = await get_global_overview()
+    assert overview.source == "coingecko"
+    assert overview.coverage == "global"
+    assert overview.total_market_cap_usd == 2_500_000_000_000
+    assert overview.total_volume_24h_usd == 88_000_000_000
+    assert overview.market_cap_change_percentage_24h_usd == 1.5
+    assert overview.btc_dominance == 53.2
+    assert overview.eth_dominance == 17.1
+    assert overview.fear_greed_value is None
+    assert overview.fear_greed_classification is None
+    assert "coingecko" in (overview.note or "").lower()
+    assert overview.source != "coinmarketcap"
+
+
+@pytest.mark.asyncio
+async def test_universe_memory_cache_avoids_second_http(monkeypatch):
+    calls = {"n": 0}
+
+    class CountingClient(_FailingClient):
+        async def get(self, *args, **kwargs):
+            calls["n"] += 1
+            raise RuntimeError("offline")
+
+    monkeypatch.setattr("app.services.market.httpx.AsyncClient", CountingClient)
+    first_assets, first_source = await get_market_universe()
+    second_assets, second_source = await get_market_universe()
+    assert first_source == second_source == "demo"
+    assert [asset.id for asset in first_assets] == [asset.id for asset in second_assets]
+    assert calls["n"] == 1

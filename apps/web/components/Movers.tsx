@@ -1,9 +1,9 @@
 import Link from "next/link";
 import type { MarketAsset } from "../lib/api";
-import { changeClass, formatPercent, formatUsd, sourceLabel } from "../lib/format";
+import { changeClass, formatPercent, formatUsd } from "../lib/format";
+import { StatusBadge } from "./StatusBadge";
 
 function MoverList({ title, assets, empty, source }: { title: string; assets: MarketAsset[]; empty: string; source: string }) {
-  const label = sourceLabel(source);
   return (
     <div className="card mover-card">
       <div className="section-heading">
@@ -11,7 +11,7 @@ function MoverList({ title, assets, empty, source }: { title: string; assets: Ma
           <div className="eyebrow">{title}</div>
           <h2>24h</h2>
         </div>
-        <span className={label.demo ? "live-dot demo" : "live-dot"}>{label.text}</span>
+        <StatusBadge source={source} />
       </div>
       <div className="mover-list">
         {assets.length === 0 ? <div className="empty">{empty}</div> : assets.map((asset) => {
@@ -19,7 +19,7 @@ function MoverList({ title, assets, empty, source }: { title: string; assets: Ma
           return (
             <Link className="mover-row" key={`${title}-${asset.id}`} href={`/asset/${asset.id}`}>
               <div className="asset-cell">
-                {asset.image ? <img src={asset.image} alt="" width={24} height={24} /> : <div className="coin-placeholder" />}
+                {asset.image ? <img src={asset.image} alt="" width={24} height={24} /> : <div className="coin-placeholder" aria-hidden="true" />}
                 <div>
                   <strong>{asset.symbol.toUpperCase()}</strong>
                   <span>{asset.name}</span>

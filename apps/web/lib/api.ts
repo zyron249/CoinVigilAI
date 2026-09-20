@@ -29,6 +29,7 @@ export type MarketPage = {
   sort: string;
   order: string;
   universe_size: number;
+  error?: string | null;
 };
 
 export type GlobalOverview = {
@@ -147,7 +148,7 @@ export type NewsItem = {
   title: string;
   link: string;
   source: string;
-  published_at: string;
+  published_at: string | null;
   summary: string;
 };
 
@@ -158,6 +159,9 @@ export type MarketQuery = {
   order?: string;
 };
 
+const FETCH_MS = 12_000;
+const MARKET_SOURCES = new Set(["coingecko", "cache", "demo"]);
+
 function apiBase() {
   if (typeof window !== "undefined") {
     return process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -165,9 +169,16 @@ function apiBase() {
   return process.env.API_INTERNAL_URL || process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 }
 
+async function request(path: string): Promise<Response> {
+  return fetch(`${apiBase()}${path}`, {
+    cache: "no-store",
+    signal: AbortSignal.timeout(FETCH_MS),
+  });
+}
+
 async function readJson<T>(path: string, fallback: T): Promise<T> {
   try {
-    const response = await fetch(`${apiBase()}${path}`, { cache: "no-store" });
+    const response = await request(path);
     if (!response.ok) return fallback;
     return await response.json();
   } catch {
@@ -189,6 +200,7 @@ export async function getMarket(query: MarketQuery = {}): Promise<MarketPage> {
     sort,
     order,
     universe_size: 0,
+    error: "Rankings are unavailable.",
   };
   try {
     const search = new URLSearchParams({
@@ -197,18 +209,19 @@ export async function getMarket(query: MarketQuery = {}): Promise<MarketPage> {
       sort,
       order,
     });
-    const response = await fetch(`${apiBase()}/api/market?${search}`, { cache: "no-store" });
+    const response = await request(`/api/market?${search}`);
     if (!response.ok) return empty;
     const json = await response.json();
     return {
       assets: json.data ?? [],
-      source: json.source ?? "unknown",
+      source: MARKET_SOURCES.has(json.source) ? json.source : "unavailable",
       page: json.page ?? page,
       limit: json.limit ?? limit,
       total: json.total ?? (json.data ?? []).length,
       sort: json.sort ?? sort,
       order: json.order ?? order,
       universe_size: json.universe_size ?? json.total ?? 0,
+      error: null,
     };
   } catch {
     return empty;
@@ -244,7 +257,7 @@ export async function getRadar(): Promise<RadarSignal[]> {
 
 export async function getAssetAnalysis(coinId: string): Promise<AssetAnalysis | null> {
   try {
-    const response = await fetch(`${apiBase()}/api/assets/${encodeURIComponent(coinId)}/analysis`, { cache: "no-store" });
+    const response = await request(`/api/assets/${encodeURIComponent(coinId)}/analysis`);
     if (!response.ok) return null;
     return await response.json();
   } catch {
@@ -266,7 +279,7 @@ export const OPTIONAL_COUNCIL_PROVIDERS: CouncilProvider[] = [
 
 export async function getCouncilStatus(): Promise<CouncilStatus> {
   try {
-    const response = await fetch(`${apiBase()}/api/ai/council/status`, { cache: "no-store" });
+    const response = await request("/api/ai/council/status");
     if (!response.ok) {
       return { enabled: true, supported: OPTIONAL_COUNCIL_PROVIDERS.length, configured: 0, mode: "unavailable", providers: OPTIONAL_COUNCIL_PROVIDERS };
     }
@@ -285,7 +298,7 @@ export async function getCouncilStatus(): Promise<CouncilStatus> {
 
 export async function getNews(): Promise<{ items: NewsItem[]; message: string | null; configured: boolean }> {
   try {
-    const response = await fetch(`${apiBase()}/api/news?limit=30`, { cache: "no-store" });
+    const response = await request("/api/news?limit=30");
     if (!response.ok) return { items: [], message: "News feed is unavailable.", configured: false };
     const json = await response.json();
     return {
@@ -300,7 +313,7 @@ export async function getNews(): Promise<{ items: NewsItem[]; message: string | 
 
 export async function getCandles(coinId: string, days = 90): Promise<{ data: Candle[]; source: string }> {
   try {
-    const response = await fetch(`${apiBase()}/api/assets/${encodeURIComponent(coinId)}/candles?days=${days}`, { cache: "no-store" });
+    const response = await request(`/api/assets/${encodeURIComponent(coinId)}/candles?days=${days}`);
     if (!response.ok) return { data: [], source: "unavailable" };
     const json = await response.json();
     return { data: json.data ?? [], source: json.source ?? "unknown" };

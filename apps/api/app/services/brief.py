@@ -11,9 +11,14 @@ from app.services.market import get_global_overview, get_market_universe, get_mo
 
 VALID_TONES = {"risk-on", "risk-off", "mixed", "neutral"}
 BIAS_TO_TONE = {"bullish": "risk-on", "bearish": "risk-off", "neutral": "neutral"}
-BRIEF_DISCLAIMER = (
+BRIEF_DISCLAIMER = "Informational research only — not financial advice."
+HEURISTIC_DISCLAIMER = (
+    "Heuristic market brief from the latest CoinVigil snapshot — not a live model vote. "
+    + BRIEF_DISCLAIMER
+)
+AI_DISCLAIMER = (
     "AI-generated market brief from the latest CoinVigil snapshot. "
-    "Informational research only — not financial advice."
+    + BRIEF_DISCLAIMER
 )
 
 
@@ -150,9 +155,14 @@ def heuristic_market_brief(facts: dict[str, Any], data_source: str) -> MarketBri
         if btc_change is not None
         else ""
     )
+    source_bit = {
+        "demo": "This uses a labeled demo snapshot, not live prices. ",
+        "cache": "This uses a cached CoinGecko snapshot. ",
+        "coingecko": "This uses live CoinGecko data. ",
+    }.get(data_source, "")
     summary = (
         f"{btc_bit}Quantitative tone is {tone} from breadth and the available market-cap change. "
-        f"Source={data_source}. This is a snapshot, not a forecast."
+        f"{source_bit}This is a snapshot, not a forecast."
     )
     return MarketBrief(
         headline=headline_map[tone],
@@ -162,7 +172,7 @@ def heuristic_market_brief(facts: dict[str, Any], data_source: str) -> MarketBri
         engine="heuristic",
         generated=False,
         data_source=data_source,
-        disclaimer=BRIEF_DISCLAIMER,
+        disclaimer=HEURISTIC_DISCLAIMER,
     )
 
 
@@ -257,7 +267,7 @@ def _combine_brief(
         data_source=heuristic.data_source,
         providers_requested=requested,
         providers_responded=[row["provider"] for row in valid],
-        disclaimer=BRIEF_DISCLAIMER,
+        disclaimer=AI_DISCLAIMER,
     )
 
 

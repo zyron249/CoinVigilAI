@@ -37,6 +37,9 @@ def test_heuristic_brief_is_labeled_and_not_advice():
     assert brief.data_source == "demo"
     assert brief.tone in {"risk-on", "risk-off", "mixed", "neutral"}
     assert "not financial advice" in brief.disclaimer.lower()
+    assert "ai-generated" not in brief.disclaimer.lower()
+    assert "heuristic" in brief.disclaimer.lower()
+    assert "source=" not in brief.summary.lower()
     assert any("demo" in bullet.lower() for bullet in brief.bullets)
     assert "live prices" in " ".join(brief.bullets).lower()
 
@@ -45,6 +48,21 @@ def test_heuristic_brief_does_not_claim_coingecko_when_demo():
     brief = heuristic_market_brief(_facts("demo"), "demo")
     assert brief.data_source != "coingecko"
     assert "coingecko" not in brief.summary.lower()
+
+
+def test_heuristic_brief_live_source_has_no_demo_warning():
+    brief = heuristic_market_brief(_facts("coingecko"), "coingecko")
+    assert brief.data_source == "coingecko"
+    assert brief.generated is False
+    assert not any("demo" in bullet.lower() for bullet in brief.bullets)
+    assert "not financial advice" in brief.disclaimer.lower()
+
+
+def test_heuristic_brief_cache_source_is_preserved():
+    brief = heuristic_market_brief(_facts("cache"), "cache")
+    assert brief.data_source == "cache"
+    assert brief.engine == "heuristic"
+    assert "not financial advice" in brief.disclaimer.lower()
 
 
 def test_normalize_brief_accepts_tone_and_bias_alias():
@@ -119,4 +137,5 @@ async def test_build_market_brief_uses_mocked_council(monkeypatch):
     assert brief.headline == "Range-bound council view"
     assert brief.providers_responded == ["xai"]
     assert "not financial advice" in brief.disclaimer.lower()
+    assert "ai-generated" in brief.disclaimer.lower()
     assert brief.data_source == "cache"
