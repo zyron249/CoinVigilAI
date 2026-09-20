@@ -20,11 +20,19 @@ export function AssetWorkspace({
 }) {
   const [tab, setTab] = useState<"markets" | "chart">("markets");
 
+  function selectTab(next: "markets" | "chart") {
+    setTab(next);
+    requestAnimationFrame(() => {
+      document.getElementById(next === "markets" ? "markets-tab" : "panel-chart")
+        ?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }
+
   return (
     <section className="asset-workspace">
       <div className="asset-tabs" role="tablist" aria-label="Asset views">
-        <TabButton current={tab} id="markets" onSelect={setTab}>Markets</TabButton>
-        <TabButton current={tab} id="chart" onSelect={setTab}>Chart</TabButton>
+        <TabButton current={tab} id="markets" onSelect={selectTab}>Markets</TabButton>
+        <TabButton current={tab} id="chart" onSelect={selectTab}>Chart</TabButton>
       </div>
       {tab === "markets" ? (
         <div role="tabpanel" id="panel-markets" aria-labelledby="tab-markets">

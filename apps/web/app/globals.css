@@ -125,6 +125,27 @@ nav { min-height: 72px; display: flex; align-items: center; justify-content: spa
 .tickers-table th:nth-child(3), .tickers-table td:nth-child(3) { text-align: left; }
 .ticker-exchange { font-weight: 700; }
 .trade-link { color: var(--accent); font-weight: 800; }
+.tickers-table { min-width: 640px; }
+.tickers-table th:nth-child(1),
+.tickers-table td:nth-child(1) {
+  min-width: 36px;
+  left: 0;
+}
+.tickers-table th:nth-child(2),
+.tickers-table td:nth-child(2) {
+  min-width: 108px;
+  left: 36px;
+}
+.tickers-table th:nth-child(3),
+.tickers-table td:nth-child(3) {
+  position: sticky;
+  left: 144px;
+  z-index: 1;
+  background: #0d1a18;
+  min-width: 92px;
+}
+.tickers-table thead th:nth-child(3) { z-index: 4; }
+.tickers-table .market-row:hover td:nth-child(3) { background: #12241f; }
 .trust-pill { display: inline-flex; align-items: center; font-size: 11px; font-weight: 800; letter-spacing: .3px; padding: 2px 8px; border-radius: 99px; border: 1px solid var(--line); }
 .trust-green { color: var(--accent); background: rgba(89,242,180,.12); }
 .trust-yellow { color: var(--warning); background: rgba(255,213,154,.12); }
@@ -133,6 +154,7 @@ nav { min-height: 72px; display: flex; align-items: center; justify-content: spa
 .live-dot { color: var(--accent); font-size: 12px; }
 .table-wrap { overflow-x: auto; }
 table { width: 100%; border-collapse: collapse; min-width: 720px; }
+table.tickers-table { min-width: 640px; }
 th, td { text-align: right; padding: 15px 18px; border-bottom: 1px solid var(--line); font-size: 13px; }
 th { color: var(--muted); font-size: 11px; letter-spacing: .7px; }
 .markets-table thead th {
@@ -399,6 +421,15 @@ footer > div:first-child { overflow-wrap: anywhere; max-width: 52rem; }
   .market-search { width: 100%; }
   .market-search input { width: 100%; }
   .section-heading { align-items: flex-start; }
+  .tickers-table th:nth-child(1),
+  .tickers-table td:nth-child(1) { display: none; }
+  .tickers-table th:nth-child(2),
+  .tickers-table td:nth-child(2) { left: 0; min-width: 92px; }
+  .tickers-table th:nth-child(3),
+  .tickers-table td:nth-child(3) { left: 92px; min-width: 78px; }
+  .tickers-table th,
+  .tickers-table td { padding: 12px 8px; }
+  table.tickers-table { min-width: 520px; }
 }
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
