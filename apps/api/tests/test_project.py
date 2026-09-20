@@ -4,6 +4,7 @@ import pytest
 from app.services.project import (
     categories_from_payload,
     contracts_from_payload,
+    explorer_url_for_address,
     genesis_date_from_payload,
     get_asset_profile,
     project_links_from_payload,
@@ -95,7 +96,38 @@ def test_contracts_from_payload_never_invents():
     assert [item.platform for item in rows] == ["ethereum", "solana"]
     assert rows[0].label == "Ethereum"
     assert rows[0].address.startswith("0xa0b8")
+    assert rows[0].explorer_url is None
     assert rows[1].platform == "solana"
+
+
+USDC_ETH = "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"
+
+
+def test_explorer_url_only_when_coingecko_url_contains_address():
+    assert explorer_url_for_address(USDC_ETH, ["https://etherscan.io/"]) is None
+    assert explorer_url_for_address(USDC_ETH, ["https://etherscan.io/token/"]) is None
+    assert explorer_url_for_address(USDC_ETH, ["javascript:alert(1)"]) is None
+    matched = explorer_url_for_address(USDC_ETH, [f"https://etherscan.io/token/{USDC_ETH}"])
+    assert matched == f"https://etherscan.io/token/{USDC_ETH}"
+    checksummed = explorer_url_for_address(
+        USDC_ETH,
+        ["https://etherscan.io/token/0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"],
+    )
+    assert checksummed and USDC_ETH.lower() in checksummed.lower()
+    homepage_only = contracts_from_payload(
+        {"ethereum": USDC_ETH},
+        None,
+        ["https://circle.com/usdc", "https://etherscan.io/"],
+    )
+    assert homepage_only and homepage_only[0].explorer_url is None
+    with_token = contracts_from_payload(
+        {"ethereum": USDC_ETH},
+        None,
+        [f"https://etherscan.io/token/{USDC_ETH}"],
+    )
+    assert with_token[0].explorer_url == f"https://etherscan.io/token/{USDC_ETH}"
+    invented = f"https://etherscan.io/token/{USDC_ETH}"
+    assert explorer_url_for_address(USDC_ETH, ["https://etherscan.io/"]) != invented
 
 
 def test_discord_from_forum_is_social_before_github():
@@ -191,6 +223,56 @@ async def test_profile_parses_coingecko_payload(monkeypatch):
     assert "invent" in profile.note.lower() or "coingecko" in profile.note.lower()
 
 
+class _UsdCoinClient(_ProfileClient):
+    payload = {
+        "id": "usd-coin",
+        "links": {
+            "homepage": ["https://www.circle.com/en/usdc"],
+            "blockchain_site": [
+                "https://etherscan.io/",
+                f"https://etherscan.io/token/{USDC_ETH}",
+            ],
+        },
+        "categories": ["Stablecoins"],
+        "description": {"en": "USDC is a digital dollar."},
+        "genesis_date": "2018-09-10",
+        "platforms": {"ethereum": USDC_ETH},
+        "detail_platforms": {"ethereum": {"contract_address": USDC_ETH}},
+    }
+
+
+class _HomepageExplorerClient(_UsdCoinClient):
+    payload = {
+        **_UsdCoinClient.payload,
+        "links": {
+            "homepage": ["https://www.circle.com/en/usdc"],
+            "blockchain_site": ["https://etherscan.io/"],
+        },
+    }
+
+
+@pytest.mark.asyncio
+async def test_profile_attaches_explorer_only_when_url_contains_address(monkeypatch):
+    monkeypatch.setattr("app.services.project.httpx.AsyncClient", _UsdCoinClient)
+    monkeypatch.setattr("app.services.project.cache_get", _noop_cache_get)
+    profile = await get_asset_profile("usd-coin")
+    assert profile.contracts
+    eth = next(item for item in profile.contracts if item.platform == "ethereum")
+    assert eth.address.lower() == USDC_ETH
+    assert eth.explorer_url == f"https://etherscan.io/token/{USDC_ETH}"
+
+
+@pytest.mark.asyncio
+async def test_profile_does_not_invent_token_explorer_path(monkeypatch):
+    monkeypatch.setattr("app.services.project.httpx.AsyncClient", _HomepageExplorerClient)
+    monkeypatch.setattr("app.services.project.cache_get", _noop_cache_get)
+    profile = await get_asset_profile("usd-coin")
+    assert profile.contracts
+    eth = next(item for item in profile.contracts if item.platform == "ethereum")
+    assert eth.explorer_url is None
+    assert not any((item.explorer_url or "").endswith(f"/token/{USDC_ETH}") for item in profile.contracts)
+
+
 class _EmptyProfileClient(_ProfileClient):
     payload = {"id": "obscure-coin", "links": {}, "categories": [], "description": {}, "genesis_date": None}
 
@@ -214,6 +296,37 @@ async def test_profile_cache_envelope_drops_javascript(monkeypatch):
     assert profile.links and profile.links[0].url == "https://bitcoin.org/"
     assert all("javascript" not in item.url for item in profile.links)
     assert profile.genesis_date is None
+
+
+@pytest.mark.asyncio
+async def test_profile_cache_drops_explorer_that_lacks_address(monkeypatch):
+    async def poisoned(_key):
+        return {
+            "links": [],
+            "categories": [],
+            "contracts": [
+                {
+                    "platform": "ethereum",
+                    "label": "Ethereum",
+                    "address": USDC_ETH,
+                    "explorer_url": "https://etherscan.io/",
+                },
+                {
+                    "platform": "solana",
+                    "label": "Solana",
+                    "address": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+                    "explorer_url": "javascript:alert(1)",
+                },
+            ],
+            "source": "coingecko",
+            "note": "cached",
+            "last_live_at": "2026-09-20T00:00:00Z",
+        }
+
+    monkeypatch.setattr("app.services.project.cache_get", poisoned)
+    profile = await get_asset_profile("usd-coin")
+    assert [item.platform for item in profile.contracts] == ["ethereum", "solana"]
+    assert all(item.explorer_url is None for item in profile.contracts)
 
 
 @pytest.mark.asyncio

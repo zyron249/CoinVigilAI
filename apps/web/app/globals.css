@@ -60,7 +60,7 @@ nav { min-height: 72px; display: flex; align-items: center; justify-content: spa
   left: 48px;
   z-index: 1;
   background: #0d1a18;
-  min-width: 168px;
+  min-width: 220px;
 }
 .market-row:hover td:nth-child(1),
 .market-row:hover td:nth-child(2) {
@@ -137,7 +137,10 @@ nav { min-height: 72px; display: flex; align-items: center; justify-content: spa
   display: grid; grid-template-columns: minmax(90px, 160px) minmax(0, 1fr) auto;
   gap: 8px; align-items: center; padding: 8px 0; border-top: 1px solid var(--line);
 }
-.contract-rows code { font-size: 12px; overflow-wrap: anywhere; color: var(--text); }
+.contract-rows code, .contract-address { font-size: 12px; overflow-wrap: anywhere; color: var(--text); font-variant-ligatures: none; }
+.contract-actions { display: flex; gap: 8px; align-items: center; justify-content: flex-end; }
+.contract-explorer { font-size: 12px; font-weight: 700; color: var(--accent); white-space: nowrap; }
+.copy-button.is-copied { border-color: rgba(89,242,180,.45) !important; color: var(--accent) !important; }
 .project-links { margin: 0; }
 .project-links-head { border-bottom: 0; padding-bottom: 8px; }
 .project-description { margin: 0; padding: 0 20px 12px; line-height: 1.55; color: var(--muted); }
@@ -251,14 +254,16 @@ th { color: var(--muted); font-size: 11px; letter-spacing: .7px; }
   z-index: 4;
 }
 th:nth-child(1), td:nth-child(1), th:nth-child(2), td:nth-child(2) { text-align: left; }
-.market-row { transition: background .15s ease; content-visibility: auto; contain-intrinsic-size: 56px; }
+.market-row { transition: background .15s ease; content-visibility: auto; contain-intrinsic-size: 72px; }
 .market-row:hover { background: rgba(89,242,180,.035); }
-.asset-link { display: inline-block; }
+.asset-link { display: flex; flex-direction: column; gap: 2px; }
 .asset-cell { display: flex; align-items: center; gap: 10px; }
 .asset-cell img, .coin-placeholder { border-radius: 50%; }
 .coin-placeholder { width: 28px; height: 28px; background: var(--accent-soft); border: 1px solid var(--line); }
 .asset-cell div { display: flex; flex-direction: column; gap: 2px; }
 .asset-cell span { color: var(--muted); font-size: 10px; }
+.asset-row-jumps { display: flex; flex-wrap: wrap; gap: 8px; }
+.asset-row-jumps a { font-size: 11px; font-weight: 700; color: var(--accent); }
 .positive { color: var(--accent); } .negative { color: var(--danger); } .warning { color: var(--warning); }
 .capitalize { text-transform: capitalize; }
 .radar-list { padding: 6px 16px 16px; }
@@ -517,6 +522,7 @@ footer > div:first-child { overflow-wrap: anywhere; max-width: 52rem; }
   .tickers-table th,
   .tickers-table td { padding: 12px 8px; }
   .contract-rows li { grid-template-columns: 1fr; }
+  .contract-actions { justify-content: flex-start; }
   table.tickers-table { min-width: 460px; }
 }
 @media (prefers-reduced-motion: reduce) {

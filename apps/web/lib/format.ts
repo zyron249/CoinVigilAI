@@ -50,6 +50,12 @@ export function formatDate(value?: string | null): string | null {
   }).format(date);
 }
 
+export function truncateAddress(address: string, head = 8, tail = 6): string {
+  const text = address.trim();
+  if (text.length <= 18) return text;
+  return `${text.slice(0, head)}…${text.slice(-tail)}`;
+}
+
 export function formatTimestamp(value?: string | null): string | null {
   if (!value) return null;
   const date = new Date(value);

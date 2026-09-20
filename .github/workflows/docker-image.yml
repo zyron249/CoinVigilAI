@@ -249,6 +249,10 @@ jobs:
               sleep 2
               continue
             fi
+            if ! grep -q "#overview" /tmp/web.html || ! grep -q "#contracts" /tmp/web.html; then
+              sleep 2
+              continue
+            fi
             if ! curl -fsS http://127.0.0.1:3000/asset/bitcoin > /tmp/bitcoin.html; then
               sleep 2
               continue
@@ -294,6 +298,10 @@ jobs:
               continue
             fi
             if ! grep -qi "no platform contracts" /tmp/bitcoin.html && ! grep -q "CONTRACTS" /tmp/bitcoin.html; then
+              sleep 2
+              continue
+            fi
+            if ! grep -q 'id="contracts"' /tmp/bitcoin.html && ! grep -q 'id=contracts' /tmp/bitcoin.html; then
               sleep 2
               continue
             fi
