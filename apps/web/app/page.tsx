@@ -58,7 +58,12 @@ export default async function Home() {
         <Link className="card feature-card" href={leadAsset ? `/asset/${leadAsset.id}` : "#markets"}>
           <div className="eyebrow">EXCHANGE MARKETS</div>
           <h3>See where it trades</h3>
-          <p>Open an asset to list CoinGecko venues, pairs, volume, and trust scores. CoinVigil does not scrape every exchange website.</p>
+          <p>Open an asset to list CoinGecko venues, pairs, volume, and trust scores. Filter, sort, and share the URL. CoinVigil does not scrape every exchange website.</p>
+        </Link>
+        <Link className="card feature-card" href="/compare?ids=bitcoin,ethereum">
+          <div className="eyebrow">COMPARE</div>
+          <h3>Two or three assets</h3>
+          <p>Side-by-side price, change, cap, and volume from this CoinGecko snapshot. Missing coins stay empty — never invented.</p>
         </Link>
         <Link className="card feature-card" href={leadAsset ? `/asset/${leadAsset.id}` : "#markets"}>
           <div className="eyebrow">PRO CHART LAB</div>

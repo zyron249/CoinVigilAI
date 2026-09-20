@@ -104,7 +104,8 @@ jobs:
           curl -fsS "http://127.0.0.1:8000/api/radar?limit=3" > /tmp/radar.json
           curl -fsS "http://127.0.0.1:8000/api/assets/bitcoin/analysis" > /tmp/analysis.json
           curl -fsS "http://127.0.0.1:8000/api/assets/bitcoin/candles?days=7" > /tmp/candles.json
-          curl -fsS "http://127.0.0.1:8000/api/assets/bitcoin/tickers?limit=5" > /tmp/tickers.json
+          curl -fsS "http://127.0.0.1:8000/api/assets/bitcoin/tickers?limit=5&sort=trust&order=desc" > /tmp/tickers.json
+          curl -fsS "http://127.0.0.1:8000/api/compare?ids=bitcoin,ethereum,not-a-real-coin" > /tmp/compare.json
           curl -fsS "http://127.0.0.1:8000/api/news?limit=3" > /tmp/news.json
           curl -fsS "http://127.0.0.1:8000/api/ai/council/status" > /tmp/council-status.json
           curl -fsS "http://127.0.0.1:8000/api/status" > /tmp/status.json
@@ -120,6 +121,7 @@ jobs:
           analysis = json.loads(Path('/tmp/analysis.json').read_text())
           candles = json.loads(Path('/tmp/candles.json').read_text())
           tickers = json.loads(Path('/tmp/tickers.json').read_text())
+          compare = json.loads(Path('/tmp/compare.json').read_text())
           council_status = json.loads(Path('/tmp/council-status.json').read_text())
           stack_status = json.loads(Path('/tmp/status.json').read_text())
           dumped_status = json.dumps(stack_status).lower()
@@ -147,8 +149,16 @@ jobs:
           assert isinstance(tickers.get('data'), list), tickers
           assert isinstance(tickers.get('unique_exchange_count'), int), tickers
           assert 'invent' in tickers.get('note', '').lower() or 'scrape' in tickers.get('note', '').lower() or tickers['data'], tickers
+          assert tickers.get('sort') == 'trust', tickers
           dumped_tickers = json.dumps(tickers).lower()
           assert 'api_key' not in dumped_tickers, tickers
+          assert isinstance(compare.get('data'), list), compare
+          assert compare.get('source') in allowed_sources, compare
+          assert 'not-a-real-coin' in compare.get('missing', []), compare
+          assert 'invent' in compare.get('note', '').lower(), compare
+          dumped_compare = json.dumps(compare).lower()
+          assert 'api_key' not in dumped_compare, compare
+          assert isinstance(compare.get('ids'), list) and len(compare['ids']) <= 3, compare
           assert council_status.get('enabled') is True, council_status
           assert council_status.get('supported', 0) >= 9, council_status
           providers = {item['provider']: item for item in council_status.get('providers', [])}
@@ -163,6 +173,7 @@ jobs:
           assert stack_status.get('market', {}).get('provider') == 'coingecko', stack_status
           assert stack_status.get('market', {}).get('observed') is True, stack_status
           assert stack_status.get('market', {}).get('source') in allowed_sources, stack_status
+          assert isinstance(stack_status.get('market', {}).get('key_configured'), bool), stack_status
           assert 'sk-' not in dumped_status and 'api_key' not in dumped_status, stack_status
           assert 'not financial advice' in stack_status.get('disclaimer', '').lower(), stack_status
           print('API, markets, brief, candle, status and AI Council smoke tests passed')
@@ -197,6 +208,10 @@ jobs:
               sleep 2
               continue
             fi
+            if ! grep -q "COMPARE" /tmp/web.html; then
+              sleep 2
+              continue
+            fi
             if ! grep -q "Search name, symbol, or id" /tmp/web.html && ! grep -q "market-search" /tmp/web.html; then
               sleep 2
               continue
@@ -222,6 +237,14 @@ jobs:
               continue
             fi
             if ! grep -q "Filter exchange or pair" /tmp/bitcoin.html; then
+              sleep 2
+              continue
+            fi
+            if ! grep -q "sort-button" /tmp/bitcoin.html && ! grep -q "Sort by" /tmp/bitcoin.html; then
+              sleep 2
+              continue
+            fi
+            if ! grep -q "/compare?ids=" /tmp/bitcoin.html; then
               sleep 2
               continue
             fi
@@ -273,7 +296,23 @@ jobs:
               sleep 2
               continue
             fi
-            echo "Web, Chart Lab, Token Studio, News and Status smoke tests passed"
+            if ! grep -q "CoinGecko key" /tmp/status.html && ! grep -q "key is configured" /tmp/status.html; then
+              sleep 2
+              continue
+            fi
+            if ! curl -fsS "http://127.0.0.1:3000/compare?ids=bitcoin,ethereum" > /tmp/compare.html; then
+              sleep 2
+              continue
+            fi
+            if ! grep -q "SIDE-BY-SIDE" /tmp/compare.html; then
+              sleep 2
+              continue
+            fi
+            if ! grep -qi "does not invent" /tmp/compare.html; then
+              sleep 2
+              continue
+            fi
+            echo "Web, Chart Lab, Token Studio, News, Status and Compare smoke tests passed"
             exit 0
           done
           exit 1

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useState, type KeyboardEvent, type ReactNode } from "react";
 import type { AssetTickers, Candle } from "../lib/api";
 import { ExchangeMarkets } from "./ExchangeMarkets";
 import { ProChartLab } from "./ProChartLab";
@@ -65,6 +65,12 @@ function TabButton({
   children: ReactNode;
 }) {
   const selected = current === id;
+  function onKeyDown(event: KeyboardEvent<HTMLButtonElement>) {
+    if (event.key === "ArrowRight" || event.key === "ArrowLeft" || event.key === "Home" || event.key === "End") {
+      event.preventDefault();
+      onSelect(id === "markets" ? "chart" : "markets");
+    }
+  }
   return (
     <button
       type="button"
@@ -72,8 +78,10 @@ function TabButton({
       id={`tab-${id}`}
       aria-selected={selected}
       aria-controls={`panel-${id}`}
+      tabIndex={selected ? 0 : -1}
       className={`asset-tab ${selected ? "is-on" : "ghost"}`}
       onClick={() => onSelect(id)}
+      onKeyDown={onKeyDown}
     >
       {children}
     </button>

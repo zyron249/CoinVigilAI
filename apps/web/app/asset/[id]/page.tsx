@@ -7,15 +7,34 @@ import { StatusBadge } from "../../../components/StatusBadge";
 import { WatchButton } from "../../../components/WatchButton";
 import { getAssetAnalysis, getAssetTickers, getCandles, getCouncilStatus } from "../../../lib/api";
 import { changeClass, formatCompact, formatCompactUsd, formatDate, formatPercent, formatTimestamp, formatUsd } from "../../../lib/format";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 
-export default async function AssetPage({ params }: { params: Promise<{ id: string }> }) {
+function firstParam(value: string | string[] | undefined) {
+  if (Array.isArray(value)) return value[0];
+  return value;
+}
+
+export default async function AssetPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const { id } = await params;
+  const query = await searchParams;
+  const q = firstParam(query.q) || "";
+  const sort = firstParam(query.sort) || "volume";
+  const order = firstParam(query.order) || "";
+  const page = Number(firstParam(query.page) || "1") || 1;
+  const minVolume = Number(firstParam(query.min_volume) || "0") || 0;
+  const companion = id.toLowerCase() === "ethereum" ? "bitcoin" : "ethereum";
   const [analysis, candleResponse, councilStatus, tickers] = await Promise.all([
     getAssetAnalysis(id),
     getCandles(id, 90),
     getCouncilStatus(),
-    getAssetTickers(id, 1, 25),
+    getAssetTickers(id, page, 25, { q, minVolume, sort, order: order || undefined }),
   ]);
 
   if (!analysis) notFound();
@@ -58,6 +77,9 @@ export default async function AssetPage({ params }: { params: Promise<{ id: stri
             <div className="asset-meta-row">
               <StatusBadge source={analysis.data_source} />
               <WatchButton id={asset.id} symbol={asset.symbol} name={asset.name} />
+              <Link className="ghost tool-button compare-link" href={`/compare?ids=${asset.id},${companion}`}>
+                Compare
+              </Link>
             </div>
             {formatTimestamp(asset.last_updated) ? (
               <p className="live-updated muted">Last updated: {formatTimestamp(asset.last_updated)}</p>

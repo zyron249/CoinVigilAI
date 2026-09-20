@@ -172,6 +172,7 @@ export function MarketTable({
                           className={`sort-button ${sorted ? "active" : ""}`}
                           onClick={() => toggleSort(column.sort!)}
                           disabled={busy}
+                          title={`Sort by ${column.label}. Enter or Space.`}
                         >
                           {column.label}
                           {sorted ? (pageData.order === "asc" ? " ↑" : " ↓") : ""}

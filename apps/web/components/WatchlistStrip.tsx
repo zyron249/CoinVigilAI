@@ -17,7 +17,14 @@ export function WatchlistStrip({ assets }: { assets: MarketAsset[] }) {
           <div className="eyebrow">WATCHLIST</div>
           <h2>Saved in this browser</h2>
         </div>
-        <span className="muted">{items.length} saved</span>
+        <div className="table-tools">
+          {items.length >= 2 ? (
+            <Link className="ghost tool-button" href={`/compare?ids=${items.slice(0, 3).map((item) => item.id).join(",")}`}>
+              Compare watched
+            </Link>
+          ) : null}
+          <span className="muted">{items.length} saved</span>
+        </div>
       </div>
       {items.length === 0 ? (
         <div className="empty empty-panel">

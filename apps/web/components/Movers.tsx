@@ -23,7 +23,14 @@ function MoverList({
           <div className="eyebrow">{title}</div>
           <h2>24h</h2>
         </div>
-        <StatusBadge source={source} stale={stale} />
+        <div className="table-tools">
+          {assets.length >= 2 ? (
+            <Link className="ghost tool-button" href={`/compare?ids=${assets.slice(0, 3).map((asset) => asset.id).join(",")}`}>
+              Compare
+            </Link>
+          ) : null}
+          <StatusBadge source={source} stale={stale} />
+        </div>
       </div>
       <div className="mover-list">
         {assets.length === 0 ? (
