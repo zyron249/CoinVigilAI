@@ -1,3 +1,4 @@
+import { AssetSubnav } from "../../../components/AssetSubnav";
 import { AssetWorkspace } from "../../../components/AssetWorkspace";
 import { CouncilRoster } from "../../../components/CouncilRoster";
 import { DemoRibbon } from "../../../components/DemoRibbon";
@@ -86,11 +87,7 @@ export default async function AssetPage({
             {formatTimestamp(asset.last_updated) ? (
               <p className="live-updated muted">Last updated: {formatTimestamp(asset.last_updated)}</p>
             ) : null}
-            <nav className="asset-jump" aria-label="On this page">
-              <a href="#overview">Overview</a>
-              <a href="#community">Links</a>
-              <a href="#contracts">Contracts</a>
-              <a href="#chart-lab">Chart</a>
+            <nav className="asset-jump" aria-label="Related pages">
               <Link href={`/compare?ids=${asset.id},${companion}`}>Compare</Link>
               <Link href="/news">News</Link>
               <Link href="/status">Status</Link>
@@ -103,6 +100,8 @@ export default async function AssetPage({
           <Sparkline values={asset.sparkline_7d} />
         </div>
       </section>
+
+      <AssetSubnav compareHref={`/compare?ids=${asset.id},${companion}`} />
 
       <section className="asset-metrics asset-metrics-wide">
         {stats.map((stat) => (

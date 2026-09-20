@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import type { GlobalOverview, MarketMovers, MarketPage } from "../lib/api";
 import { getGlobalOverview, getMarket, getMovers } from "../lib/api";
 import { sourceLabel } from "../lib/format";
+import { writeMarketQuery } from "../lib/pagination";
 import { DemoRibbon } from "./DemoRibbon";
 import { GlobalStrip } from "./GlobalStrip";
 import { MarketTable } from "./MarketTable";
@@ -13,6 +14,7 @@ import { WatchlistStrip } from "./WatchlistStrip";
 
 const POLL_MS = 30_000;
 const MIN_TICK_MS = 8_000;
+const SEARCH_MS = 280;
 
 export function LiveBoard({
   initialMarket,
@@ -35,6 +37,7 @@ export function LiveBoard({
   const [busy, setBusy] = useState(false);
   const [refreshError, setRefreshError] = useState<string | null>(initialMarket.error ?? null);
   const [checkedAt, setCheckedAt] = useState<string | null>(initialMarket.as_of ?? null);
+  const [draft, setDraft] = useState(initialMarket.query || "");
   const queryRef = useRef({
     page: initialMarket.page,
     limit: initialMarket.limit,
@@ -53,6 +56,13 @@ export function LiveBoard({
   ) => {
     const query = { ...queryRef.current, ...next };
     queryRef.current = query;
+    writeMarketQuery({
+      q: query.q || "",
+      page: query.page,
+      limit: query.limit,
+      sort: query.sort,
+      order: query.order === "asc" ? "asc" : "desc",
+    });
     const ticket = ++ticketRef.current;
     if (!silent) setBusy(true);
     const result = await getMarket(query);
@@ -110,6 +120,21 @@ export function LiveBoard({
     };
   }, [loadMarket]);
 
+  useEffect(() => {
+    if (draft.trim() !== (queryRef.current.q || "").trim()) return;
+    setDraft(market.query || "");
+  }, [draft, market.query]);
+
+  useEffect(() => {
+    const next = draft.trim();
+    const current = (queryRef.current.q || "").trim();
+    if (next === current) return;
+    const timer = window.setTimeout(() => {
+      void loadMarket({ q: draft, page: 1 });
+    }, SEARCH_MS);
+    return () => window.clearTimeout(timer);
+  }, [draft, loadMarket]);
+
   const watchAssets = useMemo(() => {
     const seen = new Set<string>();
     const rows = [];
@@ -144,8 +169,7 @@ export function LiveBoard({
           className="market-search finder-search"
           onSubmit={(event) => {
             event.preventDefault();
-            const value = new FormData(event.currentTarget).get("q");
-            void loadMarket({ q: String(value || ""), page: 1 });
+            void loadMarket({ q: draft, page: 1 });
             document.getElementById("markets")?.scrollIntoView({ behavior: "smooth", block: "start" });
           }}
         >
@@ -154,13 +178,13 @@ export function LiveBoard({
             id="hero-market-search"
             name="q"
             type="search"
-            defaultValue={market.query || ""}
-            key={market.query || "empty"}
+            value={draft}
+            onChange={(event) => setDraft(event.target.value)}
             placeholder="Search name, symbol, or id — then jump to the asset"
             autoComplete="off"
-            disabled={busy}
+            aria-busy={busy}
           />
-          <button type="submit" disabled={busy}>Search</button>
+          <button type="submit">Search</button>
         </form>
         {market.query && market.assets.length > 0 ? (
           <div className="jump-row">
@@ -220,6 +244,8 @@ export function LiveBoard({
           busy={busy}
           refreshError={refreshError}
           checkedAt={checkedAt}
+          draft={draft}
+          onDraft={setDraft}
           onQuery={(next) => { void loadMarket(next); }}
         />
       </section>

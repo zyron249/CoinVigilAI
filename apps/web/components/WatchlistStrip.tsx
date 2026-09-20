@@ -13,9 +13,11 @@ function companionId(id: string) {
 export function WatchlistStrip({ assets }: { assets: MarketAsset[] }) {
   const { items } = useWatchlist();
   const byId = new Map(assets.map((asset) => [asset.id, asset]));
-  const compareHref = items.length
+  const compareHref = items.length >= 2
     ? `/compare?ids=${items.slice(0, 3).map((item) => item.id).join(",")}`
-    : "/compare";
+    : items.length === 1
+      ? `/compare?ids=${items[0].id},${companionId(items[0].id)}`
+      : "/compare";
 
   return (
     <section id="watchlist" className="card watchlist-card">
