@@ -44,6 +44,8 @@ export type MarketPage = {
   universe_size: number;
   query?: string | null;
   coverage_note?: string | null;
+  partial?: boolean;
+  coverage_target?: number;
   error?: string | null;
 } & Freshness;
 
@@ -199,6 +201,8 @@ export type AssetTickers = {
   total: number;
   unique_exchange_count?: number;
   venues?: string[];
+  query?: string | null;
+  min_volume?: number | null;
   source: string;
   note: string;
 } & Freshness;
@@ -256,6 +260,8 @@ export async function getMarket(query: MarketQuery = {}): Promise<MarketPage> {
     universe_size: 0,
     query: q || null,
     coverage_note: "CoinGecko-tracked snapshot by market cap — not every coin on every exchange.",
+    partial: false,
+    coverage_target: 1000,
     error: "Rankings are unavailable.",
     last_live_at: null,
     as_of: null,
@@ -284,6 +290,8 @@ export async function getMarket(query: MarketQuery = {}): Promise<MarketPage> {
       universe_size: json.universe_size ?? json.total ?? 0,
       query: json.query ?? (q || null),
       coverage_note: json.coverage_note ?? empty.coverage_note,
+      partial: Boolean(json.partial),
+      coverage_target: json.coverage_target ?? 1000,
       error: null,
       ...freshnessFrom(json),
     };
@@ -327,7 +335,12 @@ export async function getRadar(): Promise<RadarSignal[]> {
   return json.data ?? [];
 }
 
-export async function getAssetTickers(coinId: string, page = 1, limit = 25): Promise<AssetTickers> {
+export async function getAssetTickers(
+  coinId: string,
+  page = 1,
+  limit = 25,
+  extras: { q?: string; minVolume?: number } = {},
+): Promise<AssetTickers> {
   const empty: AssetTickers = {
     coin_id: coinId,
     data: [],
@@ -337,6 +350,8 @@ export async function getAssetTickers(coinId: string, page = 1, limit = 25): Pro
     total: 0,
     unique_exchange_count: 0,
     venues: [],
+    query: extras.q || null,
+    min_volume: extras.minVolume ?? null,
     source: "unavailable",
     note: "Exchange listings are unavailable. CoinVigil does not scrape venues or invent pairs.",
     last_live_at: null,
@@ -345,7 +360,10 @@ export async function getAssetTickers(coinId: string, page = 1, limit = 25): Pro
     fallback_reason: "unreachable",
   };
   try {
-    const response = await request(`/api/assets/${encodeURIComponent(coinId)}/tickers?page=${page}&limit=${limit}`);
+    const search = new URLSearchParams({ page: String(page), limit: String(limit) });
+    if (extras.q) search.set("q", extras.q);
+    if (extras.minVolume && extras.minVolume > 0) search.set("min_volume", String(extras.minVolume));
+    const response = await request(`/api/assets/${encodeURIComponent(coinId)}/tickers?${search}`);
     if (!response.ok) return empty;
     const json = await response.json();
     return {
@@ -357,6 +375,8 @@ export async function getAssetTickers(coinId: string, page = 1, limit = 25): Pro
       total: json.total ?? 0,
       unique_exchange_count: json.unique_exchange_count ?? 0,
       venues: Array.isArray(json.venues) ? json.venues : [],
+      query: json.query ?? extras.q ?? null,
+      min_volume: json.min_volume ?? extras.minVolume ?? null,
       source: MARKET_SOURCES.has(json.source) ? json.source : "unavailable",
       note: json.note ?? empty.note,
       ...freshnessFrom(json),

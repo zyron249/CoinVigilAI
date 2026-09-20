@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { GlobalOverview, MarketMovers, MarketPage } from "../lib/api";
 import { getGlobalOverview, getMarket, getMovers } from "../lib/api";
@@ -129,6 +130,56 @@ export function LiveBoard({
         fallbackReason={market.fallback_reason}
       />
       {hero}
+      <section className="card finder-dock" id="find-asset" aria-label="Find a CoinGecko-tracked asset">
+        <div className="finder-copy">
+          <div className="eyebrow">FIND AN ASSET</div>
+          <h2>Search this CoinGecko snapshot</h2>
+          <p className={`coverage-count ${market.partial ? "is-partial" : ""}`}>
+            {market.universe_size} of {market.coverage_target || 1000} CoinGecko-tracked assets in this snapshot
+            {market.partial ? " — partial (later /coins/markets pages were rate-limited)." : "."}
+            {" "}Not every coin on earth.
+          </p>
+        </div>
+        <form
+          className="market-search finder-search"
+          onSubmit={(event) => {
+            event.preventDefault();
+            const value = new FormData(event.currentTarget).get("q");
+            void loadMarket({ q: String(value || ""), page: 1 });
+            document.getElementById("markets")?.scrollIntoView({ behavior: "smooth", block: "start" });
+          }}
+        >
+          <label className="sr-only" htmlFor="hero-market-search">Search name, symbol, or id</label>
+          <input
+            id="hero-market-search"
+            name="q"
+            type="search"
+            defaultValue={market.query || ""}
+            key={market.query || "empty"}
+            placeholder="Search name, symbol, or id — then jump to the asset"
+            autoComplete="off"
+            disabled={busy}
+          />
+          <button type="submit" disabled={busy}>Search</button>
+        </form>
+        {market.query && market.assets.length > 0 ? (
+          <div className="jump-row">
+            <span className="muted">Open:</span>
+            {market.assets.slice(0, 5).map((asset) => (
+              <Link className="jump-chip" key={asset.id} href={`/asset/${asset.id}`}>
+                {asset.name} <span>{asset.symbol.toUpperCase()}</span>
+              </Link>
+            ))}
+          </div>
+        ) : null}
+      </section>
+      {market.partial ? (
+        <p className="source-ribbon cache-ribbon" role="status">
+          <strong>Partial CoinGecko snapshot.</strong>
+          {" "}Showing {market.universe_size} of {market.coverage_target || 1000} assets because later market pages were rate-limited or empty.
+          CoinVigil does not invent coins to fill the table.
+        </p>
+      ) : null}
       <GlobalStrip overview={overview} checkedAt={checkedAt} />
       {brief}
       <WatchlistStrip assets={watchAssets} />

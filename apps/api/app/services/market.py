@@ -1,6 +1,7 @@
 import logging
 import math
 import time
+import asyncio
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any
@@ -23,7 +24,12 @@ MARKET_UNIVERSE_PAGES = 4
 TICKER_SOURCE_PAGES = 3
 TICKER_PAGE_SIZE = 100
 VALID_SOURCES = {"coingecko", "cache", "demo"}
-UNIVERSE_CACHE_KEY = f"markets:v5:universe:{MARKET_UNIVERSE_LIMIT}x{MARKET_UNIVERSE_PAGES}"
+UNIVERSE_CACHE_KEY = f"markets:v6:universe:{MARKET_UNIVERSE_LIMIT}x{MARKET_UNIVERSE_PAGES}"
+COVERAGE_CAP = MARKET_UNIVERSE_LIMIT * MARKET_UNIVERSE_PAGES
+RETRY_ATTEMPTS = 3
+RETRY_BASE_DELAY_SECONDS = 0.35
+MAX_RETRY_SLEEP_SECONDS = 1.2
+PAGE_GAP_SECONDS = 0.2
 # Short process cache so one dashboard render does not stampede CoinGecko
 # when Redis is down. Tests clear this via clear_market_memory_cache().
 _MEMORY_TTL_SECONDS = 20.0
@@ -56,6 +62,45 @@ def clear_market_memory_cache() -> None:
     _last_good.clear()
 
 
+async def _sleep(seconds: float) -> None:
+    await asyncio.sleep(seconds)
+
+
+async def _coingecko_get(client: httpx.AsyncClient, url: str, params: dict[str, Any] | None = None) -> httpx.Response:
+    """GET with backoff on 429/5xx. Never invents a payload."""
+    delay = RETRY_BASE_DELAY_SECONDS
+    last_error: Exception | None = None
+    for attempt in range(1, RETRY_ATTEMPTS + 1):
+        try:
+            response = await client.get(url, params=params)
+            if response.status_code == 429 or response.status_code >= 500:
+                retry_after = response.headers.get("Retry-After")
+                wait_for = delay
+                if retry_after:
+                    try:
+                        wait_for = max(delay, float(retry_after))
+                    except ValueError:
+                        wait_for = delay
+                if attempt < RETRY_ATTEMPTS:
+                    logger.warning("CoinGecko %s on %s (attempt %s); retry in %.2fs", response.status_code, url, attempt, min(wait_for, MAX_RETRY_SLEEP_SECONDS))
+                    await _sleep(min(wait_for, MAX_RETRY_SLEEP_SECONDS))
+                    delay *= 2
+                    continue
+            response.raise_for_status()
+            return response
+        except Exception as exc:
+            last_error = exc
+            if attempt < RETRY_ATTEMPTS and _fallback_reason(exc) in {"rate_limited", "unreachable"}:
+                logger.warning("CoinGecko error on %s (%s attempt %s); retry in %.2fs", url, type(exc).__name__, attempt, min(delay, MAX_RETRY_SLEEP_SECONDS))
+                await _sleep(min(delay, MAX_RETRY_SLEEP_SECONDS))
+                delay *= 2
+                continue
+            raise
+    if last_error:
+        raise last_error
+    raise RuntimeError("CoinGecko request failed")
+
+
 def _now_iso() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
@@ -73,6 +118,7 @@ class UniverseSnapshot:
     last_live_at: str | None = None
     stale: bool = False
     fallback_reason: str | None = None
+    partial: bool = False
 
     def as_tuple(self) -> tuple[list[MarketAsset], str]:
         return list(self.assets), self.source
@@ -370,6 +416,7 @@ def _snapshot_from_payload(payload: dict[str, Any], *, stale: bool, fallback_rea
         last_live_at=payload.get("last_live_at"),
         stale=stale,
         fallback_reason=fallback_reason,
+        partial=bool(payload.get("partial")),
     )
 
 
@@ -426,7 +473,7 @@ async def peek_universe_status() -> dict[str, Any]:
 async def get_universe_snapshot() -> UniverseSnapshot:
     mem = _memory_get("universe")
     if isinstance(mem, UniverseSnapshot) and mem.assets:
-        return UniverseSnapshot(list(mem.assets), mem.source, mem.last_live_at, mem.stale, mem.fallback_reason)
+        return UniverseSnapshot(list(mem.assets), mem.source, mem.last_live_at, mem.stale, mem.fallback_reason, mem.partial)
     if isinstance(mem, tuple) and len(mem) == 2 and mem[0]:
         return UniverseSnapshot(list(mem[0]), mem[1])
 
@@ -451,6 +498,7 @@ async def get_universe_snapshot() -> UniverseSnapshot:
                 "items": [asset.model_dump() for asset in snapshot.assets],
                 "source": "coingecko",
                 "last_live_at": snapshot.last_live_at,
+                "partial": snapshot.partial,
             }
             await cache_set(cache_key, envelope, settings.market_cache_ttl_seconds)
             await save_last_good("universe", envelope)
@@ -470,7 +518,7 @@ async def get_universe_snapshot() -> UniverseSnapshot:
             return snapshot
 
     demo = list(DEMO_MARKETS)
-    snapshot = UniverseSnapshot(demo, "demo", stale=False, fallback_reason=reason)
+    snapshot = UniverseSnapshot(demo, "demo", stale=False, fallback_reason=reason, partial=False)
     _memory_set("universe", snapshot)
     return snapshot
 
@@ -511,7 +559,8 @@ def _filter_assets(assets: list[MarketAsset], query: str | None) -> list[MarketA
     ]
 
 
-COVERAGE_CAP = MARKET_UNIVERSE_LIMIT * MARKET_UNIVERSE_PAGES
+def _coverage_target() -> int:
+    return MARKET_UNIVERSE_LIMIT * MARKET_UNIVERSE_PAGES
 
 
 def _coverage_note(snapshot: UniverseSnapshot) -> str:
@@ -520,9 +569,16 @@ def _coverage_note(snapshot: UniverseSnapshot) -> str:
             f"Labeled demo snapshot ({len(snapshot.assets)} assets). "
             "Not live CoinGecko coverage, and not a CoinMarketCap clone."
         )
+    target = _coverage_target()
+    if snapshot.partial:
+        return (
+            f"Partial CoinGecko-tracked snapshot: {len(snapshot.assets)} of {target} assets "
+            "(paginated /coins/markets; later pages were rate-limited or empty). "
+            "Not every coin on every exchange, and not a CoinMarketCap clone."
+        )
     return (
         f"CoinGecko-tracked snapshot of {len(snapshot.assets)} assets by market cap "
-        f"(paginated /coins/markets, up to {COVERAGE_CAP}). "
+        f"(paginated /coins/markets, up to {target}). "
         "Not every coin on every exchange, and not a CoinMarketCap clone."
     )
 
@@ -531,6 +587,7 @@ async def _fetch_coingecko_market_universe() -> UniverseSnapshot | None:
     settings = get_settings()
     collected: list[MarketAsset] = []
     seen: set[str] = set()
+    skipped = 0
     async with httpx.AsyncClient(timeout=12.0, headers=_headers()) as client:
         for page in range(1, MARKET_UNIVERSE_PAGES + 1):
             params = {
@@ -542,16 +599,19 @@ async def _fetch_coingecko_market_universe() -> UniverseSnapshot | None:
                 "price_change_percentage": "1h,24h,7d",
             }
             try:
-                response = await client.get(f"{settings.coingecko_base_url}/coins/markets", params=params)
-                response.raise_for_status()
+                response = await _coingecko_get(client, f"{settings.coingecko_base_url}/coins/markets", params)
                 payload = response.json()
             except Exception:
-                if collected:
-                    logger.warning("CoinGecko markets page %s failed; keeping %s assets", page, len(collected))
-                    break
-                raise
+                if not collected:
+                    raise
+                skipped += 1
+                logger.warning("CoinGecko markets page %s failed after retries; continuing for remaining pages", page)
+                continue
             if not isinstance(payload, list) or not payload:
-                break
+                if collected and skipped == 0:
+                    break
+                skipped += 1
+                continue
             for item in payload:
                 if not isinstance(item, dict) or not item.get("id"):
                     continue
@@ -560,11 +620,23 @@ async def _fetch_coingecko_market_universe() -> UniverseSnapshot | None:
                     continue
                 seen.add(asset.id)
                 collected.append(asset)
-            if len(payload) < MARKET_UNIVERSE_LIMIT:
+            if len(payload) < MARKET_UNIVERSE_LIMIT and skipped == 0:
                 break
+            if page < MARKET_UNIVERSE_PAGES:
+                await _sleep(PAGE_GAP_SECONDS)
     if not collected:
         return None
-    return UniverseSnapshot(collected, "coingecko", last_live_at=_now_iso(), stale=False)
+    target = _coverage_target()
+    partial = skipped > 0 or len(collected) < target
+    reason = "rate_limited" if skipped else None
+    return UniverseSnapshot(
+        collected,
+        "coingecko",
+        last_live_at=_now_iso(),
+        stale=False,
+        fallback_reason=reason,
+        partial=partial,
+    )
 
 
 async def get_ranked_markets(
@@ -591,6 +663,7 @@ async def get_ranked_markets(
                     snapshot.last_live_at,
                     snapshot.stale,
                     snapshot.fallback_reason,
+                    snapshot.partial,
                 )
     ranked = _sort_assets(filtered, sort_key, order_key)
     page_rows = _slice_page(ranked, bounded_page, bounded_limit)
@@ -607,6 +680,8 @@ async def get_ranked_markets(
         coverage="universe",
         query=(query or "").strip() or None,
         coverage_note=_coverage_note(snapshot),
+        partial=bool(snapshot.partial),
+        coverage_target=_coverage_target(),
         **_freshness_fields(snapshot),
     )
 
@@ -834,11 +909,11 @@ async def get_candles(coin_id: str, days: int = 90) -> tuple[list[Candle], str]:
 
     try:
         async with httpx.AsyncClient(timeout=12.0, headers=_headers()) as client:
-            response = await client.get(
+            response = await _coingecko_get(
+                client,
                 f"{settings.coingecko_base_url}/coins/{coin_id}/ohlc",
-                params={"vs_currency": "usd", "days": normalized_days},
+                {"vs_currency": "usd", "days": normalized_days},
             )
-            response.raise_for_status()
             payload = response.json()
             candles = [
                 Candle(
@@ -942,16 +1017,16 @@ async def _fetch_coingecko_tickers(coin_id: str) -> list[ExchangeTicker]:
     async with httpx.AsyncClient(timeout=12.0, headers=_headers()) as client:
         for page in range(1, TICKER_SOURCE_PAGES + 1):
             try:
-                response = await client.get(
+                response = await _coingecko_get(
+                    client,
                     f"{settings.coingecko_base_url}/coins/{coin_id}/tickers",
-                    params={"page": page, "order": "volume_desc", "include_exchange_logo": "false"},
+                    {"page": page, "order": "volume_desc", "include_exchange_logo": "false"},
                 )
-                response.raise_for_status()
                 payload = response.json()
             except Exception:
                 if collected:
-                    logger.warning("CoinGecko tickers page %s failed for %s; keeping %s pairs", page, coin_id, len(collected))
-                    break
+                    logger.warning("CoinGecko tickers page %s failed for %s after retries; continuing", page, coin_id)
+                    continue
                 raise
             raw = payload.get("tickers") if isinstance(payload, dict) else None
             if not isinstance(raw, list) or not raw:
@@ -970,7 +1045,13 @@ async def _fetch_coingecko_tickers(coin_id: str) -> list[ExchangeTicker]:
     return collected
 
 
-async def get_asset_tickers(coin_id: str, page: int = 1, limit: int = 25) -> AssetTickers:
+async def get_asset_tickers(
+    coin_id: str,
+    page: int = 1,
+    limit: int = 25,
+    query: str | None = None,
+    min_volume: float | None = None,
+) -> AssetTickers:
     """CoinGecko coin tickers. Never invents exchange pairs."""
     needle = coin_id.strip().lower()
     bounded_limit = max(5, min(int(limit), 100))
@@ -1030,25 +1111,69 @@ async def get_asset_tickers(coin_id: str, page: int = 1, limit: int = 25) -> Ass
 
     rows = rows or []
     ranked = sorted(rows, key=lambda ticker: ticker.volume_usd or 0, reverse=True)
-    page_rows = _slice_page(ranked, bounded_page, bounded_limit)
-    unique_count, venues = _venue_summary(ranked)
+    needle_q = (query or "").strip().lower()
+    filtered = ranked
+    if needle_q:
+        filtered = [
+            ticker
+            for ticker in filtered
+            if needle_q in ticker.exchange.lower()
+            or needle_q in (ticker.exchange_id or "").lower()
+            or needle_q in ticker.pair.lower()
+        ]
+    if min_volume is not None and min_volume > 0:
+        filtered = [ticker for ticker in filtered if (ticker.volume_usd or 0) >= min_volume]
+    page_rows = _slice_page(filtered, bounded_page, bounded_limit)
+    unique_count, venues = _venue_summary(filtered)
     note = (
-        f"CoinGecko ticker snapshot ({len(ranked)} pairs across {unique_count} venues "
+        f"CoinGecko ticker snapshot ({len(ranked)} pairs across {_venue_summary(ranked)[0]} venues "
         f"from up to {TICKER_SOURCE_PAGES} CoinGecko pages), sorted by reported USD volume. "
         "Reported volume can be inflated on some venues; trust scores are CoinGecko's when present. "
         "Not every venue worldwide, and CoinVigil does not scrape exchanges."
     )
+    if needle_q or (min_volume or 0) > 0:
+        note = (
+            f"{note} Filter: "
+            + ", ".join(
+                part for part in (
+                    f"venue/pair contains “{query.strip()}”" if needle_q else "",
+                    f"min 24h volume ${min_volume:,.0f}" if min_volume and min_volume > 0 else "",
+                ) if part
+            )
+            + "."
+        )
     if not ranked:
         return _empty_tickers(needle, bounded_page, bounded_limit, source if source in VALID_SOURCES else "unavailable", reason)
+    if not filtered:
+        return AssetTickers(
+            coin_id=needle,
+            data=[],
+            count=0,
+            page=bounded_page,
+            limit=bounded_limit,
+            total=0,
+            unique_exchange_count=0,
+            venues=[],
+            query=(query or "").strip() or None,
+            min_volume=min_volume if min_volume and min_volume > 0 else None,
+            source=source if source in VALID_SOURCES else "cache",
+            note="No CoinGecko tickers match this venue/volume filter. CoinVigil does not invent pairs.",
+            last_live_at=last_live_at,
+            as_of=last_live_at if stale else _now_iso(),
+            stale=stale,
+            fallback_reason=reason,
+        )
     return AssetTickers(
         coin_id=needle,
         data=page_rows,
         count=len(page_rows),
         page=bounded_page,
         limit=bounded_limit,
-        total=len(ranked),
+        total=len(filtered),
         unique_exchange_count=unique_count,
         venues=venues,
+        query=(query or "").strip() or None,
+        min_volume=min_volume if min_volume and min_volume > 0 else None,
         source=source if source in VALID_SOURCES else "cache",
         note=note,
         last_live_at=last_live_at,

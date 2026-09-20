@@ -147,8 +147,10 @@ async def asset_tickers(
     coin_id: str,
     limit: int = Query(25, ge=5, le=100),
     page: int = Query(1, ge=1, le=20),
+    q: str | None = Query(None, max_length=80),
+    min_volume: float | None = Query(None, ge=0),
 ):
-    return await get_asset_tickers(coin_id, page=page, limit=limit)
+    return await get_asset_tickers(coin_id, page=page, limit=limit, query=q, min_volume=min_volume)
 
 
 @app.get("/api/assets/{coin_id}/analysis", response_model=AssetAnalysis)

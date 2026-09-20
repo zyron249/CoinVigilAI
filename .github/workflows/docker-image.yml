@@ -130,6 +130,8 @@ jobs:
           assert 'stale' in market and 'last_live_at' in market and 'fallback_reason' in market, market
           assert 'coverage_note' in market, market
           assert 'coinmarketcap' in market.get('coverage_note', '').lower(), market
+          assert 'coverage_target' in market, market
+          assert isinstance(market.get('partial'), bool), market
           assert global_overview.get('source') in allowed_sources, global_overview
           assert 'stale' in global_overview, global_overview
           assert movers.get('source') in allowed_sources, movers
@@ -191,6 +193,10 @@ jobs:
               sleep 2
               continue
             fi
+            if ! grep -q "FIND AN ASSET" /tmp/web.html; then
+              sleep 2
+              continue
+            fi
             if ! grep -q "Search name, symbol, or id" /tmp/web.html && ! grep -q "market-search" /tmp/web.html; then
               sleep 2
               continue
@@ -212,6 +218,10 @@ jobs:
               continue
             fi
             if ! grep -q "EXCHANGE MARKETS" /tmp/bitcoin.html; then
+              sleep 2
+              continue
+            fi
+            if ! grep -q "Filter exchange or pair" /tmp/bitcoin.html; then
               sleep 2
               continue
             fi

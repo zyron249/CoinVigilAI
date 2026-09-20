@@ -30,8 +30,8 @@ export default async function Home() {
               <div className="eyebrow hero-tag">CRYPTOCURRENCY RANKINGS</div>
               <h1>Markets, with an <span>AI brief</span>.</h1>
               <p>
-                Ranked CoinGecko-tracked assets (paginated `/coins/markets` snapshot by market cap), 24h movers, and global stats.
-                Search finds names in this snapshot — CoinVigil does not claim every coin on earth.
+                Ranked CoinGecko-tracked assets (paginated `/coins/markets`, {market.universe_size} of {market.coverage_target || 1000} in this snapshot).
+                Search above the table, then jump straight to an asset. CoinVigil does not claim every coin on earth.
                 The brief is labeled heuristic or AI-generated. Not CoinMarketCap, and not financial advice.
               </p>
             </div>
