@@ -68,7 +68,7 @@ export function MarketBriefCard({
               {brief.providers_responded.length > 0 ? (
                 <span className="muted">Responded: {brief.providers_responded.join(", ")}</span>
               ) : (
-                <span className="muted">Set XAI_API_KEY or another council key to replace the heuristic.</span>
+                <span className="muted">No AI keys configured — this is the quantitative fallback.</span>
               )}
             </div>
             <p className="brief-disclaimer">{brief.disclaimer}</p>

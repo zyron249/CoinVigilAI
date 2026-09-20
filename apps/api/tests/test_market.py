@@ -6,6 +6,7 @@ from app.services.market import (
     get_asset,
     get_candles,
     get_global_overview,
+    get_market_universe,
     get_markets_with_source,
     get_movers,
     get_ranked_markets,
@@ -248,3 +249,20 @@ async def test_global_coingecko_payload_is_labeled_without_invented_fng(monkeypa
     assert overview.fear_greed_classification is None
     assert "coingecko" in (overview.note or "").lower()
     assert overview.source != "coinmarketcap"
+
+
+@pytest.mark.asyncio
+async def test_universe_memory_cache_avoids_second_http(monkeypatch):
+    calls = {"n": 0}
+
+    class CountingClient(_FailingClient):
+        async def get(self, *args, **kwargs):
+            calls["n"] += 1
+            raise RuntimeError("offline")
+
+    monkeypatch.setattr("app.services.market.httpx.AsyncClient", CountingClient)
+    first_assets, first_source = await get_market_universe()
+    second_assets, second_source = await get_market_universe()
+    assert first_source == second_source == "demo"
+    assert [asset.id for asset in first_assets] == [asset.id for asset in second_assets]
+    assert calls["n"] == 1

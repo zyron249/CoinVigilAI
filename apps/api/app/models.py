@@ -72,7 +72,6 @@ class MarketBrief(BaseModel):
     providers_requested: list[str] = Field(default_factory=list)
     providers_responded: list[str] = Field(default_factory=list)
     disclaimer: str = (
-        "AI-generated market brief from the latest CoinVigil snapshot. "
         "Informational research only — not financial advice."
     )
 

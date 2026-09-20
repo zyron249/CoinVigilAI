@@ -3,12 +3,14 @@ import { changeClass, formatCompactUsd, formatPercent } from "../lib/format";
 import { StatusBadge } from "./StatusBadge";
 
 export function GlobalStrip({ overview }: { overview: GlobalOverview }) {
+  const universeNote = overview.note || "Ranked universe total, not CoinGecko /global";
   const items = [
     {
       label: "Market cap",
       value: formatCompactUsd(overview.total_market_cap_usd),
-      extra: formatPercent(overview.market_cap_change_percentage_24h_usd),
+      extra: overview.coverage === "global" ? formatPercent(overview.market_cap_change_percentage_24h_usd) : null,
       extraClass: changeClass(overview.market_cap_change_percentage_24h_usd),
+      note: overview.coverage === "global" ? undefined : universeNote,
     },
     { label: "24h volume", value: formatCompactUsd(overview.total_volume_24h_usd) },
     {
@@ -35,7 +37,7 @@ export function GlobalStrip({ overview }: { overview: GlobalOverview }) {
           <span>{item.label}</span>
           <strong>{item.value}</strong>
           {"extra" in item && item.extra && item.extra !== "—" ? (
-            <em className={item.extraClass}>{item.extra} 24h</em>
+            <em className={"extraClass" in item ? item.extraClass : undefined}>{item.extra} 24h</em>
           ) : item.note ? (
             <em>{item.note}</em>
           ) : null}
@@ -44,7 +46,7 @@ export function GlobalStrip({ overview }: { overview: GlobalOverview }) {
       <div className="global-stat source-stat">
         <span>Data source</span>
         <strong><StatusBadge source={overview.source} /></strong>
-        <em>{overview.coverage === "global" ? "CoinGecko global" : overview.note || "Ranked universe"}</em>
+        <em>{overview.coverage === "global" ? "CoinGecko global" : universeNote}</em>
       </div>
     </section>
   );
