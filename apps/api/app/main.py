@@ -3,7 +3,6 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
 from app.models import AssetAnalysis, GlobalOverview, MarketBrief, MarketMovers, RadarSignal, RankedMarkets
-from app.models import AssetAnalysis, GlobalOverview, MarketBrief, MarketMovers, RadarSignal, RankedMarkets
 from app.services.ai import deterministic_view, provider_status, run_ai_council
 from app.services.brief import build_market_brief
 from app.services.cache import redis_status
@@ -14,6 +13,7 @@ from app.services.market import (
     get_markets,
     get_movers,
     get_ranked_markets,
+    peek_universe_status,
     snap_ohlc_days,
 )
 from app.services.news import get_news
@@ -58,6 +58,7 @@ async def public_status():
     settings = get_settings()
     providers = provider_status()
     configured = [provider["provider"] for provider in providers if provider["configured"]]
+    observed = await peek_universe_status()
     return {
         "status": "ok",
         "service": "coinvigil-api",
@@ -67,6 +68,11 @@ async def public_status():
             "provider": "coingecko",
             "label": "CoinGecko",
             "redis": await redis_status(),
+            "source": observed["source"],
+            "stale": observed["stale"],
+            "last_live_at": observed["last_live_at"],
+            "fallback_reason": observed["fallback_reason"],
+            "observed": observed["observed"],
         },
         "postgres": "not_provisioned",
         "news": {

@@ -29,7 +29,7 @@ export function SupplyBar({
   const pct = Math.min(100, Math.max(0, (circulating / max) * 100));
   return (
     <div className="range-bar supply-bar" aria-label="Circulating supply versus max">
-      <i style={{ left: `${pct}%` }} />
+      <b style={{ width: `${pct}%` }} />
     </div>
   );
 }

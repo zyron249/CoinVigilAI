@@ -354,7 +354,16 @@ export type StackStatus = {
   status: string;
   version?: string;
   disclaimer?: string;
-  market?: { provider: string; label?: string; redis: string };
+  market?: {
+    provider: string;
+    label?: string;
+    redis: string;
+    source?: string | null;
+    stale?: boolean;
+    last_live_at?: string | null;
+    fallback_reason?: string | null;
+    observed?: boolean;
+  };
   postgres?: string;
   news?: { feeds: number; hosts: string[]; using_defaults: boolean };
   ai?: { enabled: boolean; configured: string[]; configured_count: number; supported: number };
@@ -364,7 +373,7 @@ export async function getStackStatus(): Promise<StackStatus> {
   return readJson<StackStatus>("/api/status", {
     status: "unavailable",
     postgres: "not_provisioned",
-    market: { provider: "unknown", redis: "unavailable" },
+    market: { provider: "unknown", redis: "unavailable", source: null, observed: false },
     news: { feeds: 0, hosts: [], using_defaults: false },
     ai: { enabled: false, configured: [], configured_count: 0, supported: 0 },
     disclaimer: "Informational research only — not financial advice.",

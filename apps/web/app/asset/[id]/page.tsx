@@ -36,6 +36,7 @@ export default async function AssetPage({ params }: { params: Promise<{ id: stri
     { label: "Total supply", value: `${formatCompact(asset.total_supply)} ${asset.symbol.toUpperCase()}` },
     { label: "Max supply", value: asset.max_supply ? `${formatCompact(asset.max_supply)} ${asset.symbol.toUpperCase()}` : "—" },
     { label: "1h", value: formatPercent(asset.price_change_percentage_1h), className: changeClass(asset.price_change_percentage_1h) },
+    { label: "24h", value: formatPercent(asset.price_change_percentage_24h), className: changeClass(asset.price_change_percentage_24h) },
     { label: "7d", value: formatPercent(asset.price_change_percentage_7d), className: changeClass(asset.price_change_percentage_7d) },
     { label: "Risk", value: `${analysis.risk.score}/100 · ${analysis.risk.level}` },
   ];

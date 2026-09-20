@@ -26,6 +26,8 @@ def test_public_status_has_no_secrets_and_no_postgres():
     dumped = str(body).lower()
     assert body["postgres"] == "not_provisioned"
     assert body["market"]["provider"] == "coingecko"
+    assert body["market"]["observed"] is False
+    assert body["market"]["source"] is None
     assert "not financial advice" in body["disclaimer"].lower()
     assert "sk-" not in dumped
     assert "xai-" not in dumped
@@ -33,6 +35,28 @@ def test_public_status_has_no_secrets_and_no_postgres():
     assert body["ai"]["configured"] == []
     assert body["ai"]["configured_count"] == 0
     assert isinstance(body["news"]["hosts"], list)
+
+
+def test_public_status_reports_observed_demo_without_calling_markets(monkeypatch):
+    async def fake_peek():
+        return {
+            "source": "demo",
+            "stale": False,
+            "last_live_at": None,
+            "fallback_reason": "rate_limited",
+            "observed": True,
+        }
+
+    monkeypatch.setattr("app.main.peek_universe_status", fake_peek)
+    response = client.get("/api/status")
+    assert response.status_code == 200
+    body = response.json()
+    dumped = str(body).lower()
+    assert body["market"]["source"] == "demo"
+    assert body["market"]["observed"] is True
+    assert body["market"]["fallback_reason"] == "rate_limited"
+    assert "sk-" not in dumped
+    assert "api_key" not in dumped
 
 
 def test_council_status_lists_supported_providers():

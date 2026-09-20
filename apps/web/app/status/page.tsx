@@ -4,7 +4,9 @@ import { StatusBadge } from "../../components/StatusBadge";
 export default async function StatusPage() {
   const status = await getStackStatus();
   const redis = status.market?.redis || "unavailable";
-  const marketLabel = redis === "ok" ? "Live path + Redis cache" : "Live path, Redis optional/down";
+  const observed = Boolean(status.market?.observed);
+  const marketSource = status.market?.source || undefined;
+  const fallback = status.market?.fallback_reason;
   const aiConfigured = status.ai?.configured_count ?? 0;
 
   return (
@@ -21,8 +23,16 @@ export default async function StatusPage() {
       <section className="status-grid">
         <article className="card status-card">
           <span>Markets</span>
-          <strong><StatusBadge source="coingecko" /></strong>
-          <em>{marketLabel}. Source flips to cache/demo when CoinGecko rate-limits.</em>
+          <strong>
+            {observed
+              ? <StatusBadge source={marketSource} stale={Boolean(status.market?.stale)} />
+              : <span className="tone-cache">No snapshot yet</span>}
+          </strong>
+          <em>
+            {observed
+              ? `Last observed CoinGecko path${fallback ? ` (${fallback})` : ""}. This page does not call CoinGecko.`
+              : "Open Markets to fetch. Status never stamps the public API."}
+          </em>
         </article>
         <article className="card status-card">
           <span>Redis</span>

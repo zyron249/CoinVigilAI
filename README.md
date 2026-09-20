@@ -159,6 +159,7 @@ Strong bullish/bearish disagreement can force the final council result to neutra
 ## Main API routes
 
 - `GET /health` — process liveness plus dependency notes (`postgres` is `not_provisioned`)
+- `GET /api/status` — last observed Live/cache/demo path (no CoinGecko call), Redis, Postgres-not-provisioned, AI adapters configured (never keys), news hosts
 - `GET /api/market?limit=50&page=1&sort=market_cap&order=desc` — ranked table; `source`: `coingecko` | `cache` | `demo`; includes `last_live_at`, `as_of`, `stale`, `fallback_reason`
 - `GET /api/market/global` — market cap, 24h volume, BTC/ETH dominance, optional Fear & Greed
 - `GET /api/market/movers?limit=5` — 24h gainers and losers from the ranked universe

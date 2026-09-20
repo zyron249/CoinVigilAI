@@ -149,6 +149,8 @@ jobs:
           assert stack_status.get('status') == 'ok', stack_status
           assert stack_status.get('postgres') == 'not_provisioned', stack_status
           assert stack_status.get('market', {}).get('provider') == 'coingecko', stack_status
+          assert stack_status.get('market', {}).get('observed') is True, stack_status
+          assert stack_status.get('market', {}).get('source') in allowed_sources, stack_status
           assert 'sk-' not in dumped_status and 'api_key' not in dumped_status, stack_status
           assert 'not financial advice' in stack_status.get('disclaimer', '').lower(), stack_status
           print('API, markets, brief, candle, status and AI Council smoke tests passed')
@@ -236,6 +238,10 @@ jobs:
               continue
             fi
             if ! grep -q "Not provisioned" /tmp/status.html; then
+              sleep 2
+              continue
+            fi
+            if ! grep -q "does not call CoinGecko" /tmp/status.html && ! grep -q "never stamps the public API" /tmp/status.html; then
               sleep 2
               continue
             fi
