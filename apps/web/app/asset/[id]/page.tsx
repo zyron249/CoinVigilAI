@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { CouncilRoster } from "../../../components/CouncilRoster";
 import { ProChartLab } from "../../../components/ProChartLab";
-import { getAssetAnalysis, getCandles } from "../../../lib/api";
+import { getAssetAnalysis, getCandles, getCouncilStatus } from "../../../lib/api";
 
 const usd = new Intl.NumberFormat("en-US", {
   style: "currency",
@@ -17,9 +18,10 @@ const compact = new Intl.NumberFormat("en-US", {
 
 export default async function AssetPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const [analysis, candleResponse] = await Promise.all([
+  const [analysis, candleResponse, councilStatus] = await Promise.all([
     getAssetAnalysis(id),
     getCandles(id, 90),
+    getCouncilStatus(),
   ]);
 
   if (!analysis) notFound();
@@ -80,9 +82,11 @@ export default async function AssetPage({ params }: { params: Promise<{ id: stri
               {analysis.council.dissent.length > 0 ? <li>Dissent: {analysis.council.dissent.join(", ")}</li> : null}
             </ul>
           ) : (
-            <p className="analysis-meta">Heuristic fallback — no AI providers returned a council vote. Add provider keys in `.env` to enable the council.</p>
+            <p className="analysis-meta">
+              Engine: {analysis.engine}. Optional council models such as xAI Grok stay idle until their keys are set.
+            </p>
           )}
-          <div className="analysis-meta">Engine: {analysis.engine}</div>
+          {analysis.council ? <div className="analysis-meta">Engine: {analysis.engine}</div> : null}
         </div>
         <div className="card analysis-card">
           <div className="eyebrow">RISK DRIVERS</div>
@@ -92,6 +96,13 @@ export default async function AssetPage({ params }: { params: Promise<{ id: stri
           </ul>
         </div>
       </section>
+
+      <CouncilRoster
+        providers={councilStatus.providers}
+        configured={councilStatus.configured}
+        supported={councilStatus.supported}
+        results={analysis.council?.results ?? []}
+      />
 
       <footer>
         <div>CoinVigil AI · Interactive research workspace, not financial advice.</div>

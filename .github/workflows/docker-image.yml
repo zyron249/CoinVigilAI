@@ -41,7 +41,7 @@ jobs:
         run: python -m pytest -q
 
       - name: Validate Python syntax
-        run: python -m compileall -q apps/api/app
+        run: python -m compileall -q apps/api/app apps/api/tests
 
       - name: Validate Docker Compose configuration
         run: docker compose config > /tmp/coinvigil-compose.yml
@@ -110,6 +110,13 @@ jobs:
           assert all(key in candle for key in ('timestamp','open','high','low','close')), candle
           assert council_status.get('enabled') is True, council_status
           assert council_status.get('supported', 0) >= 9, council_status
+          providers = {item['provider']: item for item in council_status.get('providers', [])}
+          assert 'xai' in providers, council_status
+          assert providers['xai'].get('label') == 'xAI Grok', providers['xai']
+          assert providers['xai'].get('model') == 'grok-4.6', providers['xai']
+          assert providers['xai'].get('optional') is True, providers['xai']
+          assert providers['xai'].get('configured') is False, providers['xai']
+          assert providers['xai'].get('endpoint') == 'https://api.x.ai/v1/chat/completions', providers['xai']
           print('API, candle and AI Council smoke tests passed')
           PY
 
@@ -123,6 +130,10 @@ jobs:
               continue
             fi
             if ! grep -q "CoinVigil" /tmp/web.html; then
+              sleep 2
+              continue
+            fi
+            if ! grep -q "xAI Grok" /tmp/web.html; then
               sleep 2
               continue
             fi

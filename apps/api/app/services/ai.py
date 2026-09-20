@@ -12,6 +12,28 @@ from app.models import AICouncilDecision, AIProviderResult, MarketAsset, RiskAss
 
 VALID_BIASES = {"bullish", "bearish", "neutral"}
 
+# OpenAI-compatible Chat Completions path used by xAI and other adapters.
+# Official xAI call: POST https://api.x.ai/v1/chat/completions
+# Auth: Authorization: Bearer $XAI_API_KEY
+# Docs: https://docs.x.ai/developers/model-capabilities/legacy/chat-completions
+# Catalog default: grok-4.6 — https://docs.x.ai/developers/models
+CHAT_COMPLETIONS_PATH = "/chat/completions"
+XAI_CHAT_COMPLETIONS_PATH = CHAT_COMPLETIONS_PATH
+XAI_DEFAULT_MODEL = "grok-4.6"
+XAI_DEFAULT_BASE_URL = "https://api.x.ai/v1"
+
+PROVIDER_LABELS = {
+    "openai": "OpenAI",
+    "xai": "xAI Grok",
+    "gemini": "Google Gemini",
+    "anthropic": "Anthropic Claude",
+    "mistral": "Mistral",
+    "deepseek": "DeepSeek",
+    "groq": "Groq",
+    "perplexity": "Perplexity",
+    "openrouter": "OpenRouter",
+}
+
 
 def deterministic_view(asset: MarketAsset, risk: RiskAssessment) -> tuple[str, int, str]:
     change = asset.price_change_percentage_24h or 0
@@ -148,8 +170,9 @@ async def _openai_compatible_chat(
     model: str,
     base_url: str,
     timeout: float,
+    max_tokens: int | None = None,
 ) -> str:
-    url = f"{base_url.rstrip('/')}/chat/completions"
+    url = f"{base_url.rstrip('/')}{CHAT_COMPLETIONS_PATH}"
     headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
     body = {
         "model": model,
@@ -164,12 +187,41 @@ async def _openai_compatible_chat(
             {"role": "user", "content": prompt},
         ],
         "temperature": 0.1,
+        "stream": False,
     }
+    if max_tokens is not None:
+        body["max_tokens"] = max_tokens
     async with httpx.AsyncClient(timeout=timeout) as client:
         response = await client.post(url, headers=headers, json=body)
         response.raise_for_status()
         data = response.json()
-    return str(data["choices"][0]["message"]["content"]).strip()
+    content = data["choices"][0]["message"].get("content")
+    if content is None:
+        return ""
+    return str(content).strip()
+
+
+def xai_chat_completions_url(base_url: str) -> str:
+    """Official xAI Chat Completions URL: https://api.x.ai/v1/chat/completions"""
+    return f"{base_url.rstrip('/')}{XAI_CHAT_COMPLETIONS_PATH}"
+
+
+async def _xai_response(prompt: str, settings: Settings) -> str:
+    """Call xAI Grok via the official OpenAI-compatible Chat Completions API.
+
+    Endpoint: POST https://api.x.ai/v1/chat/completions
+    Auth: Authorization: Bearer $XAI_API_KEY
+    Docs: https://docs.x.ai/developers/model-capabilities/legacy/chat-completions
+    Default model: grok-4.6 (https://docs.x.ai/developers/models)
+    """
+    return await _openai_compatible_chat(
+        prompt,
+        settings.xai_api_key,
+        settings.xai_model,
+        settings.xai_base_url,
+        settings.ai_request_timeout_seconds,
+        max_tokens=700,
+    )
 
 
 async def _gemini_response(prompt: str, settings: Settings) -> str:
@@ -221,18 +273,35 @@ async def _anthropic_response(prompt: str, settings: Settings) -> str:
     ).strip()
 
 
-def provider_status() -> list[dict]:
-    settings = get_settings()
+def _provider_entry(provider: str, model: str, configured: bool, **extra: object) -> dict:
+    return {
+        "provider": provider,
+        "label": PROVIDER_LABELS.get(provider, provider),
+        "model": model,
+        "configured": configured,
+        "optional": True,
+        **extra,
+    }
+
+
+def provider_status(settings: Settings | None = None) -> list[dict]:
+    settings = settings or get_settings()
     return [
-        {"provider": "openai", "model": settings.openai_model, "configured": bool(settings.openai_api_key and settings.openai_model)},
-        {"provider": "xai", "model": settings.xai_model, "configured": bool(settings.xai_api_key and settings.xai_model)},
-        {"provider": "gemini", "model": settings.gemini_model, "configured": bool(settings.gemini_api_key and settings.gemini_model)},
-        {"provider": "anthropic", "model": settings.anthropic_model, "configured": bool(settings.anthropic_api_key and settings.anthropic_model)},
-        {"provider": "mistral", "model": settings.mistral_model, "configured": bool(settings.mistral_api_key and settings.mistral_model)},
-        {"provider": "deepseek", "model": settings.deepseek_model, "configured": bool(settings.deepseek_api_key and settings.deepseek_model)},
-        {"provider": "groq", "model": settings.groq_model, "configured": bool(settings.groq_api_key and settings.groq_model)},
-        {"provider": "perplexity", "model": settings.perplexity_model, "configured": bool(settings.perplexity_api_key and settings.perplexity_model)},
-        {"provider": "openrouter", "model": settings.openrouter_model, "configured": bool(settings.openrouter_api_key and settings.openrouter_model)},
+        _provider_entry("openai", settings.openai_model, bool(settings.openai_api_key and settings.openai_model)),
+        _provider_entry(
+            "xai",
+            settings.xai_model,
+            bool(settings.xai_api_key and settings.xai_model),
+            base_url=settings.xai_base_url,
+            endpoint=xai_chat_completions_url(settings.xai_base_url),
+        ),
+        _provider_entry("gemini", settings.gemini_model, bool(settings.gemini_api_key and settings.gemini_model)),
+        _provider_entry("anthropic", settings.anthropic_model, bool(settings.anthropic_api_key and settings.anthropic_model)),
+        _provider_entry("mistral", settings.mistral_model, bool(settings.mistral_api_key and settings.mistral_model)),
+        _provider_entry("deepseek", settings.deepseek_model, bool(settings.deepseek_api_key and settings.deepseek_model)),
+        _provider_entry("groq", settings.groq_model, bool(settings.groq_api_key and settings.groq_model)),
+        _provider_entry("perplexity", settings.perplexity_model, bool(settings.perplexity_api_key and settings.perplexity_model)),
+        _provider_entry("openrouter", settings.openrouter_model, bool(settings.openrouter_api_key and settings.openrouter_model)),
     ]
 
 
@@ -245,14 +314,7 @@ def _build_provider_calls(
     if settings.openai_api_key and settings.openai_model:
         calls.append(("openai", settings.openai_model, lambda: _openai_response(prompt, settings)))
     if settings.xai_api_key and settings.xai_model:
-        calls.append((
-            "xai",
-            settings.xai_model,
-            lambda: _openai_compatible_chat(
-                prompt, settings.xai_api_key, settings.xai_model, settings.xai_base_url,
-                settings.ai_request_timeout_seconds,
-            ),
-        ))
+        calls.append(("xai", settings.xai_model, lambda: _xai_response(prompt, settings)))
     if settings.gemini_api_key and settings.gemini_model:
         calls.append(("gemini", settings.gemini_model, lambda: _gemini_response(prompt, settings)))
     if settings.anthropic_api_key and settings.anthropic_model:
@@ -339,8 +401,12 @@ def _consensus(results: list[AIProviderResult], requested: list[str], settings: 
     )
 
 
-async def run_ai_council(asset: MarketAsset, risk: RiskAssessment) -> AICouncilDecision | None:
-    settings = get_settings()
+async def run_ai_council(
+    asset: MarketAsset,
+    risk: RiskAssessment,
+    settings: Settings | None = None,
+) -> AICouncilDecision | None:
+    settings = settings or get_settings()
     if not settings.ai_council_enabled:
         return None
 

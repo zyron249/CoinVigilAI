@@ -1,11 +1,12 @@
 import Link from "next/link";
+import { CouncilRoster } from "../components/CouncilRoster";
 import { MarketTable } from "../components/MarketTable";
 import { MetricCard } from "../components/MetricCard";
 import { Radar } from "../components/Radar";
-import { getMarket, getRadar } from "../lib/api";
+import { getCouncilStatus, getMarket, getRadar } from "../lib/api";
 
 export default async function Home() {
-  const [{ assets, source }, radar] = await Promise.all([getMarket(), getRadar()]);
+  const [{ assets, source }, radar, council] = await Promise.all([getMarket(), getRadar(), getCouncilStatus()]);
   const marketCap = assets.reduce((sum, asset) => sum + (asset.market_cap ?? 0), 0);
   const volume = assets.reduce((sum, asset) => sum + (asset.total_volume ?? 0), 0);
   const gainers = assets.filter((asset) => (asset.price_change_percentage_24h ?? 0) > 0).length;
@@ -17,7 +18,7 @@ export default async function Home() {
       <nav>
         <Link className="brand" href="/"><span className="brand-mark">V</span> CoinVigil <b>AI</b></Link>
         <div className="nav-links">
-          <a href="#markets">Markets</a><a href="#radar">AI Radar</a><Link href="/news">News</Link><Link href="/token-studio">Token Studio</Link>
+          <a href="#markets">Markets</a><a href="#radar">AI Radar</a><a href="#ai-council">AI Council</a><Link href="/news">News</Link><Link href="/token-studio">Token Studio</Link>
         </div>
         <Link className="nav-cta" href="/token-studio">Create Token</Link>
       </nav>
@@ -26,9 +27,10 @@ export default async function Home() {
         <div className="hero-copy">
           <div className="eyebrow hero-tag">ALWAYS-ON CRYPTO INTELLIGENCE</div>
           <h1>The market never sleeps.<br /><span>Neither does CoinVigil.</span></h1>
-          <p>Live prices, multi-model AI analysis, professional chart research, risk scoring and a non-custodial token launchpad in one terminal.</p>
+          <p>Live prices, multi-model AI analysis including optional xAI Grok, professional chart research, risk scoring and a non-custodial token launchpad in one terminal.</p>
           <div className="hero-actions">
             <a className="button-link" href="#markets">Explore Markets</a>
+            <a className="button-link ghost" href="#ai-council">AI Council</a>
             <Link className="button-link ghost" href="/token-studio">Open Token Studio</Link>
           </div>
         </div>
@@ -48,6 +50,12 @@ export default async function Home() {
           <Radar signals={radar} />
         </div>
       </section>
+
+      <CouncilRoster
+        providers={council.providers}
+        configured={council.configured}
+        supported={council.supported}
+      />
 
       <section className="feature-strip">
         <Link className="card feature-card" href={assets[0] ? `/asset/${assets[0].id}` : "/"}>
