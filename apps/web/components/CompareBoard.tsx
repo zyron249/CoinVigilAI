@@ -8,6 +8,8 @@ import { changeClass, formatCompactUsd, formatPercent, formatUsd } from "../lib/
 import { Sparkline } from "./Sparkline";
 import { StatusBadge } from "./StatusBadge";
 import { WatchButton } from "./WatchButton";
+import { CopyButton } from "./CopyButton";
+import { useWatchlist } from "../lib/watchlist";
 
 const MAX_COMPARE = 3;
 
@@ -24,6 +26,7 @@ export function CompareBoard({ initial }: { initial: AssetCompare }) {
   const [busy, setBusy] = useState(false);
   const [draft, setDraft] = useState("");
   const [hits, setHits] = useState<MarketPage | null>(null);
+  const { items: watched } = useWatchlist();
 
   const selected = useMemo(
     () => snapshot.data.map((asset) => asset.id),
@@ -49,7 +52,7 @@ export function CompareBoard({ initial }: { initial: AssetCompare }) {
     setHits(page);
   }
 
-  function addAsset(asset: MarketAsset) {
+  function addAsset(asset: { id: string; symbol: string; name: string }) {
     if (selected.includes(asset.id) || selected.length >= MAX_COMPARE) return;
     void load([...selected, asset.id]);
     setDraft("");
@@ -96,8 +99,26 @@ export function CompareBoard({ initial }: { initial: AssetCompare }) {
         <button type="submit" className="ghost tool-button" disabled={busy || selected.length >= MAX_COMPARE}>
           Find
         </button>
-        <span className="muted share-hint">{selected.length}/{MAX_COMPARE} selected. The ids stay in the URL.</span>
+        <CopyButton label="Copy URL" />
+        <span className="muted share-hint">{selected.length}/{MAX_COMPARE} selected. Shareable as <code>?ids=</code>.</span>
       </form>
+      {watched.length ? (
+        <ul className="compare-hits">
+          {watched.slice(0, 8).map((item) => (
+            <li key={`watch-${item.id}`}>
+              <button
+                type="button"
+                className="ghost tool-button"
+                disabled={selected.includes(item.id) || selected.length >= MAX_COMPARE}
+                onClick={() => addAsset({ id: item.id, symbol: item.symbol, name: item.name })}
+              >
+                Add {item.symbol.toUpperCase()}
+              </button>
+              <span>{item.name} <span className="muted">watchlist</span></span>
+            </li>
+          ))}
+        </ul>
+      ) : null}
       {hits ? (
         <ul className="compare-hits">
           {hits.assets.length === 0 ? (

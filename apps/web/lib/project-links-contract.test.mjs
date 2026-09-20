@@ -40,3 +40,10 @@ test("genesis date must be YYYY-MM-DD", () => {
   assert.equal(ok.test("not-a-date"), false);
   assert.equal(ok.test("javascript:alert(1)"), false);
 });
+
+test("contract addresses reject urls and empty native keys", () => {
+  const addressOk = /^[0-9A-Za-z:._-]{8,128}$/;
+  assert.equal(addressOk.test("0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"), true);
+  assert.equal(addressOk.test("javascript:alert(1)"), false);
+  assert.equal(addressOk.test(""), false);
+});

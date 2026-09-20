@@ -89,6 +89,7 @@ export default async function AssetPage({
             <nav className="asset-jump" aria-label="On this page">
               <a href="#overview">Overview</a>
               <a href="#community">Links</a>
+              {profile.contracts.length ? <a href="#contracts">Contracts</a> : null}
               <a href="#chart-lab">Chart</a>
               <Link href={`/compare?ids=${asset.id},${companion}`}>Compare</Link>
               <Link href="/news">News</Link>

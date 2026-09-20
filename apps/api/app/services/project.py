@@ -10,7 +10,7 @@ from urllib.parse import urlparse
 import httpx
 
 from app.config import get_settings
-from app.models import AssetProfile, ProjectLink
+from app.models import AssetContract, AssetProfile, ProjectLink
 from app.services.cache import cache_get, cache_set
 from app.services.market import (
     VALID_SOURCES,
@@ -38,6 +38,9 @@ MAX_CATEGORIES = 8
 MAX_EXPLORERS = 3
 MAX_REPOS = 3
 MAX_URLS_PER_LIST = 4
+MAX_CONTRACTS = 10
+PLATFORM_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,39}$")
+ADDRESS_RE = re.compile(r"^[0-9A-Za-z:._-]{8,128}$")
 KIND_RANK = {
     "website": 0,
     "whitepaper": 1,
@@ -272,6 +275,84 @@ def categories_from_payload(raw: Any) -> list[str]:
     return (preferred + noise)[:MAX_CATEGORIES]
 
 
+def sanitize_contract_address(raw: str | None) -> str | None:
+    text = (raw or "").strip()
+    if not text or len(text) < 8 or len(text) > 128:
+        return None
+    lowered = text.lower()
+    if lowered.startswith(("http://", "https://", "javascript:", "data:", "vbscript:")):
+        return None
+    if " " in text or "\n" in text or "\t" in text:
+        return None
+    if lowered in {"null", "none", "undefined", "0x", "n/a"}:
+        return None
+    if not ADDRESS_RE.match(text):
+        return None
+    return text
+
+
+CHAIN_ALIASES = {
+    "binance-smart-chain": "BNB Smart Chain",
+    "polygon-pos": "Polygon",
+    "optimistic-ethereum": "Optimism",
+    "arbitrum-one": "Arbitrum",
+    "arbitrum-nova": "Arbitrum Nova",
+    "avalanche": "Avalanche",
+    "base": "Base",
+    "solana": "Solana",
+    "the-open-network": "TON",
+}
+
+
+def chain_label(platform_id: str) -> str | None:
+    slug = platform_id.strip().lower().replace(" ", "-")
+    if not slug or not PLATFORM_RE.match(slug):
+        return None
+    if slug in CHAIN_ALIASES:
+        return CHAIN_ALIASES[slug]
+    return slug.replace("-", " ").replace("_", " ").title()
+
+
+def contracts_from_payload(platforms: Any, detail_platforms: Any = None) -> list[AssetContract]:
+    """Map CoinGecko platforms / detail_platforms. Empty native keys are omitted — never invented."""
+    rows: list[AssetContract] = []
+    seen: set[str] = set()
+
+    def add(platform_id: str, address: str | None) -> None:
+        if len(rows) >= MAX_CONTRACTS:
+            return
+        label = chain_label(platform_id)
+        clean = sanitize_contract_address(address)
+        if not label or not clean:
+            return
+        key = f"{label.lower()}|{clean.lower()}"
+        if key in seen:
+            return
+        seen.add(key)
+        rows.append(AssetContract(platform=platform_id.strip().lower(), label=label, address=clean))
+
+    if isinstance(detail_platforms, dict):
+        for platform_id, payload in detail_platforms.items():
+            if not isinstance(platform_id, str):
+                continue
+            address = None
+            if isinstance(payload, dict):
+                raw = payload.get("contract_address")
+                address = raw if isinstance(raw, str) else None
+            elif isinstance(payload, str):
+                address = payload
+            add(platform_id, address)
+
+    if isinstance(platforms, dict):
+        for platform_id, payload in platforms.items():
+            if not isinstance(platform_id, str):
+                continue
+            address = payload if isinstance(payload, str) else None
+            add(platform_id, address)
+
+    return rows
+
+
 def _empty_profile(coin_id: str, source: str, reason: str | None) -> AssetProfile:
     if source == "demo":
         note = "Project links are hidden in the labeled demo snapshot — URLs are never invented or scraped."
@@ -285,6 +366,7 @@ def _empty_profile(coin_id: str, source: str, reason: str | None) -> AssetProfil
         categories=[],
         description=None,
         genesis_date=None,
+        contracts=[],
         source=source,
         note=note,
         stale=source == "cache",
@@ -315,6 +397,29 @@ def _links_from_envelope(raw: Any) -> list[ProjectLink]:
     return ordered_project_links(rows)
 
 
+def _contracts_from_envelope(raw: Any) -> list[AssetContract]:
+    rows: list[AssetContract] = []
+    seen: set[str] = set()
+    if not isinstance(raw, list):
+        return rows
+    for item in raw:
+        if not isinstance(item, dict):
+            continue
+        platform = str(item.get("platform") or "").strip().lower()
+        label = chain_label(platform) or chain_label(str(item.get("label") or ""))
+        address = sanitize_contract_address(item.get("address") if isinstance(item.get("address"), str) else None)
+        if not platform or not label or not address:
+            continue
+        key = f"{label.lower()}|{address.lower()}"
+        if key in seen:
+            continue
+        seen.add(key)
+        rows.append(AssetContract(platform=platform[:40], label=label, address=address))
+        if len(rows) >= MAX_CONTRACTS:
+            break
+    return rows
+
+
 def _profile_from_envelope(coin_id: str, envelope: dict[str, Any], *, stale: bool, reason: str | None) -> AssetProfile:
     links = _links_from_envelope(envelope.get("links"))
     source = str(envelope.get("source") or "cache")
@@ -333,6 +438,7 @@ def _profile_from_envelope(coin_id: str, envelope: dict[str, Any], *, stale: boo
         categories=[str(item) for item in envelope.get("categories") or [] if str(item).strip()][:MAX_CATEGORIES],
         description=envelope.get("description") if isinstance(envelope.get("description"), str) else None,
         genesis_date=genesis_date_from_payload(envelope.get("genesis_date")),
+        contracts=_contracts_from_envelope(envelope.get("contracts")),
         source=source,
         note=note,
         last_live_at=envelope.get("last_live_at"),
@@ -348,7 +454,7 @@ async def get_asset_profile(coin_id: str) -> AssetProfile:
         return _empty_profile("unknown", "unavailable", "unreachable")
 
     settings = get_settings()
-    cache_key = f"profile:v2:{needle}"
+    cache_key = f"profile:v3:{needle}"
     mem = _memory_get(cache_key)
     if isinstance(mem, dict):
         return _profile_from_envelope(needle, mem, stale=bool(mem.get("stale")), reason=mem.get("fallback_reason"))
@@ -384,6 +490,7 @@ async def get_asset_profile(coin_id: str) -> AssetProfile:
             "categories": categories_from_payload(payload.get("categories")),
             "description": description,
             "genesis_date": genesis_date_from_payload(payload.get("genesis_date")),
+            "contracts": [item.model_dump() for item in contracts_from_payload(payload.get("platforms"), payload.get("detail_platforms"))],
             "source": "coingecko",
             "note": (
                 "Public links from CoinGecko /coins/{id}. Missing fields are omitted — CoinVigil does not invent URLs."

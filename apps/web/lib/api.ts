@@ -224,12 +224,19 @@ export type ProjectLink = {
   url: string;
 };
 
+export type AssetContract = {
+  platform: string;
+  label: string;
+  address: string;
+};
+
 export type AssetProfile = {
   coin_id: string;
   links: ProjectLink[];
   categories: string[];
   description?: string | null;
   genesis_date?: string | null;
+  contracts: AssetContract[];
   source: string;
   note: string;
 } & Freshness;
@@ -426,6 +433,7 @@ export async function getAssetProfile(coinId: string): Promise<AssetProfile> {
     categories: [],
     description: null,
     genesis_date: null,
+    contracts: [],
     source: "unavailable",
     note: "Project links are unavailable. CoinVigil does not invent URLs or scrape social networks.",
     last_live_at: null,
@@ -457,6 +465,19 @@ export async function getAssetProfile(coinId: string): Promise<AssetProfile> {
       genesis_date: typeof json.genesis_date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(json.genesis_date)
         ? json.genesis_date
         : null,
+      contracts: Array.isArray(json.contracts)
+        ? json.contracts.flatMap((item: AssetContract) => {
+            const platform = String(item?.platform || "").trim().toLowerCase();
+            const label = String(item?.label || "").trim().slice(0, 40);
+            const address = String(item?.address || "").trim();
+            if (!platform || !label || !address) return [];
+            if (address.startsWith("http://") || address.startsWith("https://") || address.toLowerCase().startsWith("javascript:")) {
+              return [];
+            }
+            if (!/^[0-9A-Za-z:._-]{8,128}$/.test(address)) return [];
+            return [{ platform, label, address }];
+          }).slice(0, 10)
+        : [],
       source: MARKET_SOURCES.has(json.source) ? json.source : "unavailable",
       note: json.note ?? empty.note,
       ...freshnessFrom(json),
