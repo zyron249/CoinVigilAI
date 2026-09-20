@@ -3,6 +3,7 @@ import { DemoRibbon } from "../../../components/DemoRibbon";
 import { ProChartLab } from "../../../components/ProChartLab";
 import { Sparkline } from "../../../components/Sparkline";
 import { StatusBadge } from "../../../components/StatusBadge";
+import { WatchButton } from "../../../components/WatchButton";
 import { getAssetAnalysis, getCandles, getCouncilStatus } from "../../../lib/api";
 import { changeClass, formatCompact, formatCompactUsd, formatPercent, formatTimestamp, formatUsd } from "../../../lib/format";
 import { notFound } from "next/navigation";
@@ -43,7 +44,10 @@ export default async function AssetPage({ params }: { params: Promise<{ id: stri
           <div>
             <div className="eyebrow">ASSET INTELLIGENCE</div>
             <h1>{asset.name} <span>{asset.symbol.toUpperCase()}</span></h1>
-            <StatusBadge source={analysis.data_source} />
+            <div className="asset-meta-row">
+              <StatusBadge source={analysis.data_source} />
+              <WatchButton id={asset.id} symbol={asset.symbol} name={asset.name} />
+            </div>
             {formatTimestamp(asset.last_updated) ? (
               <p className="live-updated muted">Last updated: {formatTimestamp(asset.last_updated)}</p>
             ) : null}

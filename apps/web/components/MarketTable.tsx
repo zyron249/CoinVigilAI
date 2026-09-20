@@ -5,6 +5,7 @@ import type { MarketPage } from "../lib/api";
 import { changeClass, formatCompact, formatCompactUsd, formatPercent, formatTimestamp, formatUsd } from "../lib/format";
 import { Sparkline } from "./Sparkline";
 import { StatusBadge } from "./StatusBadge";
+import { WatchButton } from "./WatchButton";
 
 const COLUMNS: { key: string; label: string; sort?: string }[] = [
   { key: "rank", label: "#", sort: "rank" },
@@ -107,6 +108,7 @@ export function MarketTable({
                   <td>
                     <Link className="asset-link" href={`/asset/${asset.id}`}>
                       <div className="asset-cell">
+                        <WatchButton id={asset.id} symbol={asset.symbol} name={asset.name} compact />
                         {asset.image
                           ? <img src={asset.image} alt="" width={28} height={28} />
                           : <div className="coin-placeholder" aria-hidden="true" />}

@@ -23,12 +23,17 @@ export function ProChartLab({ coinId, symbol, candles, source }: ProChartLabProp
   const containerRef = useRef<HTMLDivElement | null>(null);
   const chartRef = useRef<any>(null);
   const disposeRef = useRef<((container: HTMLElement) => void) | null>(null);
+  const [drawing, setDrawing] = useState<string | null>(null);
   const [status, setStatus] = useState(candles.length ? "Loading chart…" : "No candles in this snapshot");
 
   useEffect(() => {
     let active = true;
     const container = containerRef.current;
-    if (!container || candles.length === 0) return;
+    if (!container || candles.length === 0) {
+      setDrawing(null);
+      setStatus("No candles in this snapshot");
+      return;
+    }
 
     (async () => {
       const lib = await import("klinecharts");
@@ -72,6 +77,7 @@ export function ProChartLab({ coinId, symbol, candles, source }: ProChartLabProp
 
     return () => {
       active = false;
+      setDrawing(null);
       if (container && disposeRef.current) {
         disposeRef.current(container);
       }
@@ -79,11 +85,26 @@ export function ProChartLab({ coinId, symbol, candles, source }: ProChartLabProp
     };
   }, [candles, symbol, source]);
 
+  useEffect(() => {
+    if (!drawing) return;
+    function onKey(event: KeyboardEvent) {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      const chart = chartRef.current;
+      if (chart?.removeOverlay) chart.removeOverlay();
+      setDrawing(null);
+      setStatus("Drawing cancelled");
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [drawing]);
+
   function draw(name: string, label: string) {
     const chart = chartRef.current;
     if (!chart) return;
     chart.createOverlay({ name, mode: "weak_magnet", modeSensitivity: 8 });
-    setStatus(`${label}: tap/click the chart to place points`);
+    setDrawing(label);
+    setStatus(`${label}: click the chart to place points. Escape cancels.`);
   }
 
   function addIndicator(name: string) {
@@ -109,9 +130,11 @@ export function ProChartLab({ coinId, symbol, candles, source }: ProChartLabProp
     const last = overlays.at(-1);
     if (!last?.id) {
       setStatus("No drawing to undo");
+      setDrawing(null);
       return;
     }
     chart.removeOverlay({ id: last.id });
+    setDrawing(null);
     setStatus("Last drawing removed");
   }
 
@@ -119,6 +142,7 @@ export function ProChartLab({ coinId, symbol, candles, source }: ProChartLabProp
     const chart = chartRef.current;
     if (!chart) return;
     chart.removeOverlay();
+    setDrawing(null);
     setStatus("All drawings cleared");
   }
 
@@ -137,6 +161,8 @@ export function ProChartLab({ coinId, symbol, candles, source }: ProChartLabProp
     setStatus("Chart PNG exported");
   }
 
+  const empty = candles.length === 0;
+
   return (
     <section className="chart-lab card">
       <div className="chart-lab-head">
@@ -144,34 +170,53 @@ export function ProChartLab({ coinId, symbol, candles, source }: ProChartLabProp
           <div className="eyebrow">PRO CHART LAB</div>
           <h2>{symbol.toUpperCase()} technical workspace</h2>
         </div>
-        <span className="chart-status">{status}</span>
+        <span className="chart-status" role="status">{status}</span>
       </div>
 
-      <div className="chart-toolbar" aria-label="Drawing tools">
-        <button type="button" className="tool-button" disabled={!candles.length} onClick={() => draw("segment", "Trend line")}>Trend</button>
-        <button type="button" className="tool-button" disabled={!candles.length} onClick={() => draw("horizontalStraightLine", "Horizontal level")}>H-Level</button>
-        <button type="button" className="tool-button" disabled={!candles.length} onClick={() => draw("fibonacciLine", "Fibonacci")}>Fibonacci</button>
-        <button type="button" className="tool-button" disabled={!candles.length} onClick={() => draw("brush", "Brush")}>Brush</button>
-        <button type="button" className="tool-button" disabled={!candles.length} onClick={() => draw("priceLine", "Price line")}>Price line</button>
+      <div className="chart-toolbar" role="toolbar" aria-label="Drawing tools">
+        <button type="button" className="tool-button" disabled={empty} onClick={() => draw("segment", "Trend line")}>Trend</button>
+        <button type="button" className="tool-button" disabled={empty} onClick={() => draw("horizontalStraightLine", "Horizontal level")}>H-Level</button>
+        <button type="button" className="tool-button" disabled={empty} onClick={() => draw("fibonacciLine", "Fibonacci")}>Fibonacci</button>
+        <button type="button" className="tool-button" disabled={empty} onClick={() => draw("brush", "Brush")}>Brush</button>
+        <button type="button" className="tool-button" disabled={empty} onClick={() => draw("priceLine", "Price line")}>Price line</button>
         <span className="toolbar-divider" />
-        <button type="button" className="tool-button" disabled={!candles.length} onClick={() => addIndicator("MA")}>MA</button>
-        <button type="button" className="tool-button" disabled={!candles.length} onClick={() => addIndicator("EMA")}>EMA</button>
-        <button type="button" className="tool-button" disabled={!candles.length} onClick={() => addIndicator("BOLL")}>BOLL</button>
-        <button type="button" className="tool-button" disabled={!candles.length} onClick={() => addIndicator("RSI")}>RSI</button>
-        <button type="button" className="tool-button" disabled={!candles.length} onClick={() => addIndicator("MACD")}>MACD</button>
+        <button type="button" className="tool-button" disabled={empty} onClick={() => addIndicator("MA")}>MA</button>
+        <button type="button" className="tool-button" disabled={empty} onClick={() => addIndicator("EMA")}>EMA</button>
+        <button type="button" className="tool-button" disabled={empty} onClick={() => addIndicator("BOLL")}>BOLL</button>
+        <button type="button" className="tool-button" disabled={empty} onClick={() => addIndicator("RSI")}>RSI</button>
+        <button type="button" className="tool-button" disabled={empty} onClick={() => addIndicator("MACD")}>MACD</button>
         <span className="toolbar-divider" />
-        <button type="button" className="tool-button ghost" disabled={!candles.length} onClick={undoLastDrawing}>Undo drawing</button>
-        <button type="button" className="tool-button ghost" disabled={!candles.length} onClick={clearDrawings}>Clear</button>
-        <button type="button" className="tool-button ghost" disabled={!candles.length} onClick={exportPng}>Export PNG</button>
+        <button type="button" className="tool-button ghost" disabled={empty} onClick={undoLastDrawing}>Undo drawing</button>
+        <button type="button" className="tool-button ghost" disabled={empty} onClick={clearDrawings}>Clear</button>
+        <button type="button" className="tool-button ghost" disabled={empty} onClick={exportPng}>Export PNG</button>
       </div>
 
-      {candles.length === 0 ? (
-        <div className="empty chart-empty">No candle data for this snapshot. CoinVigil does not draw invented OHLC series as live charts.</div>
+      {empty ? (
+        <div className="empty empty-panel chart-empty">
+          <strong>No candles in this snapshot</strong>
+          <p>
+            CoinVigil does not invent OHLC bars or ghost drawings. Tools stay disabled until a real
+            CoinGecko or labeled demo series is available.
+          </p>
+        </div>
       ) : (
-        <div ref={containerRef} className="chart-canvas" aria-label={`${symbol} interactive candlestick chart`} />
+        <div
+          ref={containerRef}
+          className={`chart-canvas ${drawing ? "is-drawing" : ""}`}
+          aria-label={`${symbol} interactive candlestick chart`}
+          onPointerDown={() => {
+            if (drawing) setStatus(`${drawing}: keep clicking to finish, or press Escape to cancel.`);
+          }}
+        />
       )}
       <div className="chart-footnote">
-        Drawings are interactive and editable on the chart. Market data source: <strong>{sourceLabel(source).text}</strong>.
+        {empty ? (
+          "Empty chart is intentional — missing data is never filled with synthetic live candles."
+        ) : drawing ? (
+          <>{drawing} is armed. Click the plot to place points. Escape cancels the overlay. Source: <strong>{sourceLabel(source).text}</strong>.</>
+        ) : (
+          <>Drawings are interactive and editable. Market data source: <strong>{sourceLabel(source).text}</strong>.</>
+        )}
       </div>
     </section>
   );

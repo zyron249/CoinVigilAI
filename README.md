@@ -7,7 +7,7 @@ It is an informational research tool, not a production trading desk and not fina
 ## What works today
 
 - FastAPI market rankings, global overview, movers, AI brief, radar, analysis, candle, news, and health endpoints
-- Next.js Markets homepage: sortable/paginated rankings, global strip, gainers/losers, AI Market Brief
+- Next.js Markets homepage: sortable/paginated rankings, local browser watchlist, global strip, gainers/losers, AI Market Brief
 - Asset pages with CMC-like stats (1h/24h/7d, circulating supply, 24h range) plus AI analysis
 - Heuristic analysis and market brief when no AI keys are configured
 - Parallel AI Council adapters (including optional xAI Grok) when you add provider keys
@@ -17,8 +17,8 @@ It is an informational research tool, not a production trading desk and not fina
 
 ## What is not done yet
 
-- PostgreSQL is **not provisioned**. `/health` reports `postgres: not_provisioned`. Do not expect watchlists or user accounts.
-- There is no user accounts, alerts, WebSocket feed, or production deploy config.
+- PostgreSQL is **not provisioned**. `/health` reports `postgres: not_provisioned`. Watchlists are **localStorage in this browser only** — there are no accounts.
+- There are no user accounts, alerts, WebSocket feed, or production deploy config.
 - Token factory contracts are **unaudited**. Token Studio stays disabled until you deploy a factory and set `NEXT_PUBLIC_FACTORY_*`.
 - Public CoinGecko is rate-limited. Without a key the API may show a labeled **demo snapshot** of a small BTC/ETH/SOL-led universe.
 
@@ -38,6 +38,7 @@ CoinGecko ──(+ Redis cache)──> Risk ──> AI Council (optional) ──
 News/RSS (optional) ───────────────────────────────> FastAPI
                                                     |
                                                Next.js dashboard
+                                      (localStorage watchlist, this browser only)
                                                     |
                                          Token Studio (wallet-signed)
 
@@ -205,9 +206,9 @@ Pushes and pull requests against `main` run API unit tests (including mocked xAI
 ## Product direction
 
 1. Exchange WebSocket ingestion
-2. Optional persistence (watchlists / snapshot history) if a database is actually wired
+2. Optional persistence / snapshot history if a database is actually wired
 3. On-chain and whale intelligence
-4. User accounts, watchlists, and alerts
+4. User accounts, synced watchlists, and alerts
 5. Model evaluation and provider routing
 6. Production observability and a real deploy path
 
