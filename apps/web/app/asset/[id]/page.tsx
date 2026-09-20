@@ -2,6 +2,7 @@ import { CouncilRoster } from "../../../components/CouncilRoster";
 import { DemoRibbon } from "../../../components/DemoRibbon";
 import { ProChartLab } from "../../../components/ProChartLab";
 import { Sparkline } from "../../../components/Sparkline";
+import { RangeBar, SupplyBar } from "../../../components/StatBars";
 import { StatusBadge } from "../../../components/StatusBadge";
 import { WatchButton } from "../../../components/WatchButton";
 import { getAssetAnalysis, getCandles, getCouncilStatus } from "../../../lib/api";
@@ -21,14 +22,19 @@ export default async function AssetPage({ params }: { params: Promise<{ id: stri
   const asset = analysis.asset;
   const change = asset.price_change_percentage_24h;
 
+  const volToCap = asset.market_cap && asset.total_volume
+    ? `${((asset.total_volume / asset.market_cap) * 100).toFixed(2)}%`
+    : "—";
+
   const stats = [
     { label: "Rank", value: asset.market_cap_rank != null ? `#${asset.market_cap_rank}` : "—" },
     { label: "Market cap", value: formatCompactUsd(asset.market_cap) },
     { label: "Fully diluted", value: formatCompactUsd(asset.fully_diluted_valuation) },
     { label: "24h volume", value: formatCompactUsd(asset.total_volume) },
+    { label: "Vol / Mkt cap", value: volToCap },
     { label: "Circulating", value: `${formatCompact(asset.circulating_supply)} ${asset.symbol.toUpperCase()}` },
-    { label: "24h high", value: formatUsd(asset.high_24h) },
-    { label: "24h low", value: formatUsd(asset.low_24h) },
+    { label: "Total supply", value: `${formatCompact(asset.total_supply)} ${asset.symbol.toUpperCase()}` },
+    { label: "Max supply", value: asset.max_supply ? `${formatCompact(asset.max_supply)} ${asset.symbol.toUpperCase()}` : "—" },
     { label: "1h", value: formatPercent(asset.price_change_percentage_1h), className: changeClass(asset.price_change_percentage_1h) },
     { label: "7d", value: formatPercent(asset.price_change_percentage_7d), className: changeClass(asset.price_change_percentage_7d) },
     { label: "Risk", value: `${analysis.risk.score}/100 · ${analysis.risk.level}` },
@@ -56,7 +62,7 @@ export default async function AssetPage({ params }: { params: Promise<{ id: stri
         <div className="asset-price-block">
           <strong>{formatUsd(asset.current_price)}</strong>
           <span className={changeClass(change)}>{formatPercent(change)} 24h</span>
-          <Sparkline values={asset.sparkline_7d} width={160} height={40} />
+          <Sparkline values={asset.sparkline_7d} />
         </div>
       </section>
 
@@ -67,6 +73,20 @@ export default async function AssetPage({ params }: { params: Promise<{ id: stri
             <strong className={stat.className}>{stat.value}</strong>
           </div>
         ))}
+        <div className="card mini-metric range-metric">
+          <span>24h range</span>
+          <strong>{formatUsd(asset.low_24h)} – {formatUsd(asset.high_24h)}</strong>
+          <RangeBar low={asset.low_24h} high={asset.high_24h} current={asset.current_price} />
+        </div>
+        <div className="card mini-metric range-metric">
+          <span>Circulating vs max</span>
+          <strong>
+            {asset.max_supply
+              ? `${(((asset.circulating_supply || 0) / asset.max_supply) * 100).toFixed(1)}% issued`
+              : "No max supply"}
+          </strong>
+          <SupplyBar circulating={asset.circulating_supply} max={asset.max_supply} />
+        </div>
       </section>
 
       <ProChartLab

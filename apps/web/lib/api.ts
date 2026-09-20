@@ -325,19 +325,50 @@ export async function getCouncilStatus(): Promise<CouncilStatus> {
   }
 }
 
-export async function getNews(): Promise<{ items: NewsItem[]; message: string | null; configured: boolean }> {
+export async function getNews(): Promise<{
+  items: NewsItem[];
+  message: string | null;
+  configured: boolean;
+  usingDefaults: boolean;
+  hosts: string[];
+}> {
   try {
     const response = await request("/api/news?limit=30");
-    if (!response.ok) return { items: [], message: "News feed is unavailable.", configured: false };
+    if (!response.ok) {
+      return { items: [], message: "News feed is unavailable.", configured: false, usingDefaults: false, hosts: [] };
+    }
     const json = await response.json();
     return {
       items: json.data ?? [],
       message: json.message ?? null,
       configured: Boolean(json.configured),
+      usingDefaults: Boolean(json.using_defaults),
+      hosts: Array.isArray(json.hosts) ? json.hosts : [],
     };
   } catch {
-    return { items: [], message: "News feed is unavailable.", configured: false };
+    return { items: [], message: "News feed is unavailable.", configured: false, usingDefaults: false, hosts: [] };
   }
+}
+
+export type StackStatus = {
+  status: string;
+  version?: string;
+  disclaimer?: string;
+  market?: { provider: string; label?: string; redis: string };
+  postgres?: string;
+  news?: { feeds: number; hosts: string[]; using_defaults: boolean };
+  ai?: { enabled: boolean; configured: string[]; configured_count: number; supported: number };
+};
+
+export async function getStackStatus(): Promise<StackStatus> {
+  return readJson<StackStatus>("/api/status", {
+    status: "unavailable",
+    postgres: "not_provisioned",
+    market: { provider: "unknown", redis: "unavailable" },
+    news: { feeds: 0, hosts: [], using_defaults: false },
+    ai: { enabled: false, configured: [], configured_count: 0, supported: 0 },
+    disclaimer: "Informational research only — not financial advice.",
+  });
 }
 
 export async function getCandles(coinId: string, days = 90): Promise<{ data: Candle[]; source: string }> {

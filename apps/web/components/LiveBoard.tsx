@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { GlobalOverview, MarketMovers, MarketPage } from "../lib/api";
 import { getGlobalOverview, getMarket, getMovers } from "../lib/api";
 import { sourceLabel } from "../lib/format";
@@ -108,6 +108,17 @@ export function LiveBoard({
     };
   }, [loadMarket]);
 
+  const watchAssets = useMemo(() => {
+    const seen = new Set<string>();
+    const rows = [];
+    for (const asset of [...market.assets, ...movers.gainers, ...movers.losers]) {
+      if (seen.has(asset.id)) continue;
+      seen.add(asset.id);
+      rows.push(asset);
+    }
+    return rows;
+  }, [market.assets, movers.gainers, movers.losers]);
+
   return (
     <>
       <DemoRibbon
@@ -119,7 +130,7 @@ export function LiveBoard({
       {hero}
       <GlobalStrip overview={overview} checkedAt={checkedAt} />
       {brief}
-      <WatchlistStrip assets={[...market.assets, ...movers.gainers, ...movers.losers]} />
+      <WatchlistStrip assets={watchAssets} />
       <section className="slice-grid" id="movers">
         <Movers gainers={movers.gainers} losers={movers.losers} source={movers.source} stale={movers.stale} />
         <div id="radar">{radar}</div>

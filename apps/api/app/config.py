@@ -1,13 +1,20 @@
 from functools import lru_cache
+from urllib.parse import urlparse
 import json
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# Documented public feeds. CoinVigil does not write these stories.
+PUBLIC_DEFAULT_RSS = (
+    "https://www.coindesk.com/arc/outboundfeeds/rss/",
+    "https://cointelegraph.com/rss",
+)
 
 
 class Settings(BaseSettings):
     app_env: str = "development"
     coingecko_base_url: str = "https://api.coingecko.com/api/v3"
     coingecko_api_key: str = ""
-    news_rss_urls: str = ""
+    news_rss_urls: str = ",".join(PUBLIC_DEFAULT_RSS)
     # Unused. CoinVigil does not persist to Postgres in this build.
     database_url: str = ""
     redis_url: str = "redis://localhost:6379/0"
@@ -63,6 +70,21 @@ class Settings(BaseSettings):
     @property
     def rss_urls(self) -> list[str]:
         return [url.strip() for url in self.news_rss_urls.split(",") if url.strip()]
+
+    @property
+    def using_default_rss(self) -> bool:
+        return set(self.rss_urls) == set(PUBLIC_DEFAULT_RSS)
+
+    @property
+    def rss_hosts(self) -> list[str]:
+        hosts: list[str] = []
+        seen: set[str] = set()
+        for url in self.rss_urls:
+            host = urlparse(url).netloc.lower()
+            if host and host not in seen:
+                seen.add(host)
+                hosts.append(host)
+        return hosts
 
     @property
     def cors_origins(self) -> list[str]:

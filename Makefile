@@ -1,4 +1,13 @@
-.PHONY: env setup up down logs api web test test-api test-contracts
+.PHONY: help env setup up down logs api web test test-api test-contracts doctor
+
+help:
+	@echo "CoinVigil — stranger quick start"
+	@echo "  make up      One command: Docker Compose (API + web + Redis)"
+	@echo "  make setup   Local venv + npm install (no Docker)"
+	@echo "  make api     Local API on :8000  (activate .venv first)"
+	@echo "  make web     Local Next.js on :3000"
+	@echo "  make doctor  GET /api/status (stack must already be running)"
+	@echo "  make test    API + contract tests"
 
 env:
 	@test -f .env || cp .env.example .env
@@ -23,6 +32,9 @@ api: env
 
 web:
 	cd apps/web && npm run dev
+
+doctor:
+	curl -fsS http://127.0.0.1:8000/api/status
 
 test-api:
 	cd apps/api && python3 -m pytest -q

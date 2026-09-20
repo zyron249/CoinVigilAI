@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
 from app.models import AssetAnalysis, GlobalOverview, MarketBrief, MarketMovers, RadarSignal, RankedMarkets
+from app.models import AssetAnalysis, GlobalOverview, MarketBrief, MarketMovers, RadarSignal, RankedMarkets
 from app.services.ai import deterministic_view, provider_status, run_ai_council
 from app.services.brief import build_market_brief
 from app.services.cache import redis_status
@@ -47,6 +48,37 @@ async def health():
             "postgres": "not_provisioned",
             "market_provider": "coingecko",
             "ai_providers_configured": sum(1 for provider in providers if provider["configured"]),
+        },
+        "status_url": "/api/status",
+    }
+
+
+@app.get("/api/status")
+async def public_status():
+    settings = get_settings()
+    providers = provider_status()
+    configured = [provider["provider"] for provider in providers if provider["configured"]]
+    return {
+        "status": "ok",
+        "service": "coinvigil-api",
+        "version": "0.4.0",
+        "disclaimer": "Informational research only — not financial advice.",
+        "market": {
+            "provider": "coingecko",
+            "label": "CoinGecko",
+            "redis": await redis_status(),
+        },
+        "postgres": "not_provisioned",
+        "news": {
+            "feeds": len(settings.rss_urls),
+            "hosts": settings.rss_hosts,
+            "using_defaults": settings.using_default_rss,
+        },
+        "ai": {
+            "enabled": settings.ai_council_enabled,
+            "configured": configured,
+            "configured_count": len(configured),
+            "supported": len(providers),
         },
     }
 
@@ -165,15 +197,18 @@ async def radar(limit: int = Query(30, ge=3, le=100)):
 
 @app.get("/api/news")
 async def news(limit: int = Query(20, ge=1, le=100)):
+    settings = get_settings()
     items = await get_news(limit)
-    configured = bool(get_settings().rss_urls)
+    configured = bool(settings.rss_urls)
     return {
         "data": items,
         "count": len(items),
         "configured": configured,
+        "using_defaults": settings.using_default_rss,
+        "hosts": settings.rss_hosts,
         "message": None if items else (
-            "Configured RSS feeds did not return stories. Check NEWS_RSS_URLS and try again."
+            "Configured RSS feeds did not return stories. CoinVigil does not invent headlines to fill the gap."
             if configured
-            else "Add comma-separated RSS URLs to NEWS_RSS_URLS to activate the intelligence feed."
+            else "Set NEWS_RSS_URLS to public RSS feeds, or keep the documented CoinDesk + Cointelegraph defaults."
         ),
     }

@@ -3,7 +3,7 @@ import { TokenStudio } from "../../components/TokenStudio";
 export default function TokenStudioPage() {
   return (
     <main id="content">
-      <section className="studio-hero">
+      <section className="page-hero">
         <div className="eyebrow hero-tag">NON-CUSTODIAL TOKEN LAUNCHPAD</div>
         <h1>Create on-chain.<br /><span>Keep control.</span></h1>
         <p>

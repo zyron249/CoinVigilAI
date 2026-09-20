@@ -1,10 +1,12 @@
+import { memo } from "react";
+
 type Props = {
   values?: number[] | null;
   width?: number;
   height?: number;
 };
 
-export function Sparkline({ values, width = 108, height = 32 }: Props) {
+function SparklineInner({ values, width = 108, height = 32 }: Props) {
   if (!values || values.length < 2) {
     return <span className="muted">—</span>;
   }
@@ -35,3 +37,9 @@ export function Sparkline({ values, width = 108, height = 32 }: Props) {
     </svg>
   );
 }
+
+export const Sparkline = memo(SparklineInner, (prev, next) => (
+  prev.width === next.width
+  && prev.height === next.height
+  && (prev.values || []).join("\0") === (next.values || []).join("\0")
+));

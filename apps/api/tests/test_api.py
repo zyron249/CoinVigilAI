@@ -16,6 +16,23 @@ def test_health_reports_ok_and_honest_dependencies():
     assert body["dependencies"]["postgres"] == "not_provisioned"
     assert body["dependencies"]["market_provider"] == "coingecko"
     assert "redis" in body["dependencies"]
+    assert body["status_url"] == "/api/status"
+
+
+def test_public_status_has_no_secrets_and_no_postgres():
+    response = client.get("/api/status")
+    assert response.status_code == 200
+    body = response.json()
+    dumped = str(body).lower()
+    assert body["postgres"] == "not_provisioned"
+    assert body["market"]["provider"] == "coingecko"
+    assert "not financial advice" in body["disclaimer"].lower()
+    assert "sk-" not in dumped
+    assert "xai-" not in dumped
+    assert "api_key" not in dumped
+    assert body["ai"]["configured"] == []
+    assert body["ai"]["configured_count"] == 0
+    assert isinstance(body["news"]["hosts"], list)
 
 
 def test_council_status_lists_supported_providers():
@@ -33,6 +50,7 @@ def test_news_empty_without_rss_config():
     body = response.json()
     assert body["data"] == []
     assert body["configured"] is False
+    assert body["using_defaults"] is False
     assert "NEWS_RSS_URLS" in body["message"]
 
 
@@ -138,6 +156,8 @@ def test_news_configured_empty_explains_failure(monkeypatch):
 
     class FakeSettings:
         rss_urls = ["https://example.test/rss"]
+        using_default_rss = False
+        rss_hosts = ["example.test"]
 
     monkeypatch.setattr("app.main.get_news", fake_news)
     monkeypatch.setattr("app.main.get_settings", lambda: FakeSettings())

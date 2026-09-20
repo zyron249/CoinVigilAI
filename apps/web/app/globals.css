@@ -4,7 +4,7 @@
   --panel-strong: #0d1a18;
   --line: rgba(140, 255, 212, .12);
   --text: #eefcf7;
-  --muted: #8ea9a0;
+  --muted: #a3bfb6;
   --accent: #59f2b4;
   --accent-soft: rgba(89, 242, 180, .12);
   --danger: #ff7e8c;
@@ -122,7 +122,7 @@ th { color: var(--muted); font-size: 11px; letter-spacing: .7px; }
   z-index: 4;
 }
 th:nth-child(1), td:nth-child(1), th:nth-child(2), td:nth-child(2) { text-align: left; }
-.market-row { transition: background .15s ease; }
+.market-row { transition: background .15s ease; content-visibility: auto; contain-intrinsic-size: 56px; }
 .market-row:hover { background: rgba(89,242,180,.035); }
 .asset-link { display: inline-block; }
 .asset-cell { display: flex; align-items: center; gap: 10px; }
@@ -259,9 +259,22 @@ th:nth-child(1), td:nth-child(1), th:nth-child(2), td:nth-child(2) { text-align:
 .news-item div { display: flex; flex-direction: column; gap: 5px; }
 .news-item span, .news-item time { color: var(--muted); font-size: 12px; }
 
-.studio-hero { padding: 72px 0 38px; max-width: 920px; }
-.studio-hero h1 { font-size: clamp(46px, 7vw, 86px); letter-spacing: -4px; line-height: .95; margin: 18px 0 20px; }
-.studio-hero p { color: var(--muted); font-size: 18px; line-height: 1.65; max-width: 780px; }
+.status-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; padding: 8px 0 20px; }
+.status-card { padding: 18px; display: flex; flex-direction: column; gap: 8px; min-height: 148px; }
+.status-card span { color: var(--muted); font-size: 11px; letter-spacing: .7px; text-transform: uppercase; font-weight: 800; }
+.status-card strong { font-size: 20px; }
+.status-card em { font-style: normal; color: var(--muted); font-size: 13px; line-height: 1.5; }
+.tone-live { color: var(--accent); }
+.tone-cache { color: var(--warning); }
+.tone-down { color: var(--danger); }
+.range-bar { position: relative; height: 6px; margin-top: 8px; border-radius: 99px; background: rgba(89,242,180,.12); }
+.range-bar i { position: absolute; top: -3px; width: 12px; height: 12px; border-radius: 50%; background: var(--accent); transform: translateX(-50%); }
+.range-metric { grid-column: span 2; }
+footer a { color: var(--accent); }
+
+.studio-hero, .page-hero { padding: 56px 0 32px; max-width: 920px; }
+.studio-hero h1, .page-hero h1 { font-size: clamp(40px, 6vw, 72px); letter-spacing: -3px; line-height: .95; margin: 16px 0 18px; }
+.studio-hero p, .page-hero p { color: var(--muted); font-size: 17px; line-height: 1.65; max-width: 760px; }
 .studio-layout { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(300px, .7fr); gap: 14px; }
 .token-form, .token-preview { padding: 24px; }
 .token-form h2, .token-preview h2 { margin: 7px 0 22px; }
@@ -293,12 +306,13 @@ footer { display: flex; justify-content: space-between; gap: 12px; color: var(--
 footer > div:first-child { overflow-wrap: anywhere; max-width: 52rem; }
 
 @media (max-width: 1200px) {
-  .global-strip, .skeleton-cards { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .global-strip, .skeleton-cards, .status-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .slice-grid { grid-template-columns: 1fr 1fr; }
   .slice-grid #radar { grid-column: 1 / -1; }
 }
 @media (max-width: 1050px) {
-  .asset-metrics, .asset-metrics-wide { grid-template-columns: repeat(3, 1fr); }
+  .asset-metrics, .asset-metrics-wide, .status-grid { grid-template-columns: repeat(3, 1fr); }
+  .range-metric { grid-column: span 3; }
   .studio-layout { grid-template-columns: 1fr; }
   .markets-hero { grid-template-columns: 1fr; }
 }
@@ -351,7 +365,8 @@ footer > div:first-child { overflow-wrap: anywhere; max-width: 52rem; }
 @media (max-width: 650px) {
   .asset-hero { align-items: flex-start; flex-direction: column; }
   .asset-price-block { align-items: flex-start; }
-  .asset-metrics, .asset-metrics-wide, .global-strip, .skeleton-cards { grid-template-columns: repeat(2, 1fr); }
+  .asset-metrics, .asset-metrics-wide, .global-strip, .skeleton-cards, .status-grid { grid-template-columns: repeat(2, 1fr); }
+  .range-metric { grid-column: span 2; }
   .form-grid { grid-template-columns: 1fr; }
   .chart-lab-head { align-items: flex-start; flex-direction: column; }
   .chart-status { text-align: left; }
