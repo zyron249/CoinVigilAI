@@ -119,6 +119,31 @@ def test_tickers_endpoint_never_invents_pairs(monkeypatch):
     assert "api_key" not in dumped
 
 
+def test_profile_endpoint_never_invents_urls(monkeypatch):
+    from app.models import AssetProfile
+
+    async def fake_profile(coin_id: str):
+        return AssetProfile(
+            coin_id=coin_id,
+            links=[],
+            categories=[],
+            description=None,
+            source="demo",
+            note="Project links are hidden in the labeled demo snapshot — URLs are never invented or scraped.",
+        )
+
+    monkeypatch.setattr("app.main.get_asset_profile", fake_profile)
+    response = client.get("/api/assets/bitcoin/profile")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["links"] == []
+    assert body["source"] == "demo"
+    assert "invent" in body["note"].lower()
+    dumped = str(body).lower()
+    assert "api_key" not in dumped
+    assert "javascript:" not in dumped
+
+
 def test_market_source_is_exposed(monkeypatch):
     async def fake_ranked(limit=50, page=1, sort="market_cap", order="desc", query=None):
         rows = DEMO_MARKETS[:limit]

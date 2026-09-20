@@ -41,7 +41,7 @@ jobs:
         run: python -m pytest -q
 
       - name: Check local watchlist contract
-        run: node --test apps/web/lib/watchlist-contract.test.mjs
+        run: node --test apps/web/lib/watchlist-contract.test.mjs apps/web/lib/project-links-contract.test.mjs
 
       - name: Validate Python syntax
         run: python -m compileall -q apps/api/app apps/api/tests
@@ -105,6 +105,7 @@ jobs:
           curl -fsS "http://127.0.0.1:8000/api/assets/bitcoin/analysis" > /tmp/analysis.json
           curl -fsS "http://127.0.0.1:8000/api/assets/bitcoin/candles?days=7" > /tmp/candles.json
           curl -fsS "http://127.0.0.1:8000/api/assets/bitcoin/tickers?limit=5&sort=trust&order=desc" > /tmp/tickers.json
+          curl -fsS "http://127.0.0.1:8000/api/assets/bitcoin/profile" > /tmp/profile.json
           curl -fsS "http://127.0.0.1:8000/api/compare?ids=bitcoin,ethereum,not-a-real-coin" > /tmp/compare.json
           curl -fsS "http://127.0.0.1:8000/api/news?limit=3" > /tmp/news.json
           curl -fsS "http://127.0.0.1:8000/api/ai/council/status" > /tmp/council-status.json
@@ -121,6 +122,7 @@ jobs:
           analysis = json.loads(Path('/tmp/analysis.json').read_text())
           candles = json.loads(Path('/tmp/candles.json').read_text())
           tickers = json.loads(Path('/tmp/tickers.json').read_text())
+          profile = json.loads(Path('/tmp/profile.json').read_text())
           compare = json.loads(Path('/tmp/compare.json').read_text())
           council_status = json.loads(Path('/tmp/council-status.json').read_text())
           stack_status = json.loads(Path('/tmp/status.json').read_text())
@@ -152,6 +154,13 @@ jobs:
           assert tickers.get('sort') == 'trust', tickers
           dumped_tickers = json.dumps(tickers).lower()
           assert 'api_key' not in dumped_tickers, tickers
+          assert profile.get('source') in allowed_sources, profile
+          assert isinstance(profile.get('links'), list), profile
+          assert all(isinstance(item, dict) and str(item.get('url','')).startswith(('http://','https://')) for item in profile['links']), profile
+          dumped_profile = json.dumps(profile).lower()
+          assert 'javascript:' not in dumped_profile, profile
+          assert 'api_key' not in dumped_profile, profile
+          assert 'invent' in profile.get('note','').lower() or 'scrape' in profile.get('note','').lower() or profile['links'], profile
           assert isinstance(compare.get('data'), list), compare
           assert compare.get('source') in allowed_sources, compare
           assert 'not-a-real-coin' in compare.get('missing', []), compare
@@ -261,6 +270,18 @@ jobs:
               continue
             fi
             if ! grep -q ">ATH<" /tmp/bitcoin.html && ! grep -q "ATH" /tmp/bitcoin.html; then
+              sleep 2
+              continue
+            fi
+            if ! grep -q "LINKS / COMMUNITY" /tmp/bitcoin.html; then
+              sleep 2
+              continue
+            fi
+            if ! grep -q "noopener noreferrer" /tmp/bitcoin.html && ! grep -qi "Not listed" /tmp/bitcoin.html; then
+              sleep 2
+              continue
+            fi
+            if ! grep -qi "does not scrape social" /tmp/bitcoin.html && ! grep -qi "does not invent URLs" /tmp/bitcoin.html; then
               sleep 2
               continue
             fi

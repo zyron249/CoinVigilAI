@@ -200,6 +200,25 @@ class AssetCompare(BaseModel):
     fallback_reason: str | None = None
 
 
+class ProjectLink(BaseModel):
+    kind: str
+    label: str
+    url: str
+
+
+class AssetProfile(BaseModel):
+    coin_id: str
+    links: list[ProjectLink] = Field(default_factory=list)
+    categories: list[str] = Field(default_factory=list)
+    description: str | None = None
+    source: str
+    note: str
+    last_live_at: str | None = None
+    as_of: str | None = None
+    stale: bool = False
+    fallback_reason: str | None = None
+
+
 class RadarSignal(BaseModel):
     asset_id: str
     symbol: str
