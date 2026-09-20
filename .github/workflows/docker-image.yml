@@ -128,6 +128,8 @@ jobs:
           assert isinstance(market.get('data'), list) and market['data'], market
           assert market.get('source') in allowed_sources, market
           assert 'stale' in market and 'last_live_at' in market and 'fallback_reason' in market, market
+          assert 'coverage_note' in market, market
+          assert 'coinmarketcap' in market.get('coverage_note', '').lower(), market
           assert global_overview.get('source') in allowed_sources, global_overview
           assert 'stale' in global_overview, global_overview
           assert movers.get('source') in allowed_sources, movers
@@ -141,6 +143,7 @@ jobs:
           assert all(key in candle for key in ('timestamp','open','high','low','close')), candle
           assert tickers.get('source') in allowed_sources, tickers
           assert isinstance(tickers.get('data'), list), tickers
+          assert isinstance(tickers.get('unique_exchange_count'), int), tickers
           assert 'invent' in tickers.get('note', '').lower() or 'scrape' in tickers.get('note', '').lower() or tickers['data'], tickers
           dumped_tickers = json.dumps(tickers).lower()
           assert 'api_key' not in dumped_tickers, tickers

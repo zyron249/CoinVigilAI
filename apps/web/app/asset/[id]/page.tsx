@@ -6,7 +6,7 @@ import { RangeBar, SupplyBar } from "../../../components/StatBars";
 import { StatusBadge } from "../../../components/StatusBadge";
 import { WatchButton } from "../../../components/WatchButton";
 import { getAssetAnalysis, getAssetTickers, getCandles, getCouncilStatus } from "../../../lib/api";
-import { changeClass, formatCompact, formatCompactUsd, formatPercent, formatTimestamp, formatUsd } from "../../../lib/format";
+import { changeClass, formatCompact, formatCompactUsd, formatDate, formatPercent, formatTimestamp, formatUsd } from "../../../lib/format";
 import { notFound } from "next/navigation";
 
 export default async function AssetPage({ params }: { params: Promise<{ id: string }> }) {
@@ -39,9 +39,9 @@ export default async function AssetPage({ params }: { params: Promise<{ id: stri
     { label: "1h", value: formatPercent(asset.price_change_percentage_1h), className: changeClass(asset.price_change_percentage_1h) },
     { label: "24h", value: formatPercent(asset.price_change_percentage_24h), className: changeClass(asset.price_change_percentage_24h) },
     { label: "7d", value: formatPercent(asset.price_change_percentage_7d), className: changeClass(asset.price_change_percentage_7d) },
-    { label: "ATH", value: formatUsd(asset.ath) },
+    { label: "ATH", value: asset.ath_date ? `${formatUsd(asset.ath)} · ${formatDate(asset.ath_date)}` : formatUsd(asset.ath) },
     { label: "ATH change", value: formatPercent(asset.ath_change_percentage), className: changeClass(asset.ath_change_percentage) },
-    { label: "ATL", value: formatUsd(asset.atl) },
+    { label: "ATL", value: asset.atl_date ? `${formatUsd(asset.atl)} · ${formatDate(asset.atl_date)}` : formatUsd(asset.atl) },
     { label: "Risk", value: `${analysis.risk.score}/100 · ${analysis.risk.level}` },
   ];
 

@@ -38,6 +38,18 @@ export function changeClass(value: number | null | undefined): string {
 
 export type SourceTone = "live" | "cache" | "demo" | "down";
 
+export function formatDate(value?: string | null): string | null {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return new Intl.DateTimeFormat("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(date);
+}
+
 export function formatTimestamp(value?: string | null): string | null {
   if (!value) return null;
   const date = new Date(value);

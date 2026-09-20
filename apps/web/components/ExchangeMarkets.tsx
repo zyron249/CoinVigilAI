@@ -28,12 +28,18 @@ export function ExchangeMarkets({
   async function go(page: number) {
     setBusy(true);
     const next = await getAssetTickers(coinId, page, pageData.limit);
+    if (next.source === "unavailable" && next.data.length === 0 && pageData.data.length > 0) {
+      setBusy(false);
+      return;
+    }
     setPageData(next);
     setBusy(false);
   }
 
   const pageCount = Math.max(1, Math.ceil((pageData.total || 0) / Math.max(pageData.limit, 1)));
   const empty = pageData.data.length === 0;
+  const venueCount = pageData.unique_exchange_count ?? 0;
+  const venues = pageData.venues ?? [];
 
   return (
     <section className="card table-card exchange-card" id="markets-tab">
@@ -45,6 +51,20 @@ export function ExchangeMarkets({
         <StatusBadge source={pageData.source} stale={pageData.stale} />
       </div>
       <p className="exchange-note muted">{pageData.note}</p>
+      {venueCount > 0 ? (
+        <div className="exchange-summary">
+          <strong>{venueCount} venues</strong>
+          <span className="muted">
+            {pageData.total} pairs in this snapshot, sorted by 24h USD volume
+          </span>
+          {venues.length ? (
+            <ul className="venue-chips">
+              {venues.map((venue) => <li key={venue}>{venue}</li>)}
+              {venueCount > venues.length ? <li className="muted">+{venueCount - venues.length}</li> : null}
+            </ul>
+          ) : null}
+        </div>
+      ) : null}
       <div className={`table-wrap ${busy ? "is-busy" : ""}`} aria-busy={busy}>
         {empty ? (
           <div className="empty empty-panel table-empty">

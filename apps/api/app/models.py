@@ -170,6 +170,8 @@ class AssetTickers(BaseModel):
     page: int
     limit: int
     total: int
+    unique_exchange_count: int = 0
+    venues: list[str] = Field(default_factory=list)
     source: str
     coverage: str = "coingecko_tickers"
     note: str

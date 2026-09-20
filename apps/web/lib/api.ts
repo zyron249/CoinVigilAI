@@ -197,6 +197,8 @@ export type AssetTickers = {
   page: number;
   limit: number;
   total: number;
+  unique_exchange_count?: number;
+  venues?: string[];
   source: string;
   note: string;
 } & Freshness;
@@ -333,6 +335,8 @@ export async function getAssetTickers(coinId: string, page = 1, limit = 25): Pro
     page,
     limit,
     total: 0,
+    unique_exchange_count: 0,
+    venues: [],
     source: "unavailable",
     note: "Exchange listings are unavailable. CoinVigil does not scrape venues or invent pairs.",
     last_live_at: null,
@@ -351,6 +355,8 @@ export async function getAssetTickers(coinId: string, page = 1, limit = 25): Pro
       page: json.page ?? page,
       limit: json.limit ?? limit,
       total: json.total ?? 0,
+      unique_exchange_count: json.unique_exchange_count ?? 0,
+      venues: Array.isArray(json.venues) ? json.venues : [],
       source: MARKET_SOURCES.has(json.source) ? json.source : "unavailable",
       note: json.note ?? empty.note,
       ...freshnessFrom(json),

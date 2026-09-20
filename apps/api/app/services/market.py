@@ -15,10 +15,15 @@ logger = logging.getLogger(__name__)
 
 # CoinGecko's public OHLC endpoint only accepts this closed set.
 COINGECKO_OHLC_DAYS = (1, 7, 14, 30, 90, 180, 365)
-# CoinGecko public/demo `/coins/markets` allows per_page up to 250. This is a
-# CoinGecko-tracked snapshot, not every coin on every exchange.
+# CoinGecko public/demo `/coins/markets` allows per_page up to 250. We paginate
+# that endpoint into one ranked snapshot — CoinGecko-tracked assets, not every
+# coin on every exchange.
 MARKET_UNIVERSE_LIMIT = 250
+MARKET_UNIVERSE_PAGES = 4
+TICKER_SOURCE_PAGES = 3
+TICKER_PAGE_SIZE = 100
 VALID_SOURCES = {"coingecko", "cache", "demo"}
+UNIVERSE_CACHE_KEY = f"markets:v5:universe:{MARKET_UNIVERSE_LIMIT}x{MARKET_UNIVERSE_PAGES}"
 # Short process cache so one dashboard render does not stampede CoinGecko
 # when Redis is down. Tests clear this via clear_market_memory_cache().
 _MEMORY_TTL_SECONDS = 20.0
@@ -395,7 +400,7 @@ async def peek_universe_status() -> dict[str, Any]:
         if isinstance(mem, tuple) and len(mem) == 2 and mem[0]:
             return from_snapshot(UniverseSnapshot(list(mem[0]), mem[1]))
 
-    cache_key = f"markets:v4:universe:{MARKET_UNIVERSE_LIMIT}"
+    cache_key = UNIVERSE_CACHE_KEY
     cached = await cache_get(cache_key)
     if isinstance(cached, dict):
         snapshot = _snapshot_from_payload(cached, stale=False)
@@ -426,7 +431,7 @@ async def get_universe_snapshot() -> UniverseSnapshot:
         return UniverseSnapshot(list(mem[0]), mem[1])
 
     settings = get_settings()
-    cache_key = f"markets:v4:universe:{MARKET_UNIVERSE_LIMIT}"
+    cache_key = UNIVERSE_CACHE_KEY
     cached = await cache_get(cache_key)
     if isinstance(cached, dict):
         snapshot = _snapshot_from_payload(cached, stale=False)
@@ -439,34 +444,20 @@ async def get_universe_snapshot() -> UniverseSnapshot:
         _memory_set("universe", snapshot)
         return snapshot
 
-    params = {
-        "vs_currency": "usd",
-        "order": "market_cap_desc",
-        "per_page": MARKET_UNIVERSE_LIMIT,
-        "page": 1,
-        "sparkline": "true",
-        "price_change_percentage": "1h,24h,7d",
-    }
     try:
-        async with httpx.AsyncClient(timeout=12.0, headers=_headers()) as client:
-            response = await client.get(f"{settings.coingecko_base_url}/coins/markets", params=params)
-            response.raise_for_status()
-            payload = response.json()
-            assets = [market_asset_from_payload(item) for item in payload if isinstance(item, dict) and item.get("id")]
-            if assets:
-                fetched_at = _now_iso()
-                snapshot = UniverseSnapshot(assets, "coingecko", last_live_at=fetched_at, stale=False)
-                envelope = {
-                    "items": [asset.model_dump() for asset in assets],
-                    "source": "coingecko",
-                    "last_live_at": fetched_at,
-                }
-                await cache_set(cache_key, envelope, settings.market_cache_ttl_seconds)
-                await save_last_good("universe", envelope)
-                _memory_set("universe", snapshot)
-                return snapshot
-            logger.warning("CoinGecko markets returned an empty payload")
-            reason = "unreachable"
+        snapshot = await _fetch_coingecko_market_universe()
+        if snapshot and snapshot.assets:
+            envelope = {
+                "items": [asset.model_dump() for asset in snapshot.assets],
+                "source": "coingecko",
+                "last_live_at": snapshot.last_live_at,
+            }
+            await cache_set(cache_key, envelope, settings.market_cache_ttl_seconds)
+            await save_last_good("universe", envelope)
+            _memory_set("universe", snapshot)
+            return snapshot
+        logger.warning("CoinGecko markets returned an empty payload")
+        reason = "unreachable"
     except Exception as exc:
         reason = _fallback_reason(exc)
         logger.warning("CoinGecko markets unavailable (%s); trying last live snapshot", type(exc).__name__)
@@ -520,10 +511,60 @@ def _filter_assets(assets: list[MarketAsset], query: str | None) -> list[MarketA
     ]
 
 
-COVERAGE_NOTE = (
-    f"CoinGecko-tracked snapshot of the top {MARKET_UNIVERSE_LIMIT} assets by market cap — "
-    "not every coin on every exchange, and not a CoinMarketCap clone."
-)
+COVERAGE_CAP = MARKET_UNIVERSE_LIMIT * MARKET_UNIVERSE_PAGES
+
+
+def _coverage_note(snapshot: UniverseSnapshot) -> str:
+    if snapshot.source == "demo":
+        return (
+            f"Labeled demo snapshot ({len(snapshot.assets)} assets). "
+            "Not live CoinGecko coverage, and not a CoinMarketCap clone."
+        )
+    return (
+        f"CoinGecko-tracked snapshot of {len(snapshot.assets)} assets by market cap "
+        f"(paginated /coins/markets, up to {COVERAGE_CAP}). "
+        "Not every coin on every exchange, and not a CoinMarketCap clone."
+    )
+
+
+async def _fetch_coingecko_market_universe() -> UniverseSnapshot | None:
+    settings = get_settings()
+    collected: list[MarketAsset] = []
+    seen: set[str] = set()
+    async with httpx.AsyncClient(timeout=12.0, headers=_headers()) as client:
+        for page in range(1, MARKET_UNIVERSE_PAGES + 1):
+            params = {
+                "vs_currency": "usd",
+                "order": "market_cap_desc",
+                "per_page": MARKET_UNIVERSE_LIMIT,
+                "page": page,
+                "sparkline": "true",
+                "price_change_percentage": "1h,24h,7d",
+            }
+            try:
+                response = await client.get(f"{settings.coingecko_base_url}/coins/markets", params=params)
+                response.raise_for_status()
+                payload = response.json()
+            except Exception:
+                if collected:
+                    logger.warning("CoinGecko markets page %s failed; keeping %s assets", page, len(collected))
+                    break
+                raise
+            if not isinstance(payload, list) or not payload:
+                break
+            for item in payload:
+                if not isinstance(item, dict) or not item.get("id"):
+                    continue
+                asset = market_asset_from_payload(item)
+                if asset.id in seen:
+                    continue
+                seen.add(asset.id)
+                collected.append(asset)
+            if len(payload) < MARKET_UNIVERSE_LIMIT:
+                break
+    if not collected:
+        return None
+    return UniverseSnapshot(collected, "coingecko", last_live_at=_now_iso(), stale=False)
 
 
 async def get_ranked_markets(
@@ -565,7 +606,7 @@ async def get_ranked_markets(
         universe_size=len(snapshot.assets),
         coverage="universe",
         query=(query or "").strip() or None,
-        coverage_note=COVERAGE_NOTE,
+        coverage_note=_coverage_note(snapshot),
         **_freshness_fields(snapshot),
     )
 
@@ -871,6 +912,8 @@ def _empty_tickers(coin_id: str, page: int, limit: int, source: str, reason: str
         page=page,
         limit=limit,
         total=0,
+        unique_exchange_count=0,
+        venues=[],
         source=source,
         note=note,
         stale=source == "cache",
@@ -878,6 +921,53 @@ def _empty_tickers(coin_id: str, page: int, limit: int, source: str, reason: str
         last_live_at=None,
         as_of=_now_iso(),
     )
+
+
+def _venue_summary(rows: list[ExchangeTicker]) -> tuple[int, list[str]]:
+    seen: list[str] = []
+    known: set[str] = set()
+    for ticker in rows:
+        name = ticker.exchange.strip()
+        if not name or name in known:
+            continue
+        known.add(name)
+        seen.append(name)
+    return len(seen), seen[:12]
+
+
+async def _fetch_coingecko_tickers(coin_id: str) -> list[ExchangeTicker]:
+    settings = get_settings()
+    collected: list[ExchangeTicker] = []
+    seen: set[tuple[str, str]] = set()
+    async with httpx.AsyncClient(timeout=12.0, headers=_headers()) as client:
+        for page in range(1, TICKER_SOURCE_PAGES + 1):
+            try:
+                response = await client.get(
+                    f"{settings.coingecko_base_url}/coins/{coin_id}/tickers",
+                    params={"page": page, "order": "volume_desc", "include_exchange_logo": "false"},
+                )
+                response.raise_for_status()
+                payload = response.json()
+            except Exception:
+                if collected:
+                    logger.warning("CoinGecko tickers page %s failed for %s; keeping %s pairs", page, coin_id, len(collected))
+                    break
+                raise
+            raw = payload.get("tickers") if isinstance(payload, dict) else None
+            if not isinstance(raw, list) or not raw:
+                break
+            for item in raw:
+                ticker = ticker_from_payload(item) if isinstance(item, dict) else None
+                if not ticker:
+                    continue
+                key = (ticker.exchange_id or ticker.exchange, ticker.pair)
+                if key in seen:
+                    continue
+                seen.add(key)
+                collected.append(ticker)
+            if len(raw) < TICKER_PAGE_SIZE:
+                break
+    return collected
 
 
 async def get_asset_tickers(coin_id: str, page: int = 1, limit: int = 25) -> AssetTickers:
@@ -889,7 +979,7 @@ async def get_asset_tickers(coin_id: str, page: int = 1, limit: int = 25) -> Ass
         return _empty_tickers("unknown", bounded_page, bounded_limit, "unavailable", "unreachable")
 
     settings = get_settings()
-    cache_key = f"tickers:v1:{needle}"
+    cache_key = f"tickers:v2:{needle}"
     mem = _memory_get(cache_key)
     rows: list[ExchangeTicker] | None = None
     source = "cache"
@@ -914,16 +1004,7 @@ async def get_asset_tickers(coin_id: str, page: int = 1, limit: int = 25) -> Ass
 
     if rows is None:
         try:
-            async with httpx.AsyncClient(timeout=12.0, headers=_headers()) as client:
-                response = await client.get(
-                    f"{settings.coingecko_base_url}/coins/{needle}/tickers",
-                    params={"page": 1, "order": "volume_desc", "include_exchange_logo": "false"},
-                )
-                response.raise_for_status()
-                payload = response.json()
-            raw = payload.get("tickers") if isinstance(payload, dict) else None
-            parsed = [ticker_from_payload(item) for item in raw if isinstance(item, dict)] if isinstance(raw, list) else []
-            rows = [ticker for ticker in parsed if ticker]
+            rows = await _fetch_coingecko_tickers(needle)
             fetched_at = _now_iso()
             source = "coingecko"
             last_live_at = fetched_at
@@ -950,9 +1031,12 @@ async def get_asset_tickers(coin_id: str, page: int = 1, limit: int = 25) -> Ass
     rows = rows or []
     ranked = sorted(rows, key=lambda ticker: ticker.volume_usd or 0, reverse=True)
     page_rows = _slice_page(ranked, bounded_page, bounded_limit)
+    unique_count, venues = _venue_summary(ranked)
     note = (
-        f"CoinGecko ticker snapshot (up to {len(ranked)} pairs from the first CoinGecko page), "
-        "sorted by USD volume. Not every venue worldwide, and CoinVigil does not scrape exchanges."
+        f"CoinGecko ticker snapshot ({len(ranked)} pairs across {unique_count} venues "
+        f"from up to {TICKER_SOURCE_PAGES} CoinGecko pages), sorted by reported USD volume. "
+        "Reported volume can be inflated on some venues; trust scores are CoinGecko's when present. "
+        "Not every venue worldwide, and CoinVigil does not scrape exchanges."
     )
     if not ranked:
         return _empty_tickers(needle, bounded_page, bounded_limit, source if source in VALID_SOURCES else "unavailable", reason)
@@ -963,6 +1047,8 @@ async def get_asset_tickers(coin_id: str, page: int = 1, limit: int = 25) -> Ass
         page=bounded_page,
         limit=bounded_limit,
         total=len(ranked),
+        unique_exchange_count=unique_count,
+        venues=venues,
         source=source if source in VALID_SOURCES else "cache",
         note=note,
         last_live_at=last_live_at,

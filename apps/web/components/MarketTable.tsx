@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { memo } from "react";
+import { memo, useEffect, useState } from "react";
 import type { MarketAsset, MarketPage } from "../lib/api";
 import { changeClass, formatCompact, formatCompactUsd, formatPercent, formatTimestamp, formatUsd } from "../lib/format";
 import { Sparkline } from "./Sparkline";
@@ -64,6 +64,12 @@ export function MarketTable({
   checkedAt?: string | null;
   onQuery: (next: { page?: number; limit?: number; sort?: string; order?: string; q?: string }) => void;
 }) {
+  const [draft, setDraft] = useState(pageData.query || "");
+
+  useEffect(() => {
+    setDraft(pageData.query || "");
+  }, [pageData.query]);
+
   function toggleSort(sort: string) {
     if (pageData.sort === sort) {
       onQuery({ sort, order: pageData.order === "desc" ? "asc" : "desc", page: 1 });
@@ -99,12 +105,26 @@ export function MarketTable({
               id="market-search"
               name="q"
               type="search"
-              defaultValue={pageData.query || ""}
+              value={draft}
+              onChange={(event) => setDraft(event.target.value)}
               placeholder="Search name, symbol, or id"
               autoComplete="off"
               disabled={busy}
             />
             <button type="submit" className="ghost tool-button" disabled={busy}>Search</button>
+            {pageData.query ? (
+              <button
+                type="button"
+                className="ghost tool-button"
+                disabled={busy}
+                onClick={() => {
+                  setDraft("");
+                  onQuery({ q: "", page: 1 });
+                }}
+              >
+                Clear
+              </button>
+            ) : null}
           </form>
           <StatusBadge source={pageData.source} stale={pageData.stale} />
         </div>
@@ -115,11 +135,13 @@ export function MarketTable({
       <div className={`table-wrap ${busy ? "is-busy" : ""}`} aria-busy={busy}>
         {empty ? (
           <div className="empty empty-panel table-empty">
-            <strong>No rankings to show</strong>
+            <strong>{pageData.query ? `No matches for “${pageData.query}”` : "No rankings to show"}</strong>
             <p>
               {pageData.source === "unavailable" || refreshError
                 ? "Rankings are unavailable right now. CoinVigil does not invent prices to fill the table."
-                : "No assets on this page of the ranked universe. Try another page or sort."}
+                : pageData.query
+                  ? "Search looks at name, symbol, and CoinGecko id in this snapshot, then tries an exact-id lookup. It is not every coin on earth."
+                  : "No assets on this page of the ranked universe. Try another page or sort."}
             </p>
           </div>
         ) : (
@@ -167,7 +189,7 @@ export function MarketTable({
       <div className="table-footer">
         <div className="muted">
           Showing {pageData.assets.length} of {pageData.total} matching assets
-          {pageData.universe_size ? ` · snapshot ${pageData.universe_size}` : ""}
+          {pageData.universe_size ? ` · ${pageData.universe_size} CoinGecko-tracked in snapshot` : ""}
           {pageData.stale && lastLive ? ` · last live ${lastLive}` : asOf ? ` · last updated ${asOf}` : ""}
           {checked && checked !== asOf ? ` · checked ${checked}` : ""}
           {busy ? " · updating…" : ""}
