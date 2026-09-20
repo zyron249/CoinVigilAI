@@ -33,3 +33,10 @@ test("keeps http(s) links and drops duplicates", () => {
   assert.equal(rows[0].url, "https://bitcoin.org/");
   assert.equal(rows[1].url, "https://x.com/bitcoin");
 });
+
+test("genesis date must be YYYY-MM-DD", () => {
+  const ok = /^\d{4}-\d{2}-\d{2}$/;
+  assert.equal(ok.test("2009-01-03"), true);
+  assert.equal(ok.test("not-a-date"), false);
+  assert.equal(ok.test("javascript:alert(1)"), false);
+});

@@ -8,7 +8,7 @@ It is an informational research tool, not a production trading desk and not fina
 
 - FastAPI market rankings, global overview, movers, AI brief, radar, analysis, candle, news, and health endpoints
 - Next.js Markets homepage: sortable/paginated/searchable rankings of a CoinGecko-tracked snapshot (paginated `/coins/markets`, up to 1,000 by market cap — not every coin worldwide), jump-to-asset search, local browser watchlist, global strip, gainers/losers, AI Market Brief
-- Asset pages with denser stats (ATH/ATL + dates, vol/mcap, circulating vs max, 24h range), official website/community links from CoinGecko `/coins/{id}` (never invented or scraped), a Markets tab of CoinGecko exchange tickers (venue/volume filters), Chart Lab with an unmistakable mixed Live/Demo banner when OHLC falls back, and AI analysis
+- Asset pages with an About/overview (English CoinGecko description, genesis date when listed, categories), official website/community links grouped website → explorers → socials → repos, denser stats (ATH/ATL + dates, vol/mcap, circulating vs max, 24h range), a Markets tab of CoinGecko exchange tickers (venue/volume filters), Chart Lab with an unmistakable mixed Live/Demo banner when OHLC falls back, and AI analysis
 - Heuristic analysis and market brief when no AI keys are configured
 - Parallel AI Council adapters (including optional xAI Grok) when you add provider keys
 - Redis used as a short TTL cache plus a 6-hour last-live snapshot when CoinGecko rate-limits
@@ -175,7 +175,7 @@ Strong bullish/bearish disagreement can force the final council result to neutra
 - `GET /api/status` — last observed Live/cache/demo path (no CoinGecko call), Redis, Postgres-not-provisioned, AI adapters configured (never keys), news hosts
 - `GET /api/market?limit=50&page=1&sort=market_cap&order=desc&q=` — ranked CoinGecko-tracked snapshot (paginated `/coins/markets`, up to 1,000 by market cap, not every coin worldwide); `partial` is true when later pages were rate-limited; `source`: `coingecko` | `cache` | `demo`
 - `GET /api/assets/{coin_id}/tickers` — CoinGecko exchange pairs. Optional `q`, `min_volume`, `sort` (`volume|price|spread|exchange|pair|trust`), `order`. Empty rather than invented when unavailable. Shareable on `/asset/{id}?q=&min_volume=&sort=&order=&page=`.
-- `GET /api/assets/{coin_id}/profile` — CoinGecko `/coins/{id}` `links` (homepage, whitepaper, explorers, X, Telegram, Discord, Reddit, Facebook, GitHub, forums). Missing fields are omitted; URLs are never invented or scraped.
+- `GET /api/assets/{coin_id}/profile` — CoinGecko `/coins/{id}` English description, genesis date, categories, and `links` (homepage, whitepaper, explorers, X, Telegram, Discord, Reddit, Facebook, GitHub, forums). Missing fields are omitted; URLs are never invented or scraped. Chip order is website → explorers → socials → repos.
 - `GET /api/compare?ids=bitcoin,ethereum` — up to 3 CoinGecko-tracked assets side-by-side. Missing ids are listed, never invented.
 - `GET /api/ai/council/status`
 - `GET /api/radar`

@@ -86,6 +86,14 @@ export default async function AssetPage({
             {formatTimestamp(asset.last_updated) ? (
               <p className="live-updated muted">Last updated: {formatTimestamp(asset.last_updated)}</p>
             ) : null}
+            <nav className="asset-jump" aria-label="On this page">
+              <a href="#overview">Overview</a>
+              <a href="#community">Links</a>
+              <a href="#chart-lab">Chart</a>
+              <Link href={`/compare?ids=${asset.id},${companion}`}>Compare</Link>
+              <Link href="/news">News</Link>
+              <Link href="/status">Status</Link>
+            </nav>
           </div>
         </div>
         <div className="asset-price-block">

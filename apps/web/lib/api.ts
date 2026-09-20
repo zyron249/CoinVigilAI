@@ -229,6 +229,7 @@ export type AssetProfile = {
   links: ProjectLink[];
   categories: string[];
   description?: string | null;
+  genesis_date?: string | null;
   source: string;
   note: string;
 } & Freshness;
@@ -424,6 +425,7 @@ export async function getAssetProfile(coinId: string): Promise<AssetProfile> {
     links: [],
     categories: [],
     description: null,
+    genesis_date: null,
     source: "unavailable",
     note: "Project links are unavailable. CoinVigil does not invent URLs or scrape social networks.",
     last_live_at: null,
@@ -452,6 +454,9 @@ export async function getAssetProfile(coinId: string): Promise<AssetProfile> {
         ? json.categories.map((item: unknown) => String(item || "").trim()).filter(Boolean).slice(0, 8)
         : [],
       description: typeof json.description === "string" ? json.description : null,
+      genesis_date: typeof json.genesis_date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(json.genesis_date)
+        ? json.genesis_date
+        : null,
       source: MARKET_SOURCES.has(json.source) ? json.source : "unavailable",
       note: json.note ?? empty.note,
       ...freshnessFrom(json),

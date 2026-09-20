@@ -170,6 +170,29 @@ export function LiveBoard({
                 {asset.name} <span>{asset.symbol.toUpperCase()}</span>
               </Link>
             ))}
+            {market.assets.length >= 2 ? (
+              <Link
+                className="jump-chip"
+                href={`/compare?ids=${market.assets.slice(0, 3).map((asset) => asset.id).join(",")}`}
+              >
+                Compare these
+              </Link>
+            ) : null}
+          </div>
+        ) : market.assets.length >= 2 ? (
+          <div className="jump-row">
+            <span className="muted">Jump:</span>
+            {market.assets.slice(0, 3).map((asset) => (
+              <Link className="jump-chip" key={asset.id} href={`/asset/${asset.id}`}>
+                {asset.name} <span>{asset.symbol.toUpperCase()}</span>
+              </Link>
+            ))}
+            <Link
+              className="jump-chip"
+              href={`/compare?ids=${market.assets.slice(0, 2).map((asset) => asset.id).join(",")}`}
+            >
+              Compare {market.assets[0].symbol.toUpperCase()} vs {market.assets[1].symbol.toUpperCase()}
+            </Link>
           </div>
         ) : null}
       </section>
