@@ -1,10 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
 import type { MarketPage } from "../lib/api";
-import { getMarket } from "../lib/api";
-import { changeClass, formatCompact, formatCompactUsd, formatPercent, formatUsd } from "../lib/format";
+import { changeClass, formatCompact, formatCompactUsd, formatPercent, formatTimestamp, formatUsd } from "../lib/format";
 import { Sparkline } from "./Sparkline";
 import { StatusBadge } from "./StatusBadge";
 
@@ -21,40 +19,32 @@ const COLUMNS: { key: string; label: string; sort?: string }[] = [
   { key: "spark", label: "Last 7 days" },
 ];
 
-export function MarketTable({ initial }: { initial: MarketPage }) {
-  const [pageData, setPageData] = useState(initial);
-  const [busy, setBusy] = useState(false);
-  const [refreshError, setRefreshError] = useState<string | null>(initial.error ?? null);
-
-  async function load(next: { page?: number; limit?: number; sort?: string; order?: string }) {
-    setBusy(true);
-    const query = {
-      page: next.page ?? pageData.page,
-      limit: next.limit ?? pageData.limit,
-      sort: next.sort ?? pageData.sort,
-      order: next.order ?? pageData.order,
-    };
-    const result = await getMarket(query);
-    if (result.error && result.assets.length === 0 && pageData.assets.length > 0) {
-      setRefreshError("Could not refresh rankings. Showing the last loaded snapshot.");
-      setBusy(false);
-      return;
-    }
-    setRefreshError(result.error ?? null);
-    setPageData(result);
-    setBusy(false);
-  }
-
+export function MarketTable({
+  pageData,
+  busy = false,
+  refreshError,
+  checkedAt,
+  onQuery,
+}: {
+  pageData: MarketPage;
+  busy?: boolean;
+  refreshError?: string | null;
+  checkedAt?: string | null;
+  onQuery: (next: { page?: number; limit?: number; sort?: string; order?: string }) => void;
+}) {
   function toggleSort(sort: string) {
     if (pageData.sort === sort) {
-      void load({ sort, order: pageData.order === "desc" ? "asc" : "desc", page: 1 });
+      onQuery({ sort, order: pageData.order === "desc" ? "asc" : "desc", page: 1 });
       return;
     }
-    void load({ sort, order: sort === "name" || sort === "rank" ? "asc" : "desc", page: 1 });
+    onQuery({ sort, order: sort === "name" || sort === "rank" ? "asc" : "desc", page: 1 });
   }
 
   const pageCount = Math.max(1, Math.ceil((pageData.total || 0) / Math.max(pageData.limit, 1)));
   const empty = pageData.assets.length === 0;
+  const lastLive = formatTimestamp(pageData.last_live_at);
+  const asOf = formatTimestamp(pageData.as_of);
+  const checked = formatTimestamp(checkedAt);
 
   return (
     <div className="card table-card">
@@ -63,17 +53,20 @@ export function MarketTable({ initial }: { initial: MarketPage }) {
           <div className="eyebrow">MARKET SNAPSHOT</div>
           <h2>Cryptocurrency rankings</h2>
         </div>
-        <StatusBadge source={pageData.source} />
+        <StatusBadge source={pageData.source} stale={pageData.stale} />
       </div>
       {refreshError ? (
         <p className="table-banner" role="status">{refreshError}</p>
       ) : null}
       <div className={`table-wrap ${busy ? "is-busy" : ""}`} aria-busy={busy}>
         {empty ? (
-          <div className="empty table-empty">
-            {pageData.source === "unavailable" || refreshError
-              ? "Rankings are unavailable right now. CoinVigil does not invent prices to fill the table."
-              : "No assets on this page of the ranked universe."}
+          <div className="empty empty-panel table-empty">
+            <strong>No rankings to show</strong>
+            <p>
+              {pageData.source === "unavailable" || refreshError
+                ? "Rankings are unavailable right now. CoinVigil does not invent prices to fill the table."
+                : "No assets on this page of the ranked universe. Try another page or sort."}
+            </p>
           </div>
         ) : (
           <table className="markets-table">
@@ -143,22 +136,24 @@ export function MarketTable({ initial }: { initial: MarketPage }) {
       <div className="table-footer">
         <div className="muted">
           Showing {pageData.assets.length} of {pageData.total} ranked assets
+          {pageData.stale && lastLive ? ` · last live ${lastLive}` : asOf ? ` · last updated ${asOf}` : ""}
+          {checked && checked !== asOf ? ` · checked ${checked}` : ""}
           {busy ? " · updating…" : ""}
         </div>
         <div className="pager">
           <select
             value={pageData.limit}
-            onChange={(event) => void load({ limit: Number(event.target.value), page: 1 })}
+            onChange={(event) => onQuery({ limit: Number(event.target.value), page: 1 })}
             aria-label="Rows per page"
             disabled={busy}
           >
             {[20, 50, 100].map((size) => <option key={size} value={size}>{size} / page</option>)}
           </select>
-          <button type="button" className="ghost tool-button" disabled={pageData.page <= 1 || busy} onClick={() => void load({ page: pageData.page - 1 })}>
+          <button type="button" className="ghost tool-button" disabled={pageData.page <= 1 || busy} onClick={() => onQuery({ page: pageData.page - 1 })}>
             Previous
           </button>
           <span className="muted">Page {pageData.page} / {pageCount}</span>
-          <button type="button" className="ghost tool-button" disabled={pageData.page >= pageCount || busy} onClick={() => void load({ page: pageData.page + 1 })}>
+          <button type="button" className="ghost tool-button" disabled={pageData.page >= pageCount || busy} onClick={() => onQuery({ page: pageData.page + 1 })}>
             Next
           </button>
         </div>

@@ -38,7 +38,28 @@ export function changeClass(value: number | null | undefined): string {
 
 export type SourceTone = "live" | "cache" | "demo" | "down";
 
-export function sourceLabel(source: string | undefined): { text: string; tone: SourceTone; demo: boolean } {
+export function formatTimestamp(value?: string | null): string | null {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return new Intl.DateTimeFormat("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: "UTC",
+    timeZoneName: "short",
+  }).format(date);
+}
+
+export function sourceLabel(
+  source: string | undefined,
+  opts?: { stale?: boolean },
+): { text: string; tone: SourceTone; demo: boolean } {
+  if (opts?.stale && (source === "coingecko" || source === "cache")) {
+    return { text: "Stale · last live CoinGecko", tone: "cache", demo: false };
+  }
   if (source === "coingecko") return { text: "Live · CoinGecko", tone: "live", demo: false };
   if (source === "cache") return { text: "Cached · CoinGecko", tone: "cache", demo: false };
   if (source === "demo") return { text: "Demo snapshot", tone: "demo", demo: true };

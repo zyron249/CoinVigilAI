@@ -1,6 +1,8 @@
 import logging
 import math
 import time
+from dataclasses import dataclass
+from datetime import datetime, timezone
 from typing import Any
 
 import httpx
@@ -18,7 +20,9 @@ VALID_SOURCES = {"coingecko", "cache", "demo"}
 # Short process cache so one dashboard render does not stampede CoinGecko
 # when Redis is down. Tests clear this via clear_market_memory_cache().
 _MEMORY_TTL_SECONDS = 20.0
+_LAST_GOOD_TTL_SECONDS = 6 * 60 * 60
 _memory_cache: dict[str, tuple[float, Any]] = {}
+_last_good: dict[str, dict[str, Any]] = {}
 SORT_FIELDS = {
     "rank": "market_cap_rank",
     "market_cap": "market_cap",
@@ -42,6 +46,29 @@ NUMERIC_SORTS = {
 
 def clear_market_memory_cache() -> None:
     _memory_cache.clear()
+    _last_good.clear()
+
+
+def _now_iso() -> str:
+    return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def _fallback_reason(exc: Exception) -> str:
+    if isinstance(exc, httpx.HTTPStatusError) and exc.response is not None and exc.response.status_code == 429:
+        return "rate_limited"
+    return "unreachable"
+
+
+@dataclass(frozen=True)
+class UniverseSnapshot:
+    assets: list[MarketAsset]
+    source: str
+    last_live_at: str | None = None
+    stale: bool = False
+    fallback_reason: str | None = None
+
+    def as_tuple(self) -> tuple[list[MarketAsset], str]:
+        return list(self.assets), self.source
 
 
 def _memory_get(key: str) -> Any | None:
@@ -57,6 +84,30 @@ def _memory_get(key: str) -> Any | None:
 
 def _memory_set(key: str, value: Any) -> None:
     _memory_cache[key] = (time.time(), value)
+
+
+def _remember_last_good(kind: str, payload: dict[str, Any]) -> None:
+    _last_good[kind] = payload
+
+
+def _read_last_good(kind: str) -> dict[str, Any] | None:
+    return _last_good.get(kind)
+
+
+async def save_last_good(kind: str, payload: dict[str, Any]) -> None:
+    _remember_last_good(kind, payload)
+    await cache_set(f"markets:last_good:{kind}", payload, _LAST_GOOD_TTL_SECONDS)
+
+
+async def load_last_good(kind: str) -> dict[str, Any] | None:
+    local = _read_last_good(kind)
+    if local:
+        return local
+    cached = await cache_get(f"markets:last_good:{kind}")
+    if isinstance(cached, dict) and cached.get("source") in VALID_SOURCES and cached.get("source") != "demo":
+        _remember_last_good(kind, cached)
+        return cached
+    return None
 
 
 def _demo_sparkline(anchor: float, change_7d: float) -> list[float]:
@@ -289,20 +340,46 @@ def _slice_page(assets: list[MarketAsset], page: int, limit: int) -> list[Market
     return assets[start:start + limit]
 
 
-async def get_market_universe() -> tuple[list[MarketAsset], str]:
+def _snapshot_from_payload(payload: dict[str, Any], *, stale: bool, fallback_reason: str | None = None) -> UniverseSnapshot | None:
+    raw = payload.get("items") or payload.get("data")
+    if not isinstance(raw, list) or not raw:
+        return None
+    assets = [market_asset_from_payload(item) if isinstance(item, dict) else item for item in raw]
+    assets = [asset for asset in assets if getattr(asset, "id", None)]
+    if not assets:
+        return None
+    source = str(payload.get("source") or "cache")
+    if source not in VALID_SOURCES:
+        source = "cache"
+    return UniverseSnapshot(
+        assets=assets,
+        source="cache" if stale and source == "coingecko" else source,
+        last_live_at=payload.get("last_live_at"),
+        stale=stale,
+        fallback_reason=fallback_reason,
+    )
+
+
+async def get_universe_snapshot() -> UniverseSnapshot:
     mem = _memory_get("universe")
-    if isinstance(mem, tuple) and len(mem) == 2:
-        assets, source = mem
-        if isinstance(assets, list) and assets:
-            return list(assets), source
+    if isinstance(mem, UniverseSnapshot) and mem.assets:
+        return UniverseSnapshot(list(mem.assets), mem.source, mem.last_live_at, mem.stale, mem.fallback_reason)
+    if isinstance(mem, tuple) and len(mem) == 2 and mem[0]:
+        return UniverseSnapshot(list(mem[0]), mem[1])
 
     settings = get_settings()
-    cache_key = f"markets:v2:universe:{MARKET_UNIVERSE_LIMIT}"
+    cache_key = f"markets:v3:universe:{MARKET_UNIVERSE_LIMIT}"
     cached = await cache_get(cache_key)
+    if isinstance(cached, dict):
+        snapshot = _snapshot_from_payload(cached, stale=False)
+        if snapshot:
+            _memory_set("universe", snapshot)
+            return snapshot
     if isinstance(cached, list) and cached:
         assets = [market_asset_from_payload(item) for item in cached if item.get("id")]
-        _memory_set("universe", (assets, "cache"))
-        return list(assets), "cache"
+        snapshot = UniverseSnapshot(assets, "cache")
+        _memory_set("universe", snapshot)
+        return snapshot
 
     params = {
         "vs_currency": "usd",
@@ -319,16 +396,38 @@ async def get_market_universe() -> tuple[list[MarketAsset], str]:
             payload = response.json()
             assets = [market_asset_from_payload(item) for item in payload if isinstance(item, dict) and item.get("id")]
             if assets:
-                await cache_set(cache_key, [asset.model_dump() for asset in assets], settings.market_cache_ttl_seconds)
-                _memory_set("universe", (assets, "coingecko"))
-                return assets, "coingecko"
+                fetched_at = _now_iso()
+                snapshot = UniverseSnapshot(assets, "coingecko", last_live_at=fetched_at, stale=False)
+                envelope = {
+                    "items": [asset.model_dump() for asset in assets],
+                    "source": "coingecko",
+                    "last_live_at": fetched_at,
+                }
+                await cache_set(cache_key, envelope, settings.market_cache_ttl_seconds)
+                await save_last_good("universe", envelope)
+                _memory_set("universe", snapshot)
+                return snapshot
             logger.warning("CoinGecko markets returned an empty payload")
+            reason = "unreachable"
     except Exception as exc:
-        logger.warning("CoinGecko markets unavailable (%s); using demo snapshot", type(exc).__name__)
+        reason = _fallback_reason(exc)
+        logger.warning("CoinGecko markets unavailable (%s); trying last live snapshot", type(exc).__name__)
+
+    last_good = await load_last_good("universe")
+    if last_good:
+        snapshot = _snapshot_from_payload(last_good, stale=True, fallback_reason=reason)
+        if snapshot:
+            _memory_set("universe", snapshot)
+            return snapshot
 
     demo = list(DEMO_MARKETS)
-    _memory_set("universe", (demo, "demo"))
-    return demo, "demo"
+    snapshot = UniverseSnapshot(demo, "demo", stale=False, fallback_reason=reason)
+    _memory_set("universe", snapshot)
+    return snapshot
+
+
+async def get_market_universe() -> tuple[list[MarketAsset], str]:
+    return (await get_universe_snapshot()).as_tuple()
 
 
 async def get_markets_with_source(limit: int = 20) -> tuple[list[MarketAsset], str]:
@@ -341,6 +440,15 @@ async def get_markets(limit: int = 20) -> list[MarketAsset]:
     return assets
 
 
+def _freshness_fields(snapshot: UniverseSnapshot) -> dict[str, Any]:
+    return {
+        "last_live_at": snapshot.last_live_at,
+        "as_of": snapshot.last_live_at if snapshot.stale else _now_iso(),
+        "stale": snapshot.stale,
+        "fallback_reason": snapshot.fallback_reason,
+    }
+
+
 async def get_ranked_markets(
     limit: int = 50,
     page: int = 1,
@@ -351,8 +459,8 @@ async def get_ranked_markets(
     bounded_page = max(1, min(int(page), 50))
     sort_key = normalize_sort(sort)
     order_key = normalize_order(order)
-    assets, source = await get_market_universe()
-    ranked = _sort_assets(assets, sort_key, order_key)
+    snapshot = await get_universe_snapshot()
+    ranked = _sort_assets(snapshot.assets, sort_key, order_key)
     page_rows = _slice_page(ranked, bounded_page, bounded_limit)
     return RankedMarkets(
         data=page_rows,
@@ -362,13 +470,21 @@ async def get_ranked_markets(
         total=len(ranked),
         sort=sort_key,
         order=order_key,
-        source=source,
+        source=snapshot.source,
         universe_size=len(ranked),
         coverage="universe",
+        **_freshness_fields(snapshot),
     )
 
 
-def _overview_from_assets(assets: list[MarketAsset], source: str) -> GlobalOverview:
+def _overview_from_assets(
+    assets: list[MarketAsset],
+    source: str,
+    *,
+    last_live_at: str | None = None,
+    stale: bool = False,
+    fallback_reason: str | None = None,
+) -> GlobalOverview:
     total_cap = sum(asset.market_cap or 0 for asset in assets)
     total_volume = sum(asset.total_volume or 0 for asset in assets)
     btc = next((asset for asset in assets if asset.id == "bitcoin"), None)
@@ -390,6 +506,10 @@ def _overview_from_assets(assets: list[MarketAsset], source: str) -> GlobalOverv
         source=source,
         coverage="universe",
         note=note,
+        last_live_at=last_live_at,
+        as_of=last_live_at if stale else _now_iso(),
+        stale=stale,
+        fallback_reason=fallback_reason,
     )
 
 
@@ -417,18 +537,29 @@ async def _fear_greed() -> tuple[int, str, str] | None:
         return None
 
 
+def _overview_from_last_good(payload: dict[str, Any], reason: str) -> GlobalOverview:
+    fields = {key: payload.get(key) for key in GlobalOverview.model_fields}
+    overview = GlobalOverview(**fields)
+    overview.source = "cache"
+    overview.stale = True
+    overview.fallback_reason = reason
+    overview.as_of = overview.last_live_at or _now_iso()
+    return overview
+
+
 async def get_global_overview() -> GlobalOverview:
     settings = get_settings()
     mem = _memory_get("global")
     if isinstance(mem, dict) and mem.get("source") in VALID_SOURCES:
         return GlobalOverview(**mem)
-    cache_key = "markets:v2:global"
+    cache_key = "markets:v3:global"
     cached = await cache_get(cache_key)
     if isinstance(cached, dict) and cached.get("source") in VALID_SOURCES:
         _memory_set("global", cached)
         return GlobalOverview(**cached)
 
     fear = await _fear_greed()
+    reason: str | None = None
     try:
         async with httpx.AsyncClient(timeout=10.0, headers=_headers()) as client:
             response = await client.get(f"{settings.coingecko_base_url}/global")
@@ -439,6 +570,7 @@ async def get_global_overview() -> GlobalOverview:
             caps = blob.get("total_market_cap") or {}
             volumes = blob.get("total_volume") or {}
             dominance = blob.get("market_cap_percentage") or {}
+            fetched_at = _now_iso()
             overview = GlobalOverview(
                 total_market_cap_usd=_as_float(caps.get("usd") if isinstance(caps, dict) else None),
                 total_volume_24h_usd=_as_float(volumes.get("usd") if isinstance(volumes, dict) else None),
@@ -450,17 +582,37 @@ async def get_global_overview() -> GlobalOverview:
                 coverage="global",
                 note="CoinGecko /global snapshot. Not CoinMarketCap.",
                 updated_at=_as_int(blob.get("updated_at")),
+                last_live_at=fetched_at,
+                as_of=fetched_at,
+                stale=False,
             )
             if fear:
                 overview.fear_greed_value, overview.fear_greed_classification, overview.fear_greed_source = fear
-            await cache_set(cache_key, overview.model_dump(), settings.market_cache_ttl_seconds)
+            dumped = overview.model_dump()
+            await cache_set(cache_key, dumped, settings.market_cache_ttl_seconds)
+            await save_last_good("global", dumped)
+            _memory_set("global", dumped)
+            return overview
+        reason = "unreachable"
+    except Exception as exc:
+        reason = _fallback_reason(exc)
+        logger.warning("CoinGecko global unavailable (%s); trying last live snapshot", type(exc).__name__)
+        last_good = await load_last_good("global")
+        if last_good:
+            overview = _overview_from_last_good(last_good, reason)
+            if fear and overview.fear_greed_value is None:
+                overview.fear_greed_value, overview.fear_greed_classification, overview.fear_greed_source = fear
             _memory_set("global", overview.model_dump())
             return overview
-    except Exception as exc:
-        logger.warning("CoinGecko global unavailable (%s); deriving from ranked universe", type(exc).__name__)
 
-    assets, source = await get_market_universe()
-    overview = _overview_from_assets(assets, source)
+    snapshot = await get_universe_snapshot()
+    overview = _overview_from_assets(
+        snapshot.assets,
+        snapshot.source,
+        last_live_at=snapshot.last_live_at,
+        stale=snapshot.stale,
+        fallback_reason=snapshot.fallback_reason or reason,
+    )
     if fear:
         overview.fear_greed_value, overview.fear_greed_classification, overview.fear_greed_source = fear
     _memory_set("global", overview.model_dump())
@@ -469,8 +621,8 @@ async def get_global_overview() -> GlobalOverview:
 
 async def get_movers(limit: int = 5) -> MarketMovers:
     bounded = max(1, min(int(limit), 15))
-    assets, source = await get_market_universe()
-    scored = [asset for asset in assets if asset.price_change_percentage_24h is not None]
+    snapshot = await get_universe_snapshot()
+    scored = [asset for asset in snapshot.assets if asset.price_change_percentage_24h is not None]
     gainers = sorted(
         [asset for asset in scored if (asset.price_change_percentage_24h or 0) > 0],
         key=lambda asset: asset.price_change_percentage_24h or 0,
@@ -480,7 +632,13 @@ async def get_movers(limit: int = 5) -> MarketMovers:
         [asset for asset in scored if (asset.price_change_percentage_24h or 0) < 0],
         key=lambda asset: asset.price_change_percentage_24h or 0,
     )[:bounded]
-    return MarketMovers(gainers=gainers, losers=losers, count=bounded, source=source)
+    return MarketMovers(
+        gainers=gainers,
+        losers=losers,
+        count=bounded,
+        source=snapshot.source,
+        **_freshness_fields(snapshot),
+    )
 
 
 async def get_asset_with_source(coin_id: str) -> tuple[MarketAsset | None, str]:

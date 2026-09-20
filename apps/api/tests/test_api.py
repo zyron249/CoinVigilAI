@@ -13,7 +13,7 @@ def test_health_reports_ok_and_honest_dependencies():
     assert response.status_code == 200
     body = response.json()
     assert body["status"] == "ok"
-    assert body["dependencies"]["postgres"] == "reserved_unused"
+    assert body["dependencies"]["postgres"] == "not_provisioned"
     assert body["dependencies"]["market_provider"] == "coingecko"
     assert "redis" in body["dependencies"]
 

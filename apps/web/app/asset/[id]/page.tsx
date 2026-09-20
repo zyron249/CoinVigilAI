@@ -4,7 +4,7 @@ import { ProChartLab } from "../../../components/ProChartLab";
 import { Sparkline } from "../../../components/Sparkline";
 import { StatusBadge } from "../../../components/StatusBadge";
 import { getAssetAnalysis, getCandles, getCouncilStatus } from "../../../lib/api";
-import { changeClass, formatCompact, formatCompactUsd, formatPercent, formatUsd } from "../../../lib/format";
+import { changeClass, formatCompact, formatCompactUsd, formatPercent, formatTimestamp, formatUsd } from "../../../lib/format";
 import { notFound } from "next/navigation";
 
 export default async function AssetPage({ params }: { params: Promise<{ id: string }> }) {
@@ -35,7 +35,7 @@ export default async function AssetPage({ params }: { params: Promise<{ id: stri
 
   return (
     <main id="content">
-      <DemoRibbon source={analysis.data_source} />
+      <DemoRibbon source={analysis.data_source} lastLiveAt={asset.last_updated} />
 
       <section className="asset-hero">
         <div className="asset-title-row">
@@ -44,6 +44,9 @@ export default async function AssetPage({ params }: { params: Promise<{ id: stri
             <div className="eyebrow">ASSET INTELLIGENCE</div>
             <h1>{asset.name} <span>{asset.symbol.toUpperCase()}</span></h1>
             <StatusBadge source={analysis.data_source} />
+            {formatTimestamp(asset.last_updated) ? (
+              <p className="live-updated muted">Last updated: {formatTimestamp(asset.last_updated)}</p>
+            ) : null}
           </div>
         </div>
         <div className="asset-price-block">

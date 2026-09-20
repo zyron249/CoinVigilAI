@@ -20,6 +20,13 @@ export type MarketAsset = {
   last_updated?: string | null;
 };
 
+export type Freshness = {
+  last_live_at?: string | null;
+  as_of?: string | null;
+  stale?: boolean;
+  fallback_reason?: string | null;
+};
+
 export type MarketPage = {
   assets: MarketAsset[];
   source: string;
@@ -30,7 +37,7 @@ export type MarketPage = {
   order: string;
   universe_size: number;
   error?: string | null;
-};
+} & Freshness;
 
 export type GlobalOverview = {
   total_market_cap_usd?: number | null;
@@ -45,14 +52,14 @@ export type GlobalOverview = {
   source: string;
   coverage: string;
   note?: string | null;
-};
+} & Freshness;
 
 export type MarketMovers = {
   gainers: MarketAsset[];
   losers: MarketAsset[];
   count: number;
   source: string;
-};
+} & Freshness;
 
 export type MarketBrief = {
   headline: string;
@@ -162,6 +169,15 @@ export type MarketQuery = {
 const FETCH_MS = 12_000;
 const MARKET_SOURCES = new Set(["coingecko", "cache", "demo"]);
 
+function freshnessFrom(json: Partial<Freshness> | null | undefined): Freshness {
+  return {
+    last_live_at: json?.last_live_at ?? null,
+    as_of: json?.as_of ?? null,
+    stale: Boolean(json?.stale),
+    fallback_reason: json?.fallback_reason ?? null,
+  };
+}
+
 function apiBase() {
   if (typeof window !== "undefined") {
     return process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -201,6 +217,10 @@ export async function getMarket(query: MarketQuery = {}): Promise<MarketPage> {
     order,
     universe_size: 0,
     error: "Rankings are unavailable.",
+    last_live_at: null,
+    as_of: null,
+    stale: false,
+    fallback_reason: "unreachable",
   };
   try {
     const search = new URLSearchParams({
@@ -222,6 +242,7 @@ export async function getMarket(query: MarketQuery = {}): Promise<MarketPage> {
       order: json.order ?? order,
       universe_size: json.universe_size ?? json.total ?? 0,
       error: null,
+      ...freshnessFrom(json),
     };
   } catch {
     return empty;
@@ -232,6 +253,10 @@ export async function getGlobalOverview(): Promise<GlobalOverview> {
   return readJson<GlobalOverview>("/api/market/global", {
     source: "unavailable",
     coverage: "unavailable",
+    last_live_at: null,
+    as_of: null,
+    stale: false,
+    fallback_reason: "unreachable",
   });
 }
 
@@ -241,6 +266,10 @@ export async function getMovers(limit = 5): Promise<MarketMovers> {
     losers: [],
     count: 0,
     source: "unavailable",
+    last_live_at: null,
+    as_of: null,
+    stale: false,
+    fallback_reason: "unreachable",
   });
 }
 

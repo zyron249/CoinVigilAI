@@ -44,7 +44,13 @@ jobs:
         run: python -m compileall -q apps/api/app apps/api/tests
 
       - name: Validate Docker Compose configuration
-        run: docker compose config > /tmp/coinvigil-compose.yml
+        run: |
+          docker compose config --services | tee /tmp/compose-services.txt
+          if grep -qx postgres /tmp/compose-services.txt; then
+            echo "Postgres must not be started; this build does not use it"
+            exit 1
+          fi
+          docker compose config > /tmp/coinvigil-compose.yml
 
       - name: Build API image
         run: docker build --pull --tag coinvigil-api:test ./apps/api
@@ -110,10 +116,14 @@ jobs:
           candles = json.loads(Path('/tmp/candles.json').read_text())
           council_status = json.loads(Path('/tmp/council-status.json').read_text())
           assert health.get('status') == 'ok', health
+          assert health.get('dependencies', {}).get('postgres') == 'not_provisioned', health
           assert isinstance(market.get('data'), list) and market['data'], market
           assert market.get('source') in allowed_sources, market
+          assert 'stale' in market and 'last_live_at' in market and 'fallback_reason' in market, market
           assert global_overview.get('source') in allowed_sources, global_overview
+          assert 'stale' in global_overview, global_overview
           assert movers.get('source') in allowed_sources, movers
+          assert 'stale' in movers, movers
           assert brief.get('data_source') in allowed_sources, brief
           assert 'not financial advice' in brief.get('disclaimer', '').lower(), brief
           assert analysis.get('asset', {}).get('id') == 'bitcoin', analysis
@@ -155,6 +165,10 @@ jobs:
               continue
             fi
             if ! grep -q "CRYPTOCURRENCY RANKINGS" /tmp/web.html; then
+              sleep 2
+              continue
+            fi
+            if ! grep -q "Last updated" /tmp/web.html && ! grep -q "Last live" /tmp/web.html; then
               sleep 2
               continue
             fi

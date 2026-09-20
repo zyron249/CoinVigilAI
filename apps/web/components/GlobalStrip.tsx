@@ -1,9 +1,18 @@
 import type { GlobalOverview } from "../lib/api";
-import { changeClass, formatCompactUsd, formatPercent } from "../lib/format";
+import { changeClass, formatCompactUsd, formatPercent, formatTimestamp } from "../lib/format";
 import { StatusBadge } from "./StatusBadge";
 
-export function GlobalStrip({ overview }: { overview: GlobalOverview }) {
+export function GlobalStrip({
+  overview,
+  checkedAt,
+}: {
+  overview: GlobalOverview;
+  checkedAt?: string | null;
+}) {
   const universeNote = overview.note || "Ranked universe total, not CoinGecko /global";
+  const lastLive = formatTimestamp(overview.last_live_at);
+  const asOf = formatTimestamp(overview.as_of);
+  const checked = formatTimestamp(checkedAt);
   const items = [
     {
       label: "Market cap",
@@ -31,23 +40,34 @@ export function GlobalStrip({ overview }: { overview: GlobalOverview }) {
   ];
 
   return (
-    <section className="global-strip" aria-label="Global market summary">
-      {items.map((item) => (
-        <div className="global-stat" key={item.label}>
-          <span>{item.label}</span>
-          <strong>{item.value}</strong>
-          {"extra" in item && item.extra && item.extra !== "—" ? (
-            <em className={"extraClass" in item ? item.extraClass : undefined}>{item.extra} 24h</em>
-          ) : item.note ? (
-            <em>{item.note}</em>
-          ) : null}
+    <section className="global-strip-wrap" aria-label="Global market summary">
+      <div className="global-strip">
+        {items.map((item) => (
+          <div className="global-stat" key={item.label}>
+            <span>{item.label}</span>
+            <strong>{item.value}</strong>
+            {"extra" in item && item.extra && item.extra !== "—" ? (
+              <em className={"extraClass" in item ? item.extraClass : undefined}>{item.extra} 24h</em>
+            ) : item.note ? (
+              <em>{item.note}</em>
+            ) : null}
+          </div>
+        ))}
+        <div className="global-stat source-stat">
+          <span>Data source</span>
+          <strong><StatusBadge source={overview.source} stale={overview.stale} /></strong>
+          <em>{overview.coverage === "global" ? "CoinGecko global" : universeNote}</em>
         </div>
-      ))}
-      <div className="global-stat source-stat">
-        <span>Data source</span>
-        <strong><StatusBadge source={overview.source} /></strong>
-        <em>{overview.coverage === "global" ? "CoinGecko global" : universeNote}</em>
       </div>
+      <p className="live-updated muted">
+        {overview.stale && lastLive
+          ? `Last live CoinGecko data: ${lastLive}`
+          : asOf
+            ? `Last updated: ${asOf}`
+            : "Last updated: waiting for a snapshot"}
+        {checked && checked !== asOf ? ` · checked ${checked}` : ""}
+        {overview.fallback_reason === "rate_limited" ? " · CoinGecko rate-limited" : ""}
+      </p>
     </section>
   );
 }

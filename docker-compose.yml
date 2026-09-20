@@ -1,22 +1,6 @@
+# CoinVigil stack: API + web + optional Redis cache.
+# Postgres is intentionally omitted — this build does not persist to a database.
 services:
-  postgres:
-    image: postgres:16-alpine
-    restart: unless-stopped
-    environment:
-      POSTGRES_USER: coinvigil
-      POSTGRES_PASSWORD: coinvigil
-      POSTGRES_DB: coinvigil
-    ports:
-      - "5432:5432"
-    volumes:
-      - coinvigil_pg:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U coinvigil -d coinvigil"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
-      start_period: 10s
-
   redis:
     image: redis:7-alpine
     restart: unless-stopped
@@ -39,13 +23,10 @@ services:
       - path: .env
         required: false
     environment:
-      DATABASE_URL: postgresql://coinvigil:coinvigil@postgres:5432/coinvigil
       REDIS_URL: redis://redis:6379/0
     ports:
       - "8000:8000"
     depends_on:
-      postgres:
-        condition: service_healthy
       redis:
         condition: service_healthy
     healthcheck:
@@ -76,5 +57,4 @@ services:
         condition: service_healthy
 
 volumes:
-  coinvigil_pg:
   coinvigil_redis:

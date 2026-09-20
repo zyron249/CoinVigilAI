@@ -44,7 +44,7 @@ async def health():
         "version": "0.4.0",
         "dependencies": {
             "redis": await redis_status(),
-            "postgres": "reserved_unused",
+            "postgres": "not_provisioned",
             "market_provider": "coingecko",
             "ai_providers_configured": sum(1 for provider in providers if provider["configured"]),
         },

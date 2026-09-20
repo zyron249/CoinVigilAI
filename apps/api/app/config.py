@@ -8,7 +8,8 @@ class Settings(BaseSettings):
     coingecko_base_url: str = "https://api.coingecko.com/api/v3"
     coingecko_api_key: str = ""
     news_rss_urls: str = ""
-    database_url: str = "postgresql://coinvigil:coinvigil@localhost:5432/coinvigil"
+    # Unused. CoinVigil does not persist to Postgres in this build.
+    database_url: str = ""
     redis_url: str = "redis://localhost:6379/0"
     cors_allow_origins: str = "http://localhost:3000,http://127.0.0.1:3000"
     market_cache_ttl_seconds: int = 30

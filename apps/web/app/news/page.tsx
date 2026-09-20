@@ -22,9 +22,17 @@ export default async function NewsPage() {
 
       <section className="card news-panel">
         {news.items.length === 0 ? (
-          <div className="empty">
-            {news.message || "No stories available yet."}
-            {!news.configured ? " Copy a public RSS URL into NEWS_RSS_URLS in your .env file, then restart the API." : ""}
+          <div className="empty empty-panel news-empty">
+            <strong>{news.configured ? "Feeds returned no stories" : "No RSS feeds configured"}</strong>
+            <p>{news.message || "No stories available yet."}</p>
+            {!news.configured ? (
+              <p>
+                Add comma-separated URLs to <code>NEWS_RSS_URLS</code> in <code>.env</code>, restart the API, then refresh.
+                CoinVigil leaves this page empty on purpose instead of inventing headlines.
+              </p>
+            ) : (
+              <p>Check the feed URLs and try again. Gaps stay empty — they are never filled with generated news.</p>
+            )}
           </div>
         ) : (
           <div className="news-list">
