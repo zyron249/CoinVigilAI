@@ -28,6 +28,7 @@ UNIVERSE_CACHE_KEY = f"markets:v6:universe:{MARKET_UNIVERSE_LIMIT}x{MARKET_UNIVE
 COVERAGE_CAP = MARKET_UNIVERSE_LIMIT * MARKET_UNIVERSE_PAGES
 RETRY_ATTEMPTS = 3
 RETRY_BASE_DELAY_SECONDS = 0.35
+MAX_RETRY_SLEEP_SECONDS = 1.2
 PAGE_GAP_SECONDS = 0.2
 # Short process cache so one dashboard render does not stampede CoinGecko
 # when Redis is down. Tests clear this via clear_market_memory_cache().
@@ -81,8 +82,8 @@ async def _coingecko_get(client: httpx.AsyncClient, url: str, params: dict[str, 
                     except ValueError:
                         wait_for = delay
                 if attempt < RETRY_ATTEMPTS:
-                    logger.warning("CoinGecko %s on %s (attempt %s); retry in %.2fs", response.status_code, url, attempt, wait_for)
-                    await _sleep(min(wait_for, 4.0))
+                    logger.warning("CoinGecko %s on %s (attempt %s); retry in %.2fs", response.status_code, url, attempt, min(wait_for, MAX_RETRY_SLEEP_SECONDS))
+                    await _sleep(min(wait_for, MAX_RETRY_SLEEP_SECONDS))
                     delay *= 2
                     continue
             response.raise_for_status()
@@ -90,8 +91,8 @@ async def _coingecko_get(client: httpx.AsyncClient, url: str, params: dict[str, 
         except Exception as exc:
             last_error = exc
             if attempt < RETRY_ATTEMPTS and _fallback_reason(exc) in {"rate_limited", "unreachable"}:
-                logger.warning("CoinGecko error on %s (%s attempt %s); retry in %.2fs", url, type(exc).__name__, attempt, delay)
-                await _sleep(delay)
+                logger.warning("CoinGecko error on %s (%s attempt %s); retry in %.2fs", url, type(exc).__name__, attempt, min(delay, MAX_RETRY_SLEEP_SECONDS))
+                await _sleep(min(delay, MAX_RETRY_SLEEP_SECONDS))
                 delay *= 2
                 continue
             raise
