@@ -1,5 +1,6 @@
-import type { AssetProfile, ProjectLink } from "../lib/api";
+import type { AssetContract, AssetProfile, ProjectLink } from "../lib/api";
 import { formatDate } from "../lib/format";
+import { CopyButton } from "./CopyButton";
 import { StatusBadge } from "./StatusBadge";
 
 const WEBSITE_KINDS = new Set(["website", "whitepaper"]);
@@ -69,6 +70,7 @@ export function ProjectLinks({ profile }: { profile: AssetProfile }) {
   const categories = (profile.categories || []).filter((item) => item.trim()).slice(0, 8);
   const description = profile.description?.trim() || "";
   const genesis = formatDate(profile.genesis_date);
+  const contracts = (profile.contracts || []).filter((item) => item.address && item.label).slice(0, 10);
   const websites = links.filter((item) => WEBSITE_KINDS.has(item.kind));
   const explorers = links.filter((item) => EXPLORER_KINDS.has(item.kind));
   const socials = links.filter((item) => SOCIAL_KINDS.has(item.kind));
@@ -93,6 +95,9 @@ export function ProjectLinks({ profile }: { profile: AssetProfile }) {
               Genesis date: <strong>{genesis}</strong>
               <span className="muted"> CoinGecko listing — omitted when not published.</span>
             </p>
+          ) : null}
+          {contracts.length === 0 ? (
+            <p className="project-empty">Contract addresses: Not listed. CoinGecko published no platform contracts for this asset.</p>
           ) : null}
           {categories.length ? (
             <ul className="project-categories">
@@ -150,6 +155,30 @@ export function ProjectLinks({ profile }: { profile: AssetProfile }) {
         )}
         <p className="project-note">{profile.note} Not financial advice. CoinVigil does not scrape social networks.</p>
       </section>
+      {contracts.length ? <ContractList contracts={contracts} /> : null}
     </div>
+  );
+}
+
+function ContractList({ contracts }: { contracts: AssetContract[] }) {
+  return (
+    <section className="card project-links contracts-card" id="contracts" aria-labelledby="contracts-title">
+      <div className="section-heading project-links-head">
+        <div>
+          <div className="eyebrow">CONTRACTS</div>
+          <h2 id="contracts-title">Listed platforms</h2>
+        </div>
+      </div>
+      <p className="project-empty">CoinGecko-listed token addresses only. CoinVigil does not invent contracts or explorer URLs.</p>
+      <ul className="contract-rows">
+        {contracts.map((item) => (
+          <li key={`${item.platform}-${item.address}`}>
+            <strong>{item.label}</strong>
+            <code>{item.address}</code>
+            <CopyButton value={item.address} label="Copy" />
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }

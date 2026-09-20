@@ -206,12 +206,19 @@ class ProjectLink(BaseModel):
     url: str
 
 
+class AssetContract(BaseModel):
+    platform: str
+    label: str
+    address: str
+
+
 class AssetProfile(BaseModel):
     coin_id: str
     links: list[ProjectLink] = Field(default_factory=list)
     categories: list[str] = Field(default_factory=list)
     description: str | None = None
     genesis_date: str | None = None
+    contracts: list[AssetContract] = Field(default_factory=list)
     source: str
     note: str
     last_live_at: str | None = None

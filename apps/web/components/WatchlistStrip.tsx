@@ -6,9 +6,16 @@ import { changeClass, formatPercent, formatUsd } from "../lib/format";
 import { useWatchlist } from "../lib/watchlist";
 import { WatchButton } from "./WatchButton";
 
+function companionId(id: string) {
+  return id.toLowerCase() === "bitcoin" ? "ethereum" : "bitcoin";
+}
+
 export function WatchlistStrip({ assets }: { assets: MarketAsset[] }) {
   const { items } = useWatchlist();
   const byId = new Map(assets.map((asset) => [asset.id, asset]));
+  const compareHref = items.length
+    ? `/compare?ids=${items.slice(0, 3).map((item) => item.id).join(",")}`
+    : "/compare";
 
   return (
     <section id="watchlist" className="card watchlist-card">
@@ -18,11 +25,9 @@ export function WatchlistStrip({ assets }: { assets: MarketAsset[] }) {
           <h2>Saved in this browser</h2>
         </div>
         <div className="table-tools">
-          {items.length >= 2 ? (
-            <Link className="ghost tool-button" href={`/compare?ids=${items.slice(0, 3).map((item) => item.id).join(",")}`}>
-              Compare watched
-            </Link>
-          ) : null}
+          <Link className="ghost tool-button" href={compareHref}>
+            {items.length >= 2 ? "Compare watched" : "Open Compare"}
+          </Link>
           <span className="muted">{items.length} saved</span>
         </div>
       </div>
@@ -30,7 +35,7 @@ export function WatchlistStrip({ assets }: { assets: MarketAsset[] }) {
         <div className="empty empty-panel">
           <strong>No local favorites yet</strong>
           <p>
-            Star a coin in the rankings or on an asset page. The list stays in this browser only —
+            Star a coin in the rankings or on an asset page, then Compare watched. The list stays in this browser only —
             CoinVigil has no accounts and does not sync watchlists.
           </p>
         </div>
@@ -50,6 +55,9 @@ export function WatchlistStrip({ assets }: { assets: MarketAsset[] }) {
                   <span className={changeClass(live?.price_change_percentage_24h)}>
                     {live ? formatPercent(live.price_change_percentage_24h) : "Open asset"}
                   </span>
+                  <Link className="trade-link" href={`/compare?ids=${item.id},${companionId(item.id)}`}>
+                    Compare
+                  </Link>
                 </div>
               </div>
             );
@@ -57,7 +65,9 @@ export function WatchlistStrip({ assets }: { assets: MarketAsset[] }) {
         </div>
       )}
       <p className="watchlist-footnote muted">
-        Local only — no account, no server copy. This is a research shortcut, not financial advice.
+        {items.length === 1
+          ? "Star one more coin to compare two watched assets. Local only — not financial advice."
+          : "Local only — no account, no server copy. Compare uses the shareable ?ids= URL. Not financial advice."}
       </p>
     </section>
   );

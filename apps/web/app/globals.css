@@ -83,7 +83,7 @@ nav { min-height: 72px; display: flex; align-items: center; justify-content: spa
 .nav-backdrop { display: none; }
 .chart-canvas { cursor: crosshair; }
 .chart-canvas.is-drawing { outline: 1px dashed rgba(255,213,154,.35); outline-offset: -6px; }
-#watchlist, #markets, #ai-brief, #movers, #radar, #ai-council { scroll-margin-top: 108px; }
+#watchlist, #markets, #ai-brief, #movers, #radar, #ai-council, #community, #overview, #contracts, #chart-lab { scroll-margin-top: 108px; }
 .hero { min-height: 430px; display: grid; grid-template-columns: 1.35fr .65fr; align-items: center; border-bottom: 1px solid var(--line); }
 .hero h1 { font-size: clamp(44px, 6vw, 82px); line-height: .98; letter-spacing: -4px; margin: 16px 0 20px; max-width: 850px; }
 .hero h1 span, .studio-hero h1 span { color: var(--accent); }
@@ -131,6 +131,13 @@ nav { min-height: 72px; display: flex; align-items: center; justify-content: spa
 .asset-jump { display: flex; flex-wrap: wrap; gap: 8px 12px; margin: 10px 0 0; }
 .asset-jump a { font-size: 12px; font-weight: 700; color: var(--accent); }
 .asset-overview-grid { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 14px; margin: 4px 0 16px; }
+.contracts-card { grid-column: 1 / -1; }
+.contract-rows { list-style: none; margin: 0; padding: 0 20px 16px; display: grid; gap: 8px; }
+.contract-rows li {
+  display: grid; grid-template-columns: minmax(90px, 160px) minmax(0, 1fr) auto;
+  gap: 8px; align-items: center; padding: 8px 0; border-top: 1px solid var(--line);
+}
+.contract-rows code { font-size: 12px; overflow-wrap: anywhere; color: var(--text); }
 .project-links { margin: 0; }
 .project-links-head { border-bottom: 0; padding-bottom: 8px; }
 .project-description { margin: 0; padding: 0 20px 12px; line-height: 1.55; color: var(--muted); }
@@ -509,6 +516,7 @@ footer > div:first-child { overflow-wrap: anywhere; max-width: 52rem; }
   .tickers-table td:nth-child(7) { display: none; }
   .tickers-table th,
   .tickers-table td { padding: 12px 8px; }
+  .contract-rows li { grid-template-columns: 1fr; }
   table.tickers-table { min-width: 460px; }
 }
 @media (prefers-reduced-motion: reduce) {

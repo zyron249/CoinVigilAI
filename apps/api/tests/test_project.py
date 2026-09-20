@@ -3,6 +3,7 @@ import pytest
 
 from app.services.project import (
     categories_from_payload,
+    contracts_from_payload,
     genesis_date_from_payload,
     get_asset_profile,
     project_links_from_payload,
@@ -78,6 +79,25 @@ def test_genesis_date_and_category_priority():
     assert cats.index("Layer 1 (L1)") < cats.index("GMCI 30 Index")
 
 
+def test_contracts_from_payload_never_invents():
+    assert contracts_from_payload(None) == []
+    assert contracts_from_payload({"": "", "ethereum": ""}) == []
+    assert contracts_from_payload({"ethereum": "javascript:alert(1)"}) == []
+    assert contracts_from_payload({"ethereum": "0x"}) == []
+    rows = contracts_from_payload(
+        {"ethereum": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"},
+        {
+            "ethereum": {"contract_address": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"},
+            "solana": {"contract_address": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"},
+            "": {"contract_address": ""},
+        },
+    )
+    assert [item.platform for item in rows] == ["ethereum", "solana"]
+    assert rows[0].label == "Ethereum"
+    assert rows[0].address.startswith("0xa0b8")
+    assert rows[1].platform == "solana"
+
+
 def test_discord_from_forum_is_social_before_github():
     links = project_links_from_payload({
         "homepage": ["https://example.org/"],
@@ -120,6 +140,8 @@ class _ProfileClient:
         "categories": ["Cryptocurrency", "Layer 1 (L1)"],
         "description": {"en": "<p>Bitcoin is a <a href='https://bitcoin.org'>peer-to-peer</a> network.</p>"},
         "genesis_date": "2009-01-03",
+        "platforms": {"": ""},
+        "detail_platforms": {"": {"contract_address": ""}},
     }
 
     def __init__(self, *args, **kwargs):
@@ -163,6 +185,7 @@ async def test_profile_parses_coingecko_payload(monkeypatch):
     assert "Cryptocurrency" in profile.categories
     assert profile.description and "Bitcoin is a" in profile.description
     assert profile.genesis_date == "2009-01-03"
+    assert profile.contracts == []
     assert "<p>" not in (profile.description or "")
     assert all(item.url.startswith("https://") for item in profile.links)
     assert "invent" in profile.note.lower() or "coingecko" in profile.note.lower()

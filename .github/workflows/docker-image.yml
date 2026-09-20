@@ -245,6 +245,10 @@ jobs:
               sleep 2
               continue
             fi
+            if ! grep -q "Open Compare" /tmp/web.html && ! grep -q "Compare watched" /tmp/web.html; then
+              sleep 2
+              continue
+            fi
             if ! curl -fsS http://127.0.0.1:3000/asset/bitcoin > /tmp/bitcoin.html; then
               sleep 2
               continue
@@ -286,6 +290,10 @@ jobs:
               continue
             fi
             if ! grep -q "ABOUT" /tmp/bitcoin.html && ! grep -q "Genesis date" /tmp/bitcoin.html; then
+              sleep 2
+              continue
+            fi
+            if ! grep -qi "no platform contracts" /tmp/bitcoin.html && ! grep -q "CONTRACTS" /tmp/bitcoin.html; then
               sleep 2
               continue
             fi
@@ -358,6 +366,10 @@ jobs:
               continue
             fi
             if ! grep -q "#chart-lab" /tmp/compare.html; then
+              sleep 2
+              continue
+            fi
+            if ! grep -q "Copy URL" /tmp/compare.html && ! grep -q "watchlist" /tmp/compare.html; then
               sleep 2
               continue
             fi
