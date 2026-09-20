@@ -18,6 +18,28 @@ jobs:
       - name: Prepare environment
         run: cp .env.example .env
 
+      - name: Scan for committed secrets
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git grep -I -nE 'sk-[A-Za-z0-9]{20,}|sk-ant-|xai-[A-Za-z0-9]{20,}|-----BEGIN ([A-Z ]+)?PRIVATE KEY-----' -- ':!.github/**' ':!README.md' ':!.env.example'; then
+            echo "Possible secret material found in the repository"
+            exit 1
+          fi
+          echo "No obvious committed secrets"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install API test dependencies
+        run: pip install -r apps/api/requirements.txt -r apps/api/requirements-dev.txt
+
+      - name: Run API unit tests
+        working-directory: apps/api
+        run: python -m pytest -q
+
       - name: Validate Python syntax
         run: python -m compileall -q apps/api/app apps/api/tests
 
@@ -26,35 +48,6 @@ jobs:
 
       - name: Build API image
         run: docker build --pull --tag coinvigil-api:test ./apps/api
-
-      - name: Test AI Council consensus logic
-        shell: bash
-        run: |
-          set -euo pipefail
-          docker run --rm -i coinvigil-api:test python - <<'PY'
-          from app.config import Settings
-          from app.models import AIProviderResult
-          from app.services.ai import _consensus
-          settings = Settings(_env_file=None, ai_provider_weights_json='{"openai":1.2,"xai":1.0,"gemini":1.0}')
-          results = [
-              AIProviderResult(provider='openai', model='test-openai', status='ok', bias='bullish', confidence=82, summary='bullish'),
-              AIProviderResult(provider='xai', model='test-xai', status='ok', bias='bullish', confidence=76, summary='bullish'),
-              AIProviderResult(provider='gemini', model='test-gemini', status='ok', bias='bearish', confidence=55, summary='bearish'),
-          ]
-          decision = _consensus(results, ['openai', 'xai', 'gemini'], settings)
-          assert decision and decision.bias == 'bullish', decision
-          assert decision.votes == {'bullish': 2, 'bearish': 1, 'neutral': 0}, decision
-          conflict = [
-              AIProviderResult(provider='openai', model='a', status='ok', bias='bullish', confidence=80, summary='bullish'),
-              AIProviderResult(provider='xai', model='b', status='ok', bias='bearish', confidence=80, summary='bearish'),
-          ]
-          conflict_decision = _consensus(conflict, ['openai', 'xai'], Settings(_env_file=None))
-          assert conflict_decision and conflict_decision.bias == 'neutral', conflict_decision
-          print('AI Council consensus tests passed')
-          PY
-
-      - name: Test xAI Grok provider wiring
-        run: docker run --rm coinvigil-api:test python -m unittest discover -s tests -v
 
       - name: Build token contracts
         working-directory: contracts
@@ -160,7 +153,15 @@ jobs:
               sleep 2
               continue
             fi
-            echo "Web, Chart Lab and Token Studio smoke tests passed"
+            if ! curl -fsS http://127.0.0.1:3000/news > /tmp/news.html; then
+              sleep 2
+              continue
+            fi
+            if ! grep -q "Intelligence feed" /tmp/news.html && ! grep -q "INTELLIGENCE FEED" /tmp/news.html; then
+              sleep 2
+              continue
+            fi
+            echo "Web, Chart Lab, Token Studio and News smoke tests passed"
             exit 0
           done
           exit 1

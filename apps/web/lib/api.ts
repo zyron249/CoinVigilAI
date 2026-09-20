@@ -87,16 +87,24 @@ export type RadarSignal = {
   risk_score: number;
 };
 
+export type NewsItem = {
+  title: string;
+  link: string;
+  source: string;
+  published_at: string;
+  summary: string;
+};
+
 const API = process.env.API_INTERNAL_URL || process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
-export async function getMarket(): Promise<MarketAsset[]> {
+export async function getMarket(): Promise<{ assets: MarketAsset[]; source: string }> {
   try {
     const response = await fetch(`${API}/api/market?limit=20`, { cache: "no-store" });
-    if (!response.ok) return [];
+    if (!response.ok) return { assets: [], source: "unavailable" };
     const json = await response.json();
-    return json.data ?? [];
+    return { assets: json.data ?? [], source: json.source ?? "unknown" };
   } catch {
-    return [];
+    return { assets: [], source: "unavailable" };
   }
 }
 
@@ -122,14 +130,14 @@ export async function getAssetAnalysis(coinId: string): Promise<AssetAnalysis | 
 }
 
 export const OPTIONAL_COUNCIL_PROVIDERS: CouncilProvider[] = [
-  { provider: "openai", label: "OpenAI", model: "gpt-5.6-luna", configured: false, optional: true },
+  { provider: "openai", label: "OpenAI", model: "gpt-4o-mini", configured: false, optional: true },
   { provider: "xai", label: "xAI Grok", model: "grok-4.6", configured: false, optional: true },
-  { provider: "gemini", label: "Google Gemini", model: "gemini-3.8-flash", configured: false, optional: true },
-  { provider: "anthropic", label: "Anthropic Claude", model: "claude-sonnet-5", configured: false, optional: true },
+  { provider: "gemini", label: "Google Gemini", model: "gemini-2.0-flash", configured: false, optional: true },
+  { provider: "anthropic", label: "Anthropic Claude", model: "claude-sonnet-4-5", configured: false, optional: true },
   { provider: "mistral", label: "Mistral", model: "mistral-large-latest", configured: false, optional: true },
   { provider: "deepseek", label: "DeepSeek", model: "deepseek-chat", configured: false, optional: true },
   { provider: "groq", label: "Groq", model: "openai/gpt-oss-120b", configured: false, optional: true },
-  { provider: "perplexity", label: "Perplexity", model: "", configured: false, optional: true },
+  { provider: "perplexity", label: "Perplexity", model: "sonar", configured: false, optional: true },
   { provider: "openrouter", label: "OpenRouter", model: "", configured: false, optional: true },
 ];
 
@@ -149,6 +157,21 @@ export async function getCouncilStatus(): Promise<CouncilStatus> {
     };
   } catch {
     return { enabled: true, supported: OPTIONAL_COUNCIL_PROVIDERS.length, configured: 0, mode: "unavailable", providers: OPTIONAL_COUNCIL_PROVIDERS };
+  }
+}
+
+export async function getNews(): Promise<{ items: NewsItem[]; message: string | null; configured: boolean }> {
+  try {
+    const response = await fetch(`${API}/api/news?limit=30`, { cache: "no-store" });
+    if (!response.ok) return { items: [], message: "News feed is unavailable.", configured: false };
+    const json = await response.json();
+    return {
+      items: json.data ?? [],
+      message: json.message ?? null,
+      configured: Boolean(json.configured),
+    };
+  } catch {
+    return { items: [], message: "News feed is unavailable.", configured: false };
   }
 }
 
