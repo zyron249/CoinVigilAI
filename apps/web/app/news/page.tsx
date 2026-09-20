@@ -47,7 +47,7 @@ export default async function NewsPage() {
         ) : (
           <div className="news-list">
             {news.items.map((item) => (
-              <a className="news-item" key={`${item.link}-${item.title}`} href={item.link} target="_blank" rel="noreferrer">
+              <a className="news-item" key={`${item.link}-${item.title}`} href={item.link} target="_blank" rel="noopener noreferrer">
                 <div>
                   <strong>{item.title}</strong>
                   <span>{item.source}</span>

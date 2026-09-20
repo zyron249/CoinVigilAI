@@ -3,6 +3,7 @@ import pytest
 
 from app.services.project import (
     categories_from_payload,
+    genesis_date_from_payload,
     get_asset_profile,
     project_links_from_payload,
     sanitize_http_url,
@@ -59,6 +60,32 @@ def test_project_links_from_payload_maps_handles_and_skips_junk():
     assert "ftp://explorer.example" not in urls
     assert "https://evil.example/not-github" not in urls
     assert urls.count("https://bitcoin.org/") == 1
+    kinds = [item.kind for item in links]
+    assert kinds.index("website") < kinds.index("explorer")
+    assert kinds.index("explorer") < kinds.index("x")
+    assert kinds.index("telegram") < kinds.index("github")
+    assert kinds.index("discord") < kinds.index("github")
+    assert kinds.index("x") < kinds.index("github")
+
+
+def test_genesis_date_and_category_priority():
+    assert genesis_date_from_payload("2009-01-03") == "2009-01-03"
+    assert genesis_date_from_payload("not-a-date") is None
+    assert genesis_date_from_payload("1999-01-01") is None
+    assert genesis_date_from_payload("https://example.com") is None
+    cats = categories_from_payload(["GMCI 30 Index", "Layer 1 (L1)", "FTX Holdings", "Proof of Work (PoW)"])
+    assert cats[0] == "Layer 1 (L1)"
+    assert cats.index("Layer 1 (L1)") < cats.index("GMCI 30 Index")
+
+
+def test_discord_from_forum_is_social_before_github():
+    links = project_links_from_payload({
+        "homepage": ["https://example.org/"],
+        "official_forum_url": ["https://discord.gg/example"],
+        "repos_url": {"github": ["https://github.com/example/example"]},
+    })
+    kinds = [item.kind for item in links]
+    assert kinds == ["website", "discord", "github"]
 
 
 def test_project_links_empty_when_missing_or_invalid():
@@ -92,6 +119,7 @@ class _ProfileClient:
         "links": BITCOIN_LINKS,
         "categories": ["Cryptocurrency", "Layer 1 (L1)"],
         "description": {"en": "<p>Bitcoin is a <a href='https://bitcoin.org'>peer-to-peer</a> network.</p>"},
+        "genesis_date": "2009-01-03",
     }
 
     def __init__(self, *args, **kwargs):
@@ -134,13 +162,14 @@ async def test_profile_parses_coingecko_payload(monkeypatch):
     assert any(item.kind == "x" and item.url == "https://x.com/bitcoin" for item in profile.links)
     assert "Cryptocurrency" in profile.categories
     assert profile.description and "Bitcoin is a" in profile.description
+    assert profile.genesis_date == "2009-01-03"
     assert "<p>" not in (profile.description or "")
     assert all(item.url.startswith("https://") for item in profile.links)
     assert "invent" in profile.note.lower() or "coingecko" in profile.note.lower()
 
 
 class _EmptyProfileClient(_ProfileClient):
-    payload = {"id": "obscure-coin", "links": {}, "categories": [], "description": {}}
+    payload = {"id": "obscure-coin", "links": {}, "categories": [], "description": {}, "genesis_date": None}
 
 
 @pytest.mark.asyncio
@@ -150,6 +179,7 @@ async def test_profile_cache_envelope_drops_javascript(monkeypatch):
             "links": [{"kind": "x", "label": "X", "url": "javascript:alert(1)"}, {"kind": "web", "label": "Web", "url": "https://bitcoin.org/"}],
             "categories": ["Cryptocurrency"],
             "description": "ok",
+            "genesis_date": "not-a-date",
             "source": "coingecko",
             "note": "cached",
             "last_live_at": "2026-09-20T00:00:00Z",
@@ -160,6 +190,7 @@ async def test_profile_cache_envelope_drops_javascript(monkeypatch):
     assert all(item.url.startswith("https://") for item in profile.links)
     assert profile.links and profile.links[0].url == "https://bitcoin.org/"
     assert all("javascript" not in item.url for item in profile.links)
+    assert profile.genesis_date is None
 
 
 @pytest.mark.asyncio
@@ -170,4 +201,5 @@ async def test_profile_empty_links_stay_empty(monkeypatch):
     assert profile.links == []
     assert profile.source == "coingecko"
     assert profile.description is None
+    assert profile.genesis_date is None
     assert "invent" in profile.note.lower()

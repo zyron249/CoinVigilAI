@@ -211,6 +211,7 @@ class AssetProfile(BaseModel):
     links: list[ProjectLink] = Field(default_factory=list)
     categories: list[str] = Field(default_factory=list)
     description: str | None = None
+    genesis_date: str | None = None
     source: str
     note: str
     last_live_at: str | None = None

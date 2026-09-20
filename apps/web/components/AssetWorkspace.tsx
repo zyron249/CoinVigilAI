@@ -1,9 +1,15 @@
 "use client";
 
-import { useState, type KeyboardEvent, type ReactNode } from "react";
+import { useEffect, useState, type KeyboardEvent, type ReactNode } from "react";
 import type { AssetTickers, Candle } from "../lib/api";
 import { ExchangeMarkets } from "./ExchangeMarkets";
 import { ProChartLab } from "./ProChartLab";
+
+function tabFromHash(hash = ""): "markets" | "chart" {
+  const value = hash.replace(/^#/, "");
+  if (value === "chart" || value === "chart-lab") return "chart";
+  return "markets";
+}
 
 export function AssetWorkspace({
   coinId,
@@ -20,8 +26,34 @@ export function AssetWorkspace({
 }) {
   const [tab, setTab] = useState<"markets" | "chart">("markets");
 
+  useEffect(() => {
+    function applyHash() {
+      setTab(tabFromHash(window.location.hash));
+    }
+    applyHash();
+    window.addEventListener("hashchange", applyHash);
+    return () => window.removeEventListener("hashchange", applyHash);
+  }, []);
+
+  useEffect(() => {
+    const hash = typeof window === "undefined" ? "" : window.location.hash.replace(/^#/, "");
+    const target = hash === "chart" || hash === "chart-lab"
+      ? "chart-lab"
+      : hash === "markets-tab"
+        ? "markets-tab"
+        : "";
+    if (!target) return;
+    requestAnimationFrame(() => {
+      document.getElementById(target)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }, [tab]);
+
   function selectTab(next: "markets" | "chart") {
     setTab(next);
+    const hash = next === "chart" ? "chart-lab" : "markets-tab";
+    const url = new URL(window.location.href);
+    url.hash = hash;
+    window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
     requestAnimationFrame(() => {
       document.getElementById(next === "markets" ? "markets-tab" : "chart-lab")
         ?.scrollIntoView({ behavior: "smooth", block: "start" });

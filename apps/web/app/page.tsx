@@ -55,7 +55,7 @@ export default async function Home() {
       />
 
       <section className="feature-strip">
-        <Link className="card feature-card" href={leadAsset ? `/asset/${leadAsset.id}` : "#markets"}>
+        <Link className="card feature-card" href={leadAsset ? `/asset/${leadAsset.id}#markets-tab` : "#markets"}>
           <div className="eyebrow">EXCHANGE MARKETS</div>
           <h3>See where it trades</h3>
           <p>Open an asset to list CoinGecko venues, pairs, volume, and trust scores. Filter, sort, and share the URL. CoinVigil does not scrape every exchange website.</p>
@@ -63,9 +63,9 @@ export default async function Home() {
         <Link className="card feature-card" href="/compare?ids=bitcoin,ethereum">
           <div className="eyebrow">COMPARE</div>
           <h3>Two or three assets</h3>
-          <p>Side-by-side price, change, cap, and volume from this CoinGecko snapshot. Missing coins stay empty — never invented.</p>
+          <p>Side-by-side price, change, cap, volume, and 7d spark from this CoinGecko snapshot. Missing coins stay empty — never invented.</p>
         </Link>
-        <Link className="card feature-card" href={leadAsset ? `/asset/${leadAsset.id}` : "#markets"}>
+        <Link className="card feature-card" href={leadAsset ? `/asset/${leadAsset.id}#chart-lab` : "#markets"}>
           <div className="eyebrow">PRO CHART LAB</div>
           <h3>Draw, measure and analyze</h3>
           <p>Interactive candlesticks, trend lines, horizontal levels, Fibonacci, brush tools, indicators and PNG export.</p>

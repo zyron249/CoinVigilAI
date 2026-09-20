@@ -217,6 +217,14 @@ jobs:
               sleep 2
               continue
             fi
+            if ! grep -q "#chart-lab" /tmp/web.html; then
+              sleep 2
+              continue
+            fi
+            if ! grep -q "Compare" /tmp/web.html || ! grep -q "/compare?ids=" /tmp/web.html; then
+              sleep 2
+              continue
+            fi
             if ! grep -q "COMPARE" /tmp/web.html; then
               sleep 2
               continue
@@ -277,6 +285,18 @@ jobs:
               sleep 2
               continue
             fi
+            if ! grep -q "ABOUT" /tmp/bitcoin.html && ! grep -q "Genesis date" /tmp/bitcoin.html; then
+              sleep 2
+              continue
+            fi
+            if ! grep -q "Website" /tmp/bitcoin.html && ! grep -q "Explorers" /tmp/bitcoin.html; then
+              sleep 2
+              continue
+            fi
+            if ! grep -q "#chart-lab" /tmp/bitcoin.html; then
+              sleep 2
+              continue
+            fi
             if ! grep -q "noopener noreferrer" /tmp/bitcoin.html && ! grep -qi "Not listed" /tmp/bitcoin.html; then
               sleep 2
               continue
@@ -330,6 +350,14 @@ jobs:
               continue
             fi
             if ! grep -qi "does not invent" /tmp/compare.html; then
+              sleep 2
+              continue
+            fi
+            if ! grep -q "7d spark" /tmp/compare.html && ! grep -q "sparkline" /tmp/compare.html; then
+              sleep 2
+              continue
+            fi
+            if ! grep -q "#chart-lab" /tmp/compare.html; then
               sleep 2
               continue
             fi

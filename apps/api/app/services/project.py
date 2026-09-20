@@ -31,11 +31,27 @@ TELEGRAM_RE = re.compile(r"^[A-Za-z0-9_]{3,64}$")
 FACEBOOK_RE = re.compile(r"^[A-Za-z0-9._]{1,80}$")
 HTML_TAG_RE = re.compile(r"<[^>]+>")
 WHITESPACE_RE = re.compile(r"\s+")
+GENESIS_RE = re.compile(r"^(\d{4})-(\d{2})-(\d{2})$")
+CATEGORY_NOISE_RE = re.compile(r"\b(index|holdings|portfolio)\b", re.I)
 MAX_DESCRIPTION = 520
 MAX_CATEGORIES = 8
 MAX_EXPLORERS = 3
 MAX_REPOS = 3
 MAX_URLS_PER_LIST = 4
+KIND_RANK = {
+    "website": 0,
+    "whitepaper": 1,
+    "explorer": 2,
+    "x": 10,
+    "telegram": 11,
+    "discord": 12,
+    "reddit": 13,
+    "facebook": 14,
+    "forum": 15,
+    "chat": 16,
+    "announcement": 17,
+    "github": 20,
+}
 
 
 def sanitize_http_url(raw: str | None) -> str | None:
@@ -121,6 +137,21 @@ def _host_kind(url: str) -> str | None:
     return None
 
 
+def genesis_date_from_payload(raw: Any) -> str | None:
+    text = str(raw or "").strip()
+    match = GENESIS_RE.match(text)
+    if not match:
+        return None
+    year, month, day = int(match.group(1)), int(match.group(2)), int(match.group(3))
+    if not (2007 <= year <= 2100 and 1 <= month <= 12 and 1 <= day <= 31):
+        return None
+    return text
+
+
+def ordered_project_links(links: list[ProjectLink]) -> list[ProjectLink]:
+    return sorted(links, key=lambda item: (KIND_RANK.get(item.kind, 50), item.label.lower(), item.url.lower()))
+
+
 def project_links_from_payload(links: Any) -> list[ProjectLink]:
     """Map CoinGecko `links` object to public http(s) URLs. Missing fields are omitted."""
     if not isinstance(links, dict):
@@ -171,6 +202,42 @@ def project_links_from_payload(links: Any) -> list[ProjectLink]:
 
     add("reddit", "Reddit", links.get("subreddit_url") if isinstance(links.get("subreddit_url"), str) else None)
 
+    extra_labels = {"telegram": 1 if telegram else 0, "discord": 0, "chat": 0}
+
+    def add_chat(url: str) -> None:
+        kind = _host_kind(url) or "chat"
+        if kind not in {"telegram", "discord", "chat"}:
+            kind = "chat"
+        extra_labels[kind] += 1
+        if kind == "discord":
+            label = "Discord" if extra_labels[kind] == 1 else f"Discord {extra_labels[kind]}"
+        elif kind == "telegram":
+            label = "Telegram" if extra_labels[kind] == 1 else f"Telegram {extra_labels[kind]}"
+        else:
+            label = "Chat" if extra_labels[kind] == 1 else f"Chat {extra_labels[kind]}"
+        add(kind, label, url)
+
+    for url in _strings(links.get("chat_url"), 6):
+        add_chat(url)
+
+    forum_count = 0
+    for url in _strings(links.get("official_forum_url")):
+        kind = _host_kind(url)
+        if kind in {"telegram", "discord"}:
+            add_chat(url)
+            continue
+        forum_count += 1
+        add("forum", "Forum" if forum_count == 1 else f"Forum {forum_count}", url)
+
+    announcement_count = 0
+    for url in _strings(links.get("announcement_url")):
+        kind = _host_kind(url)
+        if kind in {"telegram", "discord"}:
+            add_chat(url)
+            continue
+        announcement_count += 1
+        add("announcement", "Announcement" if announcement_count == 1 else f"Announcement {announcement_count}", url)
+
     repos = links.get("repos_url") if isinstance(links.get("repos_url"), dict) else {}
     github_rows = repos.get("github") if isinstance(repos.get("github"), list) else []
     github_count = 0
@@ -183,24 +250,7 @@ def project_links_from_payload(links: Any) -> list[ProjectLink]:
         add("github", "GitHub" if github_count == 0 else f"GitHub {github_count + 1}", url)
         github_count += 1
 
-    for index, url in enumerate(_strings(links.get("official_forum_url"))):
-        add("forum", "Forum" if index == 0 else f"Forum {index + 1}", url)
-
-    extra_labels = {"telegram": 0, "discord": 0, "chat": 0}
-    for url in _strings(links.get("chat_url"), 6):
-        kind = _host_kind(url) or "chat"
-        if kind not in {"telegram", "discord", "chat"}:
-            kind = "chat"
-        extra_labels[kind] += 1
-        label = kind.capitalize() if extra_labels[kind] == 1 else f"{kind.capitalize()} {extra_labels[kind]}"
-        if kind == "discord":
-            label = "Discord" if extra_labels[kind] == 1 else f"Discord {extra_labels[kind]}"
-        add(kind, label, url)
-
-    for index, url in enumerate(_strings(links.get("announcement_url"))):
-        add("announcement", "Announcement" if index == 0 else f"Announcement {index + 1}", url)
-
-    return collected
+    return ordered_project_links(collected)
 
 
 def categories_from_payload(raw: Any) -> list[str]:
@@ -217,9 +267,9 @@ def categories_from_payload(raw: Any) -> list[str]:
             continue
         seen.add(key)
         rows.append(label)
-        if len(rows) >= MAX_CATEGORIES:
-            break
-    return rows
+    preferred = [item for item in rows if not CATEGORY_NOISE_RE.search(item)]
+    noise = [item for item in rows if CATEGORY_NOISE_RE.search(item)]
+    return (preferred + noise)[:MAX_CATEGORIES]
 
 
 def _empty_profile(coin_id: str, source: str, reason: str | None) -> AssetProfile:
@@ -234,6 +284,7 @@ def _empty_profile(coin_id: str, source: str, reason: str | None) -> AssetProfil
         links=[],
         categories=[],
         description=None,
+        genesis_date=None,
         source=source,
         note=note,
         stale=source == "cache",
@@ -261,7 +312,7 @@ def _links_from_envelope(raw: Any) -> list[ProjectLink]:
         kind = str(item.get("kind") or "link").strip()[:24] or "link"
         label = str(item.get("label") or "Link").strip()[:40] or "Link"
         rows.append(ProjectLink(kind=kind, label=label, url=url))
-    return rows
+    return ordered_project_links(rows)
 
 
 def _profile_from_envelope(coin_id: str, envelope: dict[str, Any], *, stale: bool, reason: str | None) -> AssetProfile:
@@ -281,6 +332,7 @@ def _profile_from_envelope(coin_id: str, envelope: dict[str, Any], *, stale: boo
         links=links,
         categories=[str(item) for item in envelope.get("categories") or [] if str(item).strip()][:MAX_CATEGORIES],
         description=envelope.get("description") if isinstance(envelope.get("description"), str) else None,
+        genesis_date=genesis_date_from_payload(envelope.get("genesis_date")),
         source=source,
         note=note,
         last_live_at=envelope.get("last_live_at"),
@@ -296,7 +348,7 @@ async def get_asset_profile(coin_id: str) -> AssetProfile:
         return _empty_profile("unknown", "unavailable", "unreachable")
 
     settings = get_settings()
-    cache_key = f"profile:v1:{needle}"
+    cache_key = f"profile:v2:{needle}"
     mem = _memory_get(cache_key)
     if isinstance(mem, dict):
         return _profile_from_envelope(needle, mem, stale=bool(mem.get("stale")), reason=mem.get("fallback_reason"))
@@ -331,6 +383,7 @@ async def get_asset_profile(coin_id: str) -> AssetProfile:
             "links": [link.model_dump() for link in links],
             "categories": categories_from_payload(payload.get("categories")),
             "description": description,
+            "genesis_date": genesis_date_from_payload(payload.get("genesis_date")),
             "source": "coingecko",
             "note": (
                 "Public links from CoinGecko /coins/{id}. Missing fields are omitted — CoinVigil does not invent URLs."

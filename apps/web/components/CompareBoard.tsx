@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { AssetCompare, MarketAsset, MarketPage } from "../lib/api";
 import { getCompare, getMarket } from "../lib/api";
 import { changeClass, formatCompactUsd, formatPercent, formatUsd } from "../lib/format";
+import { Sparkline } from "./Sparkline";
 import { StatusBadge } from "./StatusBadge";
 import { WatchButton } from "./WatchButton";
 
@@ -170,6 +171,14 @@ export function CompareBoard({ initial }: { initial: AssetCompare }) {
                 values={columns.map((asset) => formatPercent(asset.price_change_percentage_7d))}
                 classes={columns.map((asset) => changeClass(asset.price_change_percentage_7d))}
               />
+              <tr>
+                <th scope="row">7d spark</th>
+                {columns.map((asset) => (
+                  <td key={`${asset.id}-spark`}>
+                    <Sparkline values={asset.sparkline_7d} width={96} height={28} />
+                  </td>
+                ))}
+              </tr>
               <CompareRow label="Market cap" values={columns.map((asset) => formatCompactUsd(asset.market_cap))} />
               <CompareRow label="Volume (24h)" values={columns.map((asset) => formatCompactUsd(asset.total_volume))} />
               <CompareRow label="Rank" values={columns.map((asset) => asset.market_cap_rank != null ? `#${asset.market_cap_rank}` : "—")} />
@@ -179,6 +188,10 @@ export function CompareBoard({ initial }: { initial: AssetCompare }) {
                 {columns.map((asset) => (
                   <td key={`${asset.id}-markets`}>
                     <Link className="trade-link" href={`/asset/${asset.id}#markets-tab`}>Exchange pairs</Link>
+                    {" · "}
+                    <Link className="trade-link" href={`/asset/${asset.id}#chart-lab`}>Chart</Link>
+                    {" · "}
+                    <Link className="trade-link" href={`/asset/${asset.id}#community`}>Links</Link>
                   </td>
                 ))}
               </tr>
