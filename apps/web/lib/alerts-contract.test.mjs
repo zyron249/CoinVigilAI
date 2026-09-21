@@ -110,6 +110,22 @@ test("watchlist coin can fire; volume prefilter blocks a quiet print", () => {
   assert.equal(loud.status, "fired");
 });
 
+function alertStatusLabel(status) {
+  if (status === "fired") return "Triggered";
+  if (status === "cooldown") return "Cooldown";
+  if (status === "muted") return "Muted";
+  if (status === "off-watchlist") return "Skipped";
+  if (status === "volume-prefilter") return "Held";
+  return "Watching";
+}
+
+test("matching cooldown shows Cooldown, not Watching or a fake push", () => {
+  assert.equal(alertStatusLabel("fired"), "Triggered");
+  assert.equal(alertStatusLabel("cooldown"), "Cooldown");
+  assert.equal(alertStatusLabel("muted"), "Muted");
+  assert.equal(alertStatusLabel("watching"), "Watching");
+});
+
 test("muted and cooldown rules do not re-notify", () => {
   const alert = { kind: "above", threshold: 1, volumeMultiplier: null, muted: true };
   const muted = evaluateAlert(alert, { price: 85000, change24h: 5, volume: 1e9 }, { watched: true, lastVolume: 1e9 });

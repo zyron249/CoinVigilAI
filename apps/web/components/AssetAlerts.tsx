@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { evaluateAlert, readVolumeSeen, useAlerts } from "../lib/alerts";
+import { alertStatusLabel, evaluateAlert, readVolumeSeen, useAlerts } from "../lib/alerts";
 import { hydrateQuotes } from "../lib/snapshot-quotes";
 import { useWatchlist } from "../lib/watchlist";
 import { formatPercent, formatUsd } from "../lib/format";
@@ -34,42 +34,50 @@ export function AssetAlerts({
 
   useEffect(() => {
     let active = true;
+    let timer: number | undefined;
     async function refresh() {
+      if (timer) window.clearTimeout(timer);
+      if (typeof document !== "undefined" && document.visibilityState === "hidden") {
+        timer = window.setTimeout(refresh, 30_000);
+        return;
+      }
       const { byId } = await hydrateQuotes([coinId]);
       const live = byId.get(coinId);
-      if (!active || !live) return;
-      setQuote({
-        price: live.current_price,
-        change24h: live.price_change_percentage_24h,
-        volume: live.total_volume,
-      });
+      if (!active) return;
+      if (live) {
+        setQuote({
+          price: live.current_price,
+          change24h: live.price_change_percentage_24h,
+          volume: live.total_volume,
+        });
+      }
+      timer = window.setTimeout(refresh, 10_000);
     }
     void refresh();
-    const timer = window.setInterval(refresh, 10_000);
     const onVis = () => {
       if (document.visibilityState === "visible") void refresh();
     };
     document.addEventListener("visibilitychange", onVis);
     return () => {
       active = false;
-      window.clearInterval(timer);
+      if (timer) window.clearTimeout(timer);
       document.removeEventListener("visibilitychange", onVis);
     };
   }, [coinId]);
 
   const mine = items.filter((item) => item.coinId === coinId);
-  const fired = mine.filter((item) => evaluateAlert(
+  const matching = mine.filter((item) => evaluateAlert(
     item,
     quote,
     { watched, lastVolume },
-  ).fired);
+  ).matching);
 
   return (
     <section className="card alerts-card asset-alerts" id="asset-alerts">
       <div className="section-heading">
         <div>
           <div className="eyebrow">WATCHLIST ALERTS</div>
-          <h2>{watched ? (fired.length ? "Triggered against this quote" : "Watch this level") : "Star this coin to alert"}</h2>
+          <h2>{watched ? (matching.length ? "Matching this snapshot" : "Watch this level") : "Star this coin to alert"}</h2>
         </div>
         {watched ? (
           <Link className="ghost tool-button" href={`/alerts?coin=${coinId}`}>New rule</Link>
@@ -102,16 +110,16 @@ export function AssetAlerts({
             return (
               <li
                 key={item.id}
-                className={result.fired ? "is-fired" : undefined}
+                className={result.matching ? "is-fired" : undefined}
                 data-alert-coin={item.coinId}
                 data-alert-status={result.status}
               >
                 <div className="alert-copy">
                   <strong>{item.kind === "change_24h" ? `|24h| ≥ ${item.threshold}%` : `${item.kind} ${formatUsd(item.threshold)}`}</strong>
                   <span className="muted">{formatUsd(quote.price)}</span>
-                  {result.fired && item.note ? <span className="alert-note">{item.note.text}</span> : null}
+                  {result.matching && item.note ? <span className="alert-note">{item.note.text}</span> : null}
                 </div>
-                <span className={result.fired ? "pill" : "muted"}>{result.fired ? "Triggered" : result.status === "off-watchlist" ? "Skipped" : "Watching"}</span>
+                <span className={result.matching ? "pill" : "muted"}>{alertStatusLabel(result.status)}</span>
               </li>
             );
           })}

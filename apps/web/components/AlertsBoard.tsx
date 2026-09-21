@@ -6,6 +6,7 @@ import { getAssetInsight, getWatchlistSentiment, postAlertNotify } from "../lib/
 import {
   ALERTS_LIMIT,
   DEFAULT_COOLDOWN_MINUTES,
+  alertStatusLabel,
   evaluateAlert,
   rememberVolume,
   readVolumeSeen,
@@ -27,15 +28,6 @@ function ruleLabel(item: PriceAlert) {
   const vol = item.volumeMultiplier ? ` · vol ≥ ${item.volumeMultiplier}× last seen` : "";
   if (item.kind === "change_24h") return `|24h| ≥ ${item.threshold}%${vol}`;
   return `${item.kind} ${formatUsd(item.threshold)}${vol}`;
-}
-
-function statusLabel(status: string) {
-  if (status === "fired") return "Triggered";
-  if (status === "cooldown") return "Cooldown";
-  if (status === "muted") return "Muted";
-  if (status === "off-watchlist") return "Skipped";
-  if (status === "volume-prefilter") return "Held";
-  return "Watching";
 }
 
 export function AlertsBoard({
@@ -82,6 +74,7 @@ export function AlertsBoard({
     let timer: number | undefined;
     const delayRef = { current: 10_000 };
     async function refresh() {
+      if (timer) window.clearTimeout(timer);
       if (typeof document !== "undefined" && document.visibilityState === "hidden") {
         timer = window.setTimeout(refresh, 30_000);
         return;
@@ -270,7 +263,7 @@ export function AlertsBoard({
                   ) : null}
                 </div>
                 <div className="alert-actions">
-                  <span className={result.matching ? "pill" : "muted"}>{statusLabel(result.status)}</span>
+                  <span className={result.matching ? "pill" : "muted"}>{alertStatusLabel(result.status)}</span>
                   <button
                     type="button"
                     className="ghost tool-button"

@@ -168,6 +168,15 @@ export type AlertEval = {
   status: "fired" | "watching" | "off-watchlist" | "volume-prefilter" | "muted" | "cooldown";
 };
 
+export function alertStatusLabel(status: AlertEval["status"] | string): string {
+  if (status === "fired") return "Triggered";
+  if (status === "cooldown") return "Cooldown";
+  if (status === "muted") return "Muted";
+  if (status === "off-watchlist") return "Skipped";
+  if (status === "volume-prefilter") return "Held";
+  return "Watching";
+}
+
 export function inCooldown(alert: PriceAlert, now = Date.now()): boolean {
   if (!alert.lastNotifiedAt) return false;
   const then = new Date(alert.lastNotifiedAt).getTime();

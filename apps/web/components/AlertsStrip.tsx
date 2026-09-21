@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import type { MarketAsset } from "../lib/api";
-import { evaluateAlert, readVolumeSeen, useAlerts, type PriceAlert } from "../lib/alerts";
+import { alertStatusLabel, evaluateAlert, readVolumeSeen, useAlerts, type PriceAlert } from "../lib/alerts";
 import { hydrateQuotes } from "../lib/snapshot-quotes";
 import { useWatchlist } from "../lib/watchlist";
 import { formatPercent, formatUsd } from "../lib/format";
@@ -73,15 +73,20 @@ export function AlertsStrip({ assets }: { assets: MarketAsset[] }) {
         <ul className="alerts-list">
           {matching.slice(0, 4).map((item) => {
             const live = byId.get(item.coinId);
+            const result = evaluateAlert(
+              item,
+              { price: live?.current_price, change24h: live?.price_change_percentage_24h, volume: live?.total_volume },
+              { watched: watchIds.has(item.coinId), lastVolume: lastVolume[item.coinId] },
+            );
             return (
-              <li key={item.id} className="is-fired">
+              <li key={item.id} className="is-fired" data-alert-status={result.status}>
                 <div className="alert-copy">
                   <strong><Link href={`/asset/${item.coinId}`}>{live?.name || item.name}</Link></strong>
                   <span className="muted">{ruleLabel(item)}</span>
                   <span className="muted">{live ? `${formatUsd(live.current_price)} · ${formatPercent(live.price_change_percentage_24h)}` : "Quote pending"}</span>
                   {item.note ? <span className="alert-note">{item.note.generated ? "AI" : "Heuristic"}: {item.note.text}</span> : null}
                 </div>
-                <span className="pill">Triggered</span>
+                <span className="pill">{alertStatusLabel(result.status)}</span>
               </li>
             );
           })}
