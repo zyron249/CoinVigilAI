@@ -925,7 +925,8 @@ footer > div:first-child { overflow-wrap: anywhere; max-width: 52rem; }
   nav { min-height: 52px; gap: 6px; }
   .brand-mark { width: 28px; height: 28px; }
   .dash-hero.is-compact h1 { font-size: 18px; margin: 2px 0; }
-  .finder-dock { display: none; }
+  .finder-dock,
+  .finder-dock.is-compact { display: none; }
   .dash-hero.is-compact p { display: none; }
   .markets-board .section-heading {
     flex-direction: column;
