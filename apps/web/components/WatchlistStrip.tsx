@@ -102,13 +102,9 @@ export function WatchlistStrip({ assets }: { assets: MarketAsset[] }) {
         </p>
       ) : null}
       {items.length === 0 ? (
-        <div className="empty empty-panel">
-          <strong>No surveillance coins yet</strong>
-          <p>
-            Use the seeds on the desk above, or star a coin in the rankings. Smart alerts never spam the whole market —
-            only this list. Local only, no account.
-          </p>
-        </div>
+        <p className="muted alerts-note">
+          Use the seeds on the desk above, or star a coin in the rankings. Smart alerts never spam the whole market.
+        </p>
       ) : (
         <div className="watchlist-list">
           {items.map((item) => {

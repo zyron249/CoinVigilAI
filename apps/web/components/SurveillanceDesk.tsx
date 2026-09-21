@@ -185,7 +185,7 @@ export function SurveillanceDesk({
       {topCard}
       <div className="desk-grid">
         <WatchlistStrip assets={assets} />
-        <AlertsStrip assets={assets} />
+        <AlertsStrip assets={assets} source={source} />
       </div>
       <AskPanel compact heading="Ask CoinVigil" />
       {!ids.size ? null : movers.gainers.length || movers.losers.length ? (

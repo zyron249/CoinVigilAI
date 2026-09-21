@@ -176,7 +176,10 @@ export function AlertsBoard({
           <div className="eyebrow">WATCHLIST ALERTS</div>
           <h2>Active rules — create, list, mute</h2>
         </div>
-        <span className="muted">{items.length} / {ALERTS_LIMIT} · {tone.text} · poll {formatAge(checkedAt, now)}</span>
+        <span className="muted">
+          {items.length} / {ALERTS_LIMIT}
+          {items.length ? ` · ${tone.text} · poll ${formatAge(checkedAt, now)}` : " · star a coin first"}
+        </span>
       </div>
       <p className="muted alerts-note">
         Create a watchlist rule, then read active status and fire history below. Only starred coins are evaluated.

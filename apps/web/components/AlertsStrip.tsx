@@ -13,7 +13,7 @@ function ruleLabel(item: PriceAlert) {
   return item.kind === "change_24h" ? `|24h| ≥ ${item.threshold}%` : `${item.kind} ${formatUsd(item.threshold)}`;
 }
 
-export function AlertsStrip({ assets }: { assets: MarketAsset[] }) {
+export function AlertsStrip({ assets, source: marketSource }: { assets: MarketAsset[]; source?: string }) {
   const { items } = useAlerts();
   const { ids: watchIds } = useWatchlist();
   const [extra, setExtra] = useState<MarketAsset[]>([]);
@@ -75,7 +75,7 @@ export function AlertsStrip({ assets }: { assets: MarketAsset[] }) {
     ).matching;
   });
   useAlertFires(items, byId, { watchIds, lastVolume, source, now });
-  const tone = sourceLabel(source);
+  const tone = sourceLabel(source === "unavailable" ? marketSource : source);
 
   return (
     <section id="alerts-dock" className="card alerts-card alerts-dock">
@@ -94,8 +94,9 @@ export function AlertsStrip({ assets }: { assets: MarketAsset[] }) {
         </div>
       </div>
       <p className="muted alerts-note">
-        Evaluated only for starred coins. Snapshot poll ({tone.text}) — no WebSocket.
-        Delivery is in-app in this browser; Telegram and Discord are not implemented.
+        {items.length
+          ? `Evaluated only for starred coins. Snapshot poll (${tone.text}) — no WebSocket. Delivery is in-app in this browser; Telegram and Discord are not implemented.`
+          : "Watchlist-scoped only. Star a coin, then create a price or 24h rule. Telegram and Discord are not implemented."}
       </p>
       {items.length === 0 ? (
         <p className="muted alerts-note">No local rules yet. <Link href="/alerts#create-alert">Create a watchlist alert</Link> for a starred coin.</p>
