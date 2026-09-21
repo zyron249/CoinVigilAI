@@ -60,18 +60,22 @@ export function MarketBriefCard({
           <>
             <p>{brief.summary}</p>
             <ul>
-              {brief.bullets.map((bullet) => <li key={bullet}>{bullet}</li>)}
+              {brief.bullets.map((bullet, index) => <li key={`${index}:${bullet.slice(0, 48)}`}>{bullet}</li>)}
             </ul>
             <div className="brief-labels">
               <span className="pill">{brief.generated ? "AI-generated" : "Heuristic"}</span>
               <span className="muted">{engineLabel}</span>
+              {brief.grounded ? <span className="muted">Tool-grounded (markets / movers / global).</span> : null}
               {brief.providers_responded.length > 0 ? (
-                <span className="muted">Responded: {brief.providers_responded.join(", ")}</span>
+                <span className="muted">Responded: {brief.providers_responded.join(", ")}.</span>
               ) : (
-                <span className="muted">No AI keys configured — this is the quantitative fallback.</span>
+                <span className="muted">No AI keys configured — this is the quantitative fallback, not a live model vote.</span>
               )}
             </div>
-            <p className="brief-disclaimer">{brief.disclaimer}</p>
+            <p className="brief-disclaimer">
+              {brief.generated ? "You are reading AI-generated research. " : ""}
+              {brief.disclaimer}
+            </p>
           </>
         ) : null}
       </div>

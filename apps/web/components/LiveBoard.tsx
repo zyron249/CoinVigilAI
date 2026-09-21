@@ -6,6 +6,7 @@ import type { GlobalOverview, MarketMovers, MarketPage } from "../lib/api";
 import { getGlobalOverview, getMarket, getMovers } from "../lib/api";
 import { sourceLabel } from "../lib/format";
 import { writeMarketQuery } from "../lib/pagination";
+import { AskPanel } from "./AskPanel";
 import { DemoRibbon } from "./DemoRibbon";
 import { GlobalStrip } from "./GlobalStrip";
 import { MarketTable } from "./MarketTable";
@@ -235,6 +236,7 @@ export function LiveBoard({
           {" "}A follow-up pass is scheduled — CoinVigil does not invent coins to fill the table.
         </p>
       ) : null}
+      <AskPanel compact heading="Ask CoinVigil" />
       <GlobalStrip overview={overview} checkedAt={checkedAt} />
       {brief}
       <WatchlistStrip assets={watchAssets} />

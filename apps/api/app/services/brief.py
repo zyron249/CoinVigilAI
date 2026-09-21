@@ -172,6 +172,8 @@ def heuristic_market_brief(facts: dict[str, Any], data_source: str) -> MarketBri
         engine="heuristic",
         generated=False,
         data_source=data_source,
+        grounded=True,
+        tools_used=["screen_markets", "get_movers", "get_global"],
         disclaimer=HEURISTIC_DISCLAIMER,
     )
 
@@ -267,13 +269,15 @@ def _combine_brief(
         data_source=heuristic.data_source,
         providers_requested=requested,
         providers_responded=[row["provider"] for row in valid],
+        grounded=True,
+        tools_used=heuristic.tools_used or ["screen_markets", "get_movers", "get_global"],
         disclaimer=AI_DISCLAIMER,
     )
 
 
 async def build_market_brief() -> MarketBrief:
     settings = get_settings()
-    cache_key = "markets:v2:brief"
+    cache_key = "markets:v3:brief"
     cached = await cache_get(cache_key)
     if isinstance(cached, dict) and cached.get("headline") and cached.get("data_source"):
         return MarketBrief(**cached)

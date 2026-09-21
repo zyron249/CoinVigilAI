@@ -41,7 +41,7 @@ jobs:
         run: python -m pytest -q
 
       - name: Check local watchlist contract
-        run: node --test apps/web/lib/watchlist-contract.test.mjs apps/web/lib/project-links-contract.test.mjs apps/web/lib/pagination-contract.test.mjs
+        run: node --test apps/web/lib/watchlist-contract.test.mjs apps/web/lib/project-links-contract.test.mjs apps/web/lib/pagination-contract.test.mjs apps/web/lib/alerts-contract.test.mjs
 
       - name: Validate Python syntax
         run: python -m compileall -q apps/api/app apps/api/tests
@@ -110,6 +110,9 @@ jobs:
           curl -fsS "http://127.0.0.1:8000/api/news?limit=3" > /tmp/news.json
           curl -fsS "http://127.0.0.1:8000/api/ai/council/status" > /tmp/council-status.json
           curl -fsS "http://127.0.0.1:8000/api/status" > /tmp/status.json
+          curl -fsS -X POST "http://127.0.0.1:8000/api/ai/ask" -H "Content-Type: application/json" -d '{"question":"What is bitcoin price?"}' > /tmp/ask.json
+          curl -fsS "http://127.0.0.1:8000/api/convert?from=bitcoin&to=usd&amount=1" > /tmp/convert.json
+          curl -fsS "http://127.0.0.1:8000/api/assets/bitcoin/insight" > /tmp/insight.json
           python - <<'PY'
           import json
           from pathlib import Path
@@ -126,6 +129,9 @@ jobs:
           compare = json.loads(Path('/tmp/compare.json').read_text())
           council_status = json.loads(Path('/tmp/council-status.json').read_text())
           stack_status = json.loads(Path('/tmp/status.json').read_text())
+          ask = json.loads(Path('/tmp/ask.json').read_text())
+          convert = json.loads(Path('/tmp/convert.json').read_text())
+          insight = json.loads(Path('/tmp/insight.json').read_text())
           dumped_status = json.dumps(stack_status).lower()
           assert health.get('status') == 'ok', health
           assert health.get('dependencies', {}).get('postgres') == 'not_provisioned', health
@@ -185,7 +191,19 @@ jobs:
           assert isinstance(stack_status.get('market', {}).get('key_configured'), bool), stack_status
           assert 'sk-' not in dumped_status and 'api_key' not in dumped_status, stack_status
           assert 'not financial advice' in stack_status.get('disclaimer', '').lower(), stack_status
-          print('API, markets, brief, candle, status and AI Council smoke tests passed')
+          assert ask.get('interacting_with_ai') is True, ask
+          assert 'get_asset_quote' in ask.get('tools_used', []) or 'screen_markets' in ask.get('tools_used', []), ask
+          assert 'not financial advice' in ask.get('disclaimer', '').lower(), ask
+          assert 'invent' in ask.get('disclaimer', '').lower() or 'tools' in ask.get('disclaimer', '').lower(), ask
+          dumped_ask = json.dumps(ask).lower()
+          assert 'api_key' not in dumped_ask, ask
+          assert convert.get('from_id') in ('bitcoin', 'btc'), convert
+          assert convert.get('to_id') == 'usd', convert
+          assert convert.get('value') is not None or convert.get('missing'), convert
+          assert 'invent' in convert.get('note', '').lower() or 'not financial advice' in convert.get('disclaimer', '').lower(), convert
+          assert insight.get('interacting_with_ai') is True, insight
+          assert insight.get('tools_used'), insight
+          print('API, markets, brief, candle, status, Ask, convert and AI Council smoke tests passed')
           PY
 
       - name: Smoke test web application
@@ -242,6 +260,10 @@ jobs:
               continue
             fi
             if ! grep -q "Saved in this browser" /tmp/web.html; then
+              sleep 2
+              continue
+            fi
+            if ! grep -q "Ask CoinVigil" /tmp/web.html; then
               sleep 2
               continue
             fi
@@ -329,6 +351,10 @@ jobs:
               sleep 2
               continue
             fi
+            if ! grep -q "AI INSIGHT" /tmp/bitcoin.html && ! grep -q "Ask about this asset" /tmp/bitcoin.html; then
+              sleep 2
+              continue
+            fi
             if ! grep -q "aria-current" /tmp/bitcoin.html; then
               sleep 2
               continue
@@ -405,7 +431,43 @@ jobs:
               sleep 2
               continue
             fi
-            echo "Web, Chart Lab, Token Studio, News, Status and Compare smoke tests passed"
+            if ! curl -fsS http://127.0.0.1:3000/ask > /tmp/ask.html; then
+              sleep 2
+              continue
+            fi
+            if ! grep -q "ASK COINVIGIL" /tmp/ask.html; then
+              sleep 2
+              continue
+            fi
+            if ! grep -qi "interacting with" /tmp/ask.html && ! grep -qi "talking to an AI" /tmp/ask.html; then
+              sleep 2
+              continue
+            fi
+            if ! curl -fsS "http://127.0.0.1:3000/convert?from=bitcoin&to=usd" > /tmp/convert.html; then
+              sleep 2
+              continue
+            fi
+            if ! grep -q "CONVERTER" /tmp/convert.html; then
+              sleep 2
+              continue
+            fi
+            if ! grep -qi "invent" /tmp/convert.html && ! grep -qi "not financial advice" /tmp/convert.html; then
+              sleep 2
+              continue
+            fi
+            if ! curl -fsS http://127.0.0.1:3000/alerts > /tmp/alerts.html; then
+              sleep 2
+              continue
+            fi
+            if ! grep -q "ALERTS" /tmp/alerts.html; then
+              sleep 2
+              continue
+            fi
+            if ! grep -qi "no push" /tmp/alerts.html && ! grep -qi "local only" /tmp/alerts.html; then
+              sleep 2
+              continue
+            fi
+            echo "Web, Chart Lab, Ask, Convert, Alerts, News, Status and Compare smoke tests passed"
             exit 0
           done
           exit 1

@@ -1,3 +1,4 @@
+import { AssetInsight } from "../../../components/AssetInsight";
 import { AssetSubnav } from "../../../components/AssetSubnav";
 import { AssetWorkspace } from "../../../components/AssetWorkspace";
 import { CouncilRoster } from "../../../components/CouncilRoster";
@@ -89,6 +90,8 @@ export default async function AssetPage({
             ) : null}
             <nav className="asset-jump" aria-label="Related pages">
               <Link href={`/compare?ids=${asset.id},${companion}`}>Compare</Link>
+              <Link href={`/convert?from=${asset.id}&to=usd`}>Convert</Link>
+              <Link href="/ask">Ask</Link>
               <Link href="/news">News</Link>
               <Link href="/status">Status</Link>
             </nav>
@@ -127,6 +130,8 @@ export default async function AssetPage({
       </section>
 
       <ProjectLinks profile={profile} />
+
+      <AssetInsight coinId={asset.id} />
 
       <AssetWorkspace
         coinId={asset.id}

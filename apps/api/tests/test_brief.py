@@ -36,6 +36,8 @@ def test_heuristic_brief_is_labeled_and_not_advice():
     assert brief.generated is False
     assert brief.data_source == "demo"
     assert brief.tone in {"risk-on", "risk-off", "mixed", "neutral"}
+    assert brief.grounded is True
+    assert "screen_markets" in brief.tools_used
     assert "not financial advice" in brief.disclaimer.lower()
     assert "ai-generated" not in brief.disclaimer.lower()
     assert "heuristic" in brief.disclaimer.lower()

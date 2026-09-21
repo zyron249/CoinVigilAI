@@ -8,6 +8,7 @@ const SECTIONS = [
   { id: "overview", href: "#overview", label: "Overview" },
   { id: "community", href: "#community", label: "Links" },
   { id: "contracts", href: "#contracts", label: "Contracts" },
+  { id: "ai-insight", href: "#ai-insight", label: "Insight" },
   { id: "markets-tab", href: "#markets-tab", label: "Markets" },
   { id: "chart-lab", href: "#chart-lab", label: "Chart" },
 ] as const;
