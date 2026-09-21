@@ -13,7 +13,13 @@ export function GlobalStrip({
   const lastLive = formatTimestamp(overview.last_live_at);
   const asOf = formatTimestamp(overview.as_of);
   const checked = formatTimestamp(checkedAt);
-  const items = [
+  const items: Array<{
+    label: string;
+    value: string;
+    extra?: string | null;
+    extraClass?: string;
+    note?: string;
+  }> = [
     {
       label: "Market cap",
       value: formatCompactUsd(overview.total_market_cap_usd),
@@ -30,14 +36,14 @@ export function GlobalStrip({
       label: "ETH dominance",
       value: overview.eth_dominance != null ? `${overview.eth_dominance.toFixed(1)}%` : "—",
     },
-    {
-      label: "Fear & Greed",
-      value: overview.fear_greed_value != null
-        ? `${overview.fear_greed_value} · ${overview.fear_greed_classification}`
-        : "Unavailable",
-      note: overview.fear_greed_source ? `via ${overview.fear_greed_source}` : "Omitted — never invented",
-    },
   ];
+  if (overview.fear_greed_value != null) {
+    items.push({
+      label: "Fear & Greed",
+      value: `${overview.fear_greed_value} · ${overview.fear_greed_classification}`,
+      note: overview.fear_greed_source ? `via ${overview.fear_greed_source}` : "via Alternative.me",
+    });
+  }
 
   return (
     <section className="global-strip-wrap" aria-label="Global market summary">
@@ -58,11 +64,11 @@ export function GlobalStrip({
         ))}
         <div className="global-stat source-stat">
           <span>Data source</span>
-          <strong><StatusBadge source={overview.source} stale={overview.stale} /></strong>
+          <StatusBadge source={overview.source} stale={overview.stale} fallbackReason={overview.fallback_reason} />
           <em>{overview.coverage === "global" ? "CoinGecko global" : universeNote}</em>
         </div>
       </div>
-      <p className="live-updated muted">
+      <p className="live-updated muted sr-only">
         {overview.stale && lastLive
           ? `Last live CoinGecko data: ${lastLive}`
           : asOf

@@ -664,6 +664,7 @@ export type AskAnswer = {
     market_cap?: number | null;
     volume_24h?: number | null;
     source?: string;
+    last_updated?: string | null;
   }>;
   data_source: string;
   coin_id?: string | null;

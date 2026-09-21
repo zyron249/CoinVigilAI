@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { getCandles, type Candle } from "../lib/api";
-import { sourceLabel } from "../lib/format";
+import { formatUsd, sourceLabel } from "../lib/format";
 
 type ProChartLabProps = {
   coinId: string;
@@ -10,6 +10,7 @@ type ProChartLabProps = {
   candles: Candle[];
   source: string;
   tickerSource?: string;
+  tapePrice?: number | null;
 };
 
 const RANGES: { id: string; label: string; days: number }[] = [
@@ -28,7 +29,7 @@ function pricePrecision(candles: Candle[]) {
   return 8;
 }
 
-export function ProChartLab({ coinId, symbol, candles, source, tickerSource }: ProChartLabProps) {
+export function ProChartLab({ coinId, symbol, candles, source, tickerSource, tapePrice }: ProChartLabProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const chartRef = useRef<any>(null);
   const disposeRef = useRef<((container: HTMLElement) => void) | null>(null);
@@ -94,7 +95,9 @@ export function ProChartLab({ coinId, symbol, candles, source, tickerSource }: P
           callback(series, { forward: false, backward: false });
         },
       });
-      chart.createIndicator({ name: "MA", paneId: "candle_pane" }, true);
+      if (series.length >= 10) {
+        chart.createIndicator({ name: "MA", paneId: "candle_pane" }, true);
+      }
 
       chartRef.current = chart;
       disposeRef.current = lib.dispose;
@@ -190,6 +193,13 @@ export function ProChartLab({ coinId, symbol, candles, source, tickerSource }: P
   }
 
   const empty = series.length === 0;
+  const lastClose = series.at(-1)?.close;
+  const diverge = Boolean(
+    tapePrice
+    && lastClose
+    && Number.isFinite(lastClose)
+    && Math.abs(lastClose - tapePrice) / Math.max(Math.abs(tapePrice), 1) > 0.015,
+  );
   const mixed = (seriesSource === "demo" || seriesSource === "unavailable")
     && (tickerSource === "coingecko" || tickerSource === "cache");
 
@@ -197,8 +207,8 @@ export function ProChartLab({ coinId, symbol, candles, source, tickerSource }: P
     <section className="chart-lab card">
       <div className="chart-lab-head">
         <div>
-          <div className="eyebrow">PRO CHART LAB</div>
-          <h2>{symbol.toUpperCase()} technical workspace</h2>
+          <div className="eyebrow">{sourceLabel(seriesSource).demo ? "DEMO CANDLES" : "CHART"}</div>
+          <h2>{symbol.toUpperCase()} {sourceLabel(seriesSource).demo ? "labeled demo series" : "technical workspace"}</h2>
         </div>
         <span className="chart-status" role="status">{busy && empty ? "Loading OHLC…" : status}</span>
       </div>
@@ -218,6 +228,7 @@ export function ProChartLab({ coinId, symbol, candles, source, tickerSource }: P
         CoinGecko OHLC for the selected range — not a TradingView widget, not a WebSocket tick stream.
         {range === "1h" ? " 1H uses the same 1-day OHLC snap as 24H (CoinGecko does not give true hourly ticks here)." : ""}
         {sourceLabel(seriesSource).demo ? " Demo candles are labeled, never live." : ""}
+        {diverge ? ` Last OHLC close ${formatUsd(lastClose)} vs tape ${formatUsd(tapePrice)} — candles are a different series.` : ""}
       </p>
       {mixed ? (
         <div className="source-ribbon demo-ribbon mixed-ribbon" role="status">
@@ -236,9 +247,9 @@ export function ProChartLab({ coinId, symbol, candles, source, tickerSource }: P
         <button type="button" className="tool-button" disabled={empty} onClick={() => draw("brush", "Brush")}>Brush</button>
         <button type="button" className="tool-button" disabled={empty} onClick={() => draw("priceLine", "Price line")}>Price line</button>
         <span className="toolbar-divider" />
-        <button type="button" className="tool-button" disabled={empty} onClick={() => addIndicator("MA")}>MA</button>
-        <button type="button" className="tool-button" disabled={empty} onClick={() => addIndicator("EMA")}>EMA</button>
-        <button type="button" className="tool-button" disabled={empty} onClick={() => addIndicator("BOLL")}>BOLL</button>
+        {series.length >= 10 ? <button type="button" className="tool-button" disabled={empty} onClick={() => addIndicator("MA")}>MA</button> : null}
+        {series.length >= 10 ? <button type="button" className="tool-button" disabled={empty} onClick={() => addIndicator("EMA")}>EMA</button> : null}
+        {series.length >= 20 ? <button type="button" className="tool-button" disabled={empty} onClick={() => addIndicator("BOLL")}>BOLL</button> : null}
         <button type="button" className="tool-button" disabled={empty} onClick={() => addIndicator("RSI")}>RSI</button>
         <button type="button" className="tool-button" disabled={empty} onClick={() => addIndicator("MACD")}>MACD</button>
         <span className="toolbar-divider" />

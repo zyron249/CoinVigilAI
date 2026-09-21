@@ -79,7 +79,7 @@ export default async function AssetPage({
             <div className="eyebrow">ASSET INTELLIGENCE</div>
             <h1>{asset.name} <span>{asset.symbol.toUpperCase()}</span></h1>
             <div className="asset-meta-row">
-              <StatusBadge source={analysis.data_source} />
+              <StatusBadge source={analysis.data_source} stale={analysis.data_source === "cache"} />
               <WatchButton id={asset.id} symbol={asset.symbol} name={asset.name} compact />
               <Link className="ghost tool-button compare-link" href={`/compare?ids=${asset.id},${companion}`}>
                 Compare
@@ -112,6 +112,7 @@ export default async function AssetPage({
         tickers={tickers}
         candles={candleResponse.data}
         candleSource={candleResponse.source}
+        tapePrice={asset.current_price}
       />
 
       <section className="asset-metrics asset-metrics-wide">
@@ -152,7 +153,7 @@ export default async function AssetPage({
       <section className="analysis-grid">
         <div className="card analysis-card">
           <div className="eyebrow">AI ANALYSIS</div>
-          <h2>{analysis.bias.toUpperCase()} · {analysis.confidence}% confidence</h2>
+          <h2>{analysis.council ? `${analysis.bias.toUpperCase()} · ${analysis.confidence}% confidence` : `Heuristic ${analysis.bias} · not a model vote`}</h2>
           <p>{analysis.summary}</p>
           {analysis.council ? (
             <ul className="council-meta">

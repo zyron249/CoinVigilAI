@@ -79,7 +79,7 @@ export function WatchlistStrip({ assets }: { assets: MarketAsset[] }) {
           <h2>Surveillance list — not the whole market</h2>
         </div>
         <div className="table-tools">
-          <Link className="ghost tool-button" href="/alerts">Smart alerts</Link>
+          <Link className="ghost tool-button" href="/alerts#create-alert">Create alert</Link>
           <Link className="ghost tool-button" href={compareHref}>
             {items.length >= 2 ? "Compare watched" : "Open Compare"}
           </Link>
@@ -91,7 +91,7 @@ export function WatchlistStrip({ assets }: { assets: MarketAsset[] }) {
       </div>
       <p className="muted alerts-note">
         Alerts only evaluate coins you star here. Free tier is {premium ? "unlocked locally" : "3 coins"} — the 4th star
-        is blocked until the local premium toggle. Not billing. Telegram is not implemented; optional HTTPS webhook is env-gated.
+        is blocked until the local premium toggle. Not billing. Telegram and Discord are not implemented; optional HTTPS webhook is env-gated.
       </p>
       <PremiumToggle />
       {atCap ? (
@@ -102,13 +102,9 @@ export function WatchlistStrip({ assets }: { assets: MarketAsset[] }) {
         </p>
       ) : null}
       {items.length === 0 ? (
-        <div className="empty empty-panel">
-          <strong>No surveillance coins yet</strong>
-          <p>
-            Star a coin in the rankings or on an asset page. Smart alerts never spam the whole market — only this list.
-            Local only, no account.
-          </p>
-        </div>
+        <p className="muted alerts-note">
+          Use the seeds on the desk above, or star a coin in the rankings. Smart alerts never spam the whole market.
+        </p>
       ) : (
         <div className="watchlist-list">
           {items.map((item) => {

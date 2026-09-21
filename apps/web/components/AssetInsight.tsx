@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { getAssetInsight, type AskAnswer } from "../lib/api";
+import { formatAge, formatPercent, formatUsd, sourceLabel } from "../lib/format";
 import { AskPanel } from "./AskPanel";
 import { StatusBadge } from "./StatusBadge";
 
@@ -32,7 +33,14 @@ export function AssetInsight({ coinId }: { coinId: string }) {
 
   return (
     <div className="insight-stack" id="ai-insight">
-      {busy && !insight ? <p className="muted insight-loading">Loading a tool-grounded TLDR…</p> : null}
+      {busy && !insight ? (
+        <section className="card insight-card desk-skeleton" id="ai-insight-tldr" aria-busy="true">
+          <div className="skeleton skeleton-chip" />
+          <div className="skeleton skeleton-title" />
+          <div className="skeleton skeleton-copy" />
+          <div className="skeleton skeleton-row" />
+        </section>
+      ) : null}
       {!busy && (!insight || failed) ? (
         <section className="card insight-card" id="ai-insight-tldr">
           <div className="section-heading">
@@ -61,8 +69,25 @@ export function AssetInsight({ coinId }: { coinId: string }) {
           <p className="ask-engine muted">
             {insight.generated ? "AI-generated" : "Heuristic tools"} · {insight.engine}
             {insight.tools_used.length ? ` · ${insight.tools_used.join(", ")}` : ""}
+            {" · "}{sourceLabel(insight.data_source).text}
           </p>
           <p>{insight.answer}</p>
+          {insight.quotes.length ? (
+            <ul className="ask-quotes">
+              {insight.quotes.slice(0, 3).map((row) => (
+                <li key={row.id || row.symbol}>
+                  <strong>{row.symbol || row.name || row.id}</strong>
+                  <span>{formatUsd(row.price_usd ?? null)}</span>
+                  <span>{formatPercent(row.change_24h ?? null)} 24h</span>
+                  <span className="muted">
+                    {sourceLabel(row.source || insight.data_source).text}
+                    {" · "}
+                    {row.last_updated ? formatAge(row.last_updated) : "age unknown"}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          ) : null}
           {insight.citations.length ? (
             <ul className="ask-cites">
               {insight.citations.map((cite, index) => (

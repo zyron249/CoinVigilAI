@@ -137,7 +137,7 @@ export function MarketTable({
               </button>
             ) : null}
           </form>
-          <StatusBadge source={pageData.source} stale={pageData.stale} />
+          <StatusBadge source={pageData.source} stale={pageData.stale} fallbackReason={pageData.fallback_reason} />
         </div>
       </div>
       <p id="market-results-status" className="sr-only" aria-live="polite" aria-atomic="true">

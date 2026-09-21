@@ -502,6 +502,31 @@ jobs:
             exit 0
           done
           echo "Web smoke still missing a homepage/asset/status/ask/alerts string after 60 tries" >&2
+          diagnose() {
+            local url="$1" file="$2"
+            shift 2
+            if ! curl -fsS --max-time 20 "$url" > "$file"; then
+              echo "SMOKE DIAG curl failed: $url" >&2
+              return
+            fi
+            for pat in "$@"; do
+              if ! grep -q "$pat" "$file"; then
+                echo "SMOKE DIAG miss in $url: $pat" >&2
+              fi
+            done
+          }
+          diagnose http://127.0.0.1:3000/ /tmp/web.html \
+            CoinVigil "AI MARKET BRIEF" "CRYPTOCURRENCY RANKINGS" "FIND AN ASSET" "#chart-lab" \
+            Compare "/compare?ids=" COMPARE "Saved in this browser" "Ask CoinVigil" "#overview" "#contracts" \
+            "xAI Grok" "market-results-status"
+          diagnose http://127.0.0.1:3000/asset/bitcoin /tmp/bitcoin.html \
+            "EXCHANGE MARKETS" "Filter exchange or pair" Circulating "Vol / Mkt cap" \
+            "LINKS / COMMUNITY" 'id="chart-lab"' 'id="markets-tab"' "asset-workspace-anchors"
+          diagnose http://127.0.0.1:3000/token-studio /tmp/token-studio.html "Token Studio"
+          diagnose http://127.0.0.1:3000/status /tmp/status.html "STACK STATUS" "Not provisioned"
+          diagnose http://127.0.0.1:3000/ask /tmp/ask.html "ASK COINVIGIL"
+          diagnose http://127.0.0.1:3000/alerts /tmp/alerts.html ALERTS
+          diagnose http://127.0.0.1:3000/portfolio /tmp/portfolio.html PORTFOLIO
           exit 1
 
       - name: Verify running services

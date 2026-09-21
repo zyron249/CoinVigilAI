@@ -17,7 +17,7 @@ export function DemoRibbon({
   stale?: boolean;
   fallbackReason?: string | null;
 }) {
-  const info = sourceLabel(source, { stale });
+  const info = sourceLabel(source, { stale, fallbackReason });
   const lastLive = formatTimestamp(lastLiveAt);
 
   if (stale || (info.tone === "cache" && fallbackReason)) {

@@ -85,10 +85,16 @@ export function formatAge(value?: string | null, now = Date.now()): string {
 
 export function sourceLabel(
   source: string | undefined,
-  opts?: { stale?: boolean },
+  opts?: { stale?: boolean; fallbackReason?: string | null },
 ): { text: string; tone: SourceTone; demo: boolean } {
-  if (opts?.stale && (source === "coingecko" || source === "cache")) {
-    return { text: "Stale · last live CoinGecko", tone: "cache", demo: false };
+  const rateLimited = opts?.fallbackReason === "rate_limited";
+  const stale = Boolean(opts?.stale) || (rateLimited && (source === "coingecko" || source === "cache"));
+  if (stale && (source === "coingecko" || source === "cache")) {
+    return {
+      text: rateLimited ? "Stale · CoinGecko rate-limited" : "Stale · last live CoinGecko",
+      tone: "cache",
+      demo: false,
+    };
   }
   if (source === "coingecko") return { text: "Live · CoinGecko", tone: "live", demo: false };
   if (source === "cache") return { text: "Cached · CoinGecko", tone: "cache", demo: false };
