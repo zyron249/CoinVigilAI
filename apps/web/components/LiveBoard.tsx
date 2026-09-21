@@ -123,7 +123,7 @@ export function LiveBoard({
 
   useEffect(() => {
     if (!market.partial) return;
-    const id = window.setTimeout(() => { void loadMarket({}, true); }, 3500);
+    const id = window.setTimeout(() => { void loadMarket({}, true); }, 2000);
     return () => window.clearTimeout(id);
   }, [loadMarket, market.partial, market.universe_size]);
 
@@ -168,7 +168,7 @@ export function LiveBoard({
           <h2>Search this CoinGecko snapshot</h2>
           <p className={`coverage-count ${market.partial ? "is-partial" : ""}`}>
             {market.universe_size} of {market.coverage_target || 1000} CoinGecko-tracked assets in this snapshot
-            {market.partial ? " — partial (later /coins/markets pages were rate-limited)." : "."}
+            {market.partial ? " — partial (later /coins/markets pages were rate-limited). Held rows stay cached; only missing pages are retried." : "."}
             {" "}Not every coin on earth.
           </p>
         </div>
@@ -232,7 +232,7 @@ export function LiveBoard({
         <p className="source-ribbon cache-ribbon" role="status">
           <strong>Partial CoinGecko snapshot.</strong>
           {" "}Showing {market.universe_size} of {market.coverage_target || 1000} assets because later market pages were rate-limited or empty.
-          {" "}A follow-up pass is scheduled — CoinVigil does not invent coins to fill the table.
+          {" "}A follow-up pass retries only the missing pages — CoinVigil does not invent coins to fill the table.
         </p>
       ) : null}
       <GlobalStrip overview={overview} checkedAt={checkedAt} />

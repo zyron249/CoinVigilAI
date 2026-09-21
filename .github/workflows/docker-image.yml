@@ -41,7 +41,7 @@ jobs:
         run: python -m pytest -q
 
       - name: Check local watchlist contract
-        run: node --test apps/web/lib/watchlist-contract.test.mjs apps/web/lib/project-links-contract.test.mjs apps/web/lib/pagination-contract.test.mjs
+        run: node --test apps/web/lib/watchlist-contract.test.mjs apps/web/lib/project-links-contract.test.mjs apps/web/lib/pagination-contract.test.mjs apps/web/lib/scroll-workspace-contract.test.mjs
 
       - name: Validate Python syntax
         run: python -m compileall -q apps/api/app apps/api/tests

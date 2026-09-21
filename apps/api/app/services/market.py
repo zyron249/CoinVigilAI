@@ -33,15 +33,20 @@ PAGE_GAP_SECONDS = 0.2
 PAGE_GAP_AFTER_SKIP_SECONDS = 0.55
 PAGE_FILL_PASSES = 1
 PAGE_FILL_SLEEP_SECONDS = 0.9
-PAGE_BACKGROUND_FILL_SECONDS = 2.0
+PAGE_BACKGROUND_FILL_SECONDS = 1.2
+MAX_FILL_BACKOFF_SECONDS = 6.0
 # Short process cache so one dashboard render does not stampede CoinGecko
-# when Redis is down. Partial snapshots expire faster so the next tick can fill gaps.
+# when Redis is down. Partial snapshots stay long enough that the next tick
+# fills missing pages only instead of re-fetching ranks already held.
 _MEMORY_TTL_SECONDS = 20.0
-_MEMORY_TTL_PARTIAL_SECONDS = 8.0
+_MEMORY_TTL_PARTIAL_SECONDS = 25.0
+_PARTIAL_REDIS_TTL_SECONDS = 45
+_PARTIAL_REUSE_SECONDS = 120.0
 _LAST_GOOD_TTL_SECONDS = 6 * 60 * 60
 _memory_cache: dict[str, tuple[float, Any, float]] = {}
 _last_good: dict[str, dict[str, Any]] = {}
 _fill_task: asyncio.Task[None] | None = None
+_fill_fail_streak = 0
 SORT_FIELDS = {
     "rank": "market_cap_rank",
     "market_cap": "market_cap",
@@ -67,16 +72,26 @@ NUMERIC_SORTS = {
 
 
 def clear_market_memory_cache() -> None:
-    global _fill_task
+    global _fill_task, _fill_fail_streak
     _memory_cache.clear()
     _last_good.clear()
     if _fill_task and not _fill_task.done():
         _fill_task.cancel()
     _fill_task = None
+    _fill_fail_streak = 0
 
 
 def pending_universe_fill() -> asyncio.Task[None] | None:
     return _fill_task if _fill_task and not _fill_task.done() else None
+
+
+def fill_fail_streak() -> int:
+    return _fill_fail_streak
+
+
+def _fill_backoff_seconds() -> float:
+    delay = PAGE_BACKGROUND_FILL_SECONDS * (2 ** min(_fill_fail_streak, 3))
+    return min(delay, MAX_FILL_BACKOFF_SECONDS)
 
 
 async def _sleep(seconds: float) -> None:
@@ -197,6 +212,34 @@ def _fresh_cache_payload(payload: dict[str, Any]) -> bool:
     return True
 
 
+def _last_live_age_seconds(value: str | None) -> float | None:
+    if not value:
+        return None
+    try:
+        stamped = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if stamped.tzinfo is None:
+        stamped = stamped.replace(tzinfo=timezone.utc)
+    return datetime.now(timezone.utc).timestamp() - stamped.timestamp()
+
+
+def _partial_fill_snapshot(payload: dict[str, Any]) -> UniverseSnapshot | None:
+    """Serve a known-gap last-good without a full /coins/markets refetch."""
+    if not payload.get("partial") or not _fresh_cache_payload(payload):
+        return None
+    age = _last_live_age_seconds(payload.get("last_live_at") if isinstance(payload.get("last_live_at"), str) else None)
+    fresh = age is not None and age <= _PARTIAL_REUSE_SECONDS
+    snapshot = _snapshot_from_payload(
+        payload,
+        stale=not fresh,
+        fallback_reason=None if fresh else "rate_limited",
+    )
+    if not snapshot or not snapshot.assets or not snapshot.missing_pages:
+        return None
+    return snapshot
+
+
 def _universe_envelope(snapshot: UniverseSnapshot) -> dict[str, Any]:
     return {
         "items": [asset.model_dump() for asset in snapshot.assets],
@@ -219,7 +262,7 @@ async def save_last_good_universe(envelope: dict[str, Any]) -> None:
 async def _store_universe(snapshot: UniverseSnapshot) -> None:
     settings = get_settings()
     envelope = _universe_envelope(snapshot)
-    ttl = 12 if snapshot.partial else settings.market_cache_ttl_seconds
+    ttl = _PARTIAL_REDIS_TTL_SECONDS if snapshot.partial else settings.market_cache_ttl_seconds
     await cache_set(UNIVERSE_CACHE_KEY, envelope, ttl)
     if snapshot.source != "demo":
         await save_last_good_universe(envelope)
@@ -253,9 +296,11 @@ def _background_fill_is_obsolete(collected: list[MarketAsset]) -> bool:
 
 
 async def _background_fill_pages(pages: tuple[int, ...], seed: list[MarketAsset]) -> None:
-    await _sleep(PAGE_BACKGROUND_FILL_SECONDS)
+    global _fill_fail_streak
+    await _sleep(_fill_backoff_seconds())
     mem = _memory_get("universe")
     if isinstance(mem, UniverseSnapshot) and mem.assets and not mem.partial:
+        _fill_fail_streak = 0
         return
     collected = list(seed)
     seen = {asset.id for asset in collected}
@@ -268,11 +313,14 @@ async def _background_fill_pages(pages: tuple[int, ...], seed: list[MarketAsset]
     before = len(collected)
     still = await _pull_market_pages(list(pages), collected, seen)
     if len(collected) <= before:
+        _fill_fail_streak = min(_fill_fail_streak + 1, 8)
         logger.warning("CoinGecko background fill recovered no new rows; leaving snapshot timestamp unchanged")
         return
     if _background_fill_is_obsolete(collected):
+        _fill_fail_streak = 0
         logger.info("CoinGecko background fill discarded; a newer snapshot already won")
         return
+    _fill_fail_streak = 0
     target = _coverage_target()
     partial = bool(still) or len(collected) < target
     snapshot = UniverseSnapshot(
@@ -696,10 +744,10 @@ async def peek_universe_status() -> dict[str, Any]:
 
 
 def _maybe_schedule_fill(snapshot: UniverseSnapshot) -> None:
-    if snapshot.stale or snapshot.source == "demo" or not snapshot.partial:
+    if snapshot.source == "demo" or not snapshot.partial:
         return
     pages = snapshot.missing_pages
-    if pages:
+    if pages and snapshot.assets:
         _schedule_background_fill(pages, list(snapshot.assets))
 
 
@@ -729,6 +777,17 @@ async def get_universe_snapshot() -> UniverseSnapshot:
         _memory_set("universe", snapshot)
         return snapshot
 
+    last_good = await load_last_good("universe")
+    fillable = _partial_fill_snapshot(last_good) if last_good else None
+    if fillable:
+        _memory_set(
+            "universe",
+            fillable,
+            _MEMORY_TTL_PARTIAL_SECONDS,
+        )
+        _maybe_schedule_fill(fillable)
+        return fillable
+
     try:
         snapshot = await _fetch_coingecko_market_universe()
         if snapshot and snapshot.assets:
@@ -741,11 +800,11 @@ async def get_universe_snapshot() -> UniverseSnapshot:
         reason = _fallback_reason(exc)
         logger.warning("CoinGecko markets unavailable (%s); trying last live snapshot", type(exc).__name__)
 
-    last_good = await load_last_good("universe")
     if last_good:
         snapshot = _snapshot_from_payload(last_good, stale=True, fallback_reason=reason)
         if snapshot:
             _memory_set("universe", snapshot)
+            _maybe_schedule_fill(snapshot)
             return snapshot
 
     demo = list(DEMO_MARKETS)
@@ -802,7 +861,12 @@ def _coverage_note(snapshot: UniverseSnapshot) -> str:
         )
     target = _coverage_target()
     if snapshot.partial:
-        filling = " A follow-up CoinGecko pass is scheduled; missing ranks stay omitted until they arrive." if pending_universe_fill() else ""
+        filling = (
+            " Held rows stay cached; only missing /coins/markets pages are retried."
+            " Missing ranks stay omitted until they arrive."
+        )
+        if pending_universe_fill():
+            filling += " A follow-up CoinGecko pass is scheduled."
         return (
             f"Partial CoinGecko-tracked snapshot: {len(snapshot.assets)} of {target} assets "
             "(paginated /coins/markets; later pages were rate-limited or empty). "

@@ -4,7 +4,7 @@ import { useEffect, useState, type KeyboardEvent, type ReactNode } from "react";
 import type { AssetTickers, Candle } from "../lib/api";
 import { ExchangeMarkets } from "./ExchangeMarkets";
 import { ProChartLab } from "./ProChartLab";
-import { scrollAssetWorkspace } from "../lib/scroll-workspace";
+import { queueWorkspaceScroll, scrollAssetWorkspace, workspaceHashId } from "../lib/scroll-workspace";
 
 function tabFromHash(hash = ""): "markets" | "chart" {
   const value = hash.replace(/^#/, "");
@@ -37,16 +37,23 @@ export function AssetWorkspace({
   }, []);
 
   useEffect(() => {
-    const hash = typeof window === "undefined" ? "" : window.location.hash.replace(/^#/, "");
-    const target = hash === "chart" || hash === "chart-lab"
-      ? "chart-lab"
-      : hash === "markets-tab"
-        ? "markets-tab"
-        : "";
-    if (!target) return;
-    const id = window.setTimeout(() => { scrollAssetWorkspace(); }, 40);
-    return () => window.clearTimeout(id);
+    if (!workspaceHashId()) return;
+    queueWorkspaceScroll(tab === "chart" ? 180 : 0);
   }, [tab]);
+
+  useEffect(() => {
+    let timer = 0;
+    function onResize() {
+      if (!workspaceHashId()) return;
+      window.clearTimeout(timer);
+      timer = window.setTimeout(() => { scrollAssetWorkspace(); }, 120);
+    }
+    window.addEventListener("resize", onResize);
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener("resize", onResize);
+    };
+  }, []);
 
   function selectTab(next: "markets" | "chart") {
     setTab(next);
@@ -54,7 +61,7 @@ export function AssetWorkspace({
     const url = new URL(window.location.href);
     url.hash = hash;
     window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
-    window.setTimeout(() => { scrollAssetWorkspace(); }, 40);
+    queueWorkspaceScroll(next === "chart" ? 180 : 0);
   }
 
   return (
