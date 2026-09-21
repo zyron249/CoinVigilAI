@@ -233,7 +233,10 @@ nav { min-height: 72px; display: flex; align-items: center; justify-content: spa
   color: var(--text);
   font-size: 13px;
   line-height: 1.5;
-  display: block;
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
   flex-basis: 100%;
   max-width: 100%;
   white-space: normal;
@@ -259,10 +262,10 @@ nav { min-height: 72px; display: flex; align-items: center; justify-content: spa
 .ask-engine { padding: 0 20px 8px; }
 .ask-quotes, .ask-cites, .alerts-list { list-style: none; margin: 0; padding: 0 20px 14px; display: grid; gap: 8px; }
 .ask-quotes li, .alerts-list li {
-  display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap;
-  padding: 10px 0; border-top: 1px solid var(--line); align-items: center;
+  display: flex; justify-content: space-between; gap: 12px; flex-wrap: nowrap;
+  padding: 10px 0; border-top: 1px solid var(--line); align-items: flex-start;
 }
-.alert-copy { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.alert-copy { display: flex; flex-direction: column; gap: 4px; min-width: 0; flex: 1; }
 .ask-cites li { color: var(--muted); font-size: 13px; }
 .ask-cites a { color: var(--accent); font-weight: 700; }
 .alerts-list li.is-fired {
@@ -271,7 +274,7 @@ nav { min-height: 72px; display: flex; align-items: center; justify-content: spa
   padding: 10px 8px;
   border-radius: 10px;
 }
-.alert-actions { display: flex; gap: 8px; align-items: center; }
+.alert-actions { display: flex; gap: 8px; align-items: center; flex-shrink: 0; flex-wrap: wrap; justify-content: flex-end; }
 .convert-out { font-size: 22px; font-weight: 800; }
 .insight-loading { padding: 0 4px 10px; }
 .insight-stack { margin: 0 0 16px; }
@@ -633,6 +636,8 @@ footer > div:first-child { overflow-wrap: anywhere; max-width: 52rem; }
   .pager { width: 100%; }
   .pager-pages { width: 100%; }
   .section-heading { align-items: flex-start; }
+  .alerts-list li { flex-wrap: wrap; }
+  .alert-actions { justify-content: flex-start; }
   .tickers-table th:nth-child(1),
   .tickers-table td:nth-child(1) { display: none; }
   .tickers-table th:nth-child(2),

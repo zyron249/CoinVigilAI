@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import type { MarketAsset, WatchlistSentiment } from "./api";
 import { getAssetInsight, getWatchlistSentiment, postAlertNotify } from "./api";
 import { recordFire } from "./alert-history";
-import { claimFire, evaluateAlert, isFireableQuoteSource, useAlerts, type AlertNote, type PriceAlert } from "./alerts";
+import { claimFire, clipNote, evaluateAlert, isFireableQuoteSource, useAlerts, type AlertNote, type PriceAlert } from "./alerts";
 
 export function useAlertFires(
   items: PriceAlert[],
@@ -42,7 +42,7 @@ export function useAlertFires(
         if (!claimFire(item.id)) continue;
         claimed.push(item);
         const pending: AlertNote = {
-          text: "Rule matched this snapshot. Loading a tool-grounded note… CoinVigil does not invent prices or whale prints.",
+          text: clipNote("Rule matched this snapshot. Loading a tool-grounded note… CoinVigil does not invent prices or whale prints."),
           engine: "heuristic-tools",
           generated: false,
           at: new Date().toISOString(),
@@ -64,11 +64,11 @@ export function useAlertFires(
         let extra = " No on-chain whale feed on this instance — CoinVigil does not invent whale prints.";
         if (item.analysis === "sentiment" || item.analysis === "all") {
           extra = sentiment?.available
-            ? ` Headline sentiment (${sentiment.engine}, ${sentiment.lean}): ${sentiment.items.slice(0, 2).map((row) => row.title).join(" · ") || "matched RSS"}. ${sentiment.note || ""}`
+            ? ` Headline sentiment ${sentiment.lean || "mixed"} (${sentiment.engine}, ${sentiment.matched ?? sentiment.items.length} RSS titles). Not Twitter, not NLP.`
             : ` ${sentiment?.reason || "sentiment unavailable"}.`;
         }
         const note: AlertNote = {
-          text: `Rule matched this snapshot.${extra}`.slice(0, 800),
+          text: clipNote(`Rule matched this snapshot.${extra}`),
           engine: "heuristic-tools",
           generated: false,
           at: new Date().toISOString(),
@@ -76,7 +76,7 @@ export function useAlertFires(
         let delivered = false;
         try {
           const insight = await getAssetInsight(item.coinId);
-          note.text = `${insight.answer}${extra}`.slice(0, 800);
+          note.text = clipNote(`${insight.answer}${extra}`);
           note.engine = insight.engine || "heuristic-tools";
           note.generated = Boolean(insight.generated);
           note.at = new Date().toISOString();

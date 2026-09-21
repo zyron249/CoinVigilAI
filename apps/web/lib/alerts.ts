@@ -179,6 +179,14 @@ export type AlertEval = {
   status: "fired" | "watching" | "off-watchlist" | "volume-prefilter" | "muted" | "cooldown" | "demo";
 };
 
+export function clipNote(text: string, max = 420): string {
+  const raw = String(text || "").replace(/\s+/g, " ").trim();
+  if (raw.length <= max) return raw;
+  const cut = raw.slice(0, max - 1);
+  const breakAt = Math.max(cut.lastIndexOf(". "), cut.lastIndexOf("; "), cut.lastIndexOf(" "));
+  return `${(breakAt > max * 0.45 ? cut.slice(0, breakAt) : cut).trim()}…`;
+}
+
 export function alertStatusLabel(status: AlertEval["status"] | string): string {
   if (status === "fired") return "Triggered";
   if (status === "cooldown") return "Cooldown";

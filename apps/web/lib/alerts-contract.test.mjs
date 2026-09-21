@@ -179,3 +179,19 @@ test("muted and cooldown rules do not re-notify", () => {
   assert.equal(cool.matching, true);
   assert.equal(cool.fired, false);
 });
+
+function clipNote(text, max = 420) {
+  const raw = String(text || "").replace(/\s+/g, " ").trim();
+  if (raw.length <= max) return raw;
+  const cut = raw.slice(0, max - 1);
+  const breakAt = Math.max(cut.lastIndexOf(". "), cut.lastIndexOf("; "), cut.lastIndexOf(" "));
+  return `${(breakAt > max * 0.45 ? cut.slice(0, breakAt) : cut).trim()}…`;
+}
+
+test("fire notes clip on a word boundary instead of mid-letter", () => {
+  const long = `${"word ".repeat(80)}CoinVigil does not invent whale prints.`;
+  const clipped = clipNote(long, 80);
+  assert.ok(clipped.endsWith("…"));
+  assert.ok(!clipped.includes("inven…"));
+  assert.ok(clipped.length <= 81);
+});
