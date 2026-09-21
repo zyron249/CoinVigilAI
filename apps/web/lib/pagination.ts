@@ -95,3 +95,28 @@ export function writeMarketQuery(next: MarketQueryState): void {
   const nextUrl = `${url.pathname}${nextSearch ? `?${nextSearch}` : ""}${url.hash}`;
   window.history.replaceState(null, "", nextUrl);
 }
+
+export function searchAnnouncement(input: {
+  query?: string | null;
+  total: number;
+  page: number;
+  limit: number;
+  universe?: number | null;
+  coverageTarget?: number | null;
+}): string {
+  const q = String(input.query || "").trim();
+  const range = rowRange(input.page, input.limit, input.total);
+  const pageCount = Math.max(1, Math.ceil((input.total || 0) / Math.max(input.limit, 1)));
+  if (q) {
+    const matches = input.total === 1 ? "1 match" : `${input.total} matches`;
+    const slice = range.start ? ` Showing rows ${range.start}–${range.end}.` : " No matching rows on this page.";
+    return `${matches} for “${q}” in this CoinGecko snapshot.${slice} Not every coin on earth.`;
+  }
+  const slice = range.start
+    ? `Rows ${range.start}–${range.end} of ${input.total}, page ${input.page} of ${pageCount}.`
+    : `No rows on page ${input.page} of ${pageCount}.`;
+  const coverage = input.universe
+    ? ` ${input.universe} of ${input.coverageTarget || 1000} CoinGecko-tracked in snapshot.`
+    : "";
+  return `${slice}${coverage}`;
+}

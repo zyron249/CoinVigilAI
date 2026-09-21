@@ -183,6 +183,7 @@ export function LiveBoard({
             placeholder="Search name, symbol, or id — then jump to the asset"
             autoComplete="off"
             aria-busy={busy}
+            aria-describedby="market-results-status"
           />
           <button type="submit">Search</button>
         </form>

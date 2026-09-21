@@ -160,9 +160,13 @@ nav { min-height: 72px; display: flex; align-items: center; justify-content: spa
   color: var(--muted);
   white-space: nowrap;
 }
-.asset-subnav a:hover, .asset-subnav a.is-on, .asset-subnav a[aria-current="location"] {
+.asset-subnav a:hover, .asset-subnav a.is-on, .asset-subnav a[aria-current="true"], .asset-subnav a[aria-current="location"] {
   color: #062019;
   background: var(--accent);
+}
+.asset-subnav a:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
 }
 .asset-overview-grid { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 14px; margin: 4px 0 16px; }
 .contracts-card { grid-column: 1 / -1; }

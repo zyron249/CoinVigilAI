@@ -4,7 +4,7 @@ import Link from "next/link";
 import { memo } from "react";
 import type { MarketAsset, MarketPage } from "../lib/api";
 import { changeClass, formatCompact, formatCompactUsd, formatPercent, formatTimestamp, formatUsd } from "../lib/format";
-import { MARKET_LIMITS, pageWindow, rowRange } from "../lib/pagination";
+import { MARKET_LIMITS, pageWindow, rowRange, searchAnnouncement } from "../lib/pagination";
 import { Sparkline } from "./Sparkline";
 import { StatusBadge } from "./StatusBadge";
 import { WatchButton } from "./WatchButton";
@@ -88,6 +88,14 @@ export function MarketTable({
   const checked = formatTimestamp(checkedAt);
   const range = rowRange(pageData.page, pageData.limit, pageData.total);
   const pages = pageWindow(pageData.page, pageCount);
+  const announcement = searchAnnouncement({
+    query: pageData.query,
+    total: pageData.total,
+    page: pageData.page,
+    limit: pageData.limit,
+    universe: pageData.universe_size,
+    coverageTarget: pageData.coverage_target,
+  });
 
   return (
     <div className="card table-card">
@@ -115,6 +123,7 @@ export function MarketTable({
               placeholder="Search name, symbol, or id"
               autoComplete="off"
               aria-busy={busy}
+              aria-describedby="market-results-status"
             />
             <button type="submit" className="ghost tool-button">Search</button>
             {pageData.query || draft ? (
@@ -133,8 +142,11 @@ export function MarketTable({
           <StatusBadge source={pageData.source} stale={pageData.stale} />
         </div>
       </div>
+      <p id="market-results-status" className="sr-only" aria-live="polite" aria-atomic="true">
+        {announcement}
+      </p>
       {pageData.query ? (
-        <p className="table-banner" role="status">
+        <p className="table-banner">
           Filtered to “{pageData.query}” in this CoinGecko snapshot ({pageData.total} matches).
         </p>
       ) : null}
@@ -197,7 +209,7 @@ export function MarketTable({
       </div>
       <p className="table-swipe muted">Swipe sideways on small screens to see 1h/24h/7d, volume, supply, and 7d sparkline.</p>
       <div className="table-footer">
-        <div className="muted" aria-live="polite">
+        <div className="muted">
           {range.start
             ? `Rows ${range.start}–${range.end} of ${pageData.total} matching · page ${pageData.page} of ${pageCount}`
             : `No rows on this page · page ${pageData.page} of ${pageCount}`}
@@ -215,7 +227,7 @@ export function MarketTable({
           >
             {MARKET_LIMITS.map((size) => <option key={size} value={size}>{size} / page</option>)}
           </select>
-          <button type="button" className="ghost tool-button" disabled={pageData.page <= 1 || busy} onClick={() => onQuery({ page: pageData.page - 1 })}>
+          <button type="button" className="ghost tool-button" disabled={pageData.page <= 1 || busy} onClick={() => onQuery({ page: pageData.page - 1 })} aria-label={`Previous rankings page, currently ${pageData.page} of ${pageCount}`}>
             Previous
           </button>
           <div className="pager-pages" role="navigation" aria-label="Rankings pages">
@@ -237,7 +249,7 @@ export function MarketTable({
               )
             ))}
           </div>
-          <button type="button" className="ghost tool-button" disabled={pageData.page >= pageCount || busy} onClick={() => onQuery({ page: pageData.page + 1 })}>
+          <button type="button" className="ghost tool-button" disabled={pageData.page >= pageCount || busy} onClick={() => onQuery({ page: pageData.page + 1 })} aria-label={`Next rankings page, currently ${pageData.page} of ${pageCount}`}>
             Next
           </button>
         </div>

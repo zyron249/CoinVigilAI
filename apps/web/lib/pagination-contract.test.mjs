@@ -66,3 +66,46 @@ test("market query ignores junk sort/limit/page", () => {
   assert.equal(parseMarketQuery({ limit: "999" }).limit, 50);
   assert.equal(parseMarketQuery({ page: "0" }).page, 1);
 });
+
+function searchAnnouncement(input) {
+  const q = String(input.query || "").trim();
+  const range = rowRange(input.page, input.limit, input.total);
+  const pageCount = Math.max(1, Math.ceil((input.total || 0) / Math.max(input.limit, 1)));
+  if (q) {
+    const matches = input.total === 1 ? "1 match" : `${input.total} matches`;
+    const slice = range.start ? ` Showing rows ${range.start}–${range.end}.` : " No matching rows on this page.";
+    return `${matches} for “${q}” in this CoinGecko snapshot.${slice} Not every coin on earth.`;
+  }
+  const slice = range.start
+    ? `Rows ${range.start}–${range.end} of ${input.total}, page ${input.page} of ${pageCount}.`
+    : `No rows on page ${input.page} of ${pageCount}.`;
+  const coverage = input.universe ? ` ${input.universe} of ${input.coverageTarget || 1000} CoinGecko-tracked in snapshot.` : "";
+  return `${slice}${coverage}`;
+}
+
+test("search announcement names match counts without inventing coverage", () => {
+  const filtered = searchAnnouncement({ query: "usdc", total: 2, page: 1, limit: 50, universe: 750, coverageTarget: 1000 });
+  assert.match(filtered, /2 matches for “usdc”/);
+  assert.match(filtered, /rows 1–2/i);
+  assert.match(filtered, /not every coin on earth/i);
+  const open = searchAnnouncement({ query: "", total: 750, page: 2, limit: 50, universe: 750, coverageTarget: 1000 });
+  assert.match(open, /Rows 51–100 of 750/);
+  assert.match(open, /page 2 of 15/);
+  assert.match(open, /750 of 1000/);
+});
+
+function nextChip(index, length, key) {
+  if (key === "ArrowRight" || key === "ArrowDown") return (index + 1) % length;
+  if (key === "ArrowLeft" || key === "ArrowUp") return (index - 1 + length) % length;
+  if (key === "Home") return 0;
+  if (key === "End") return length - 1;
+  return index;
+}
+
+test("sticky sub-nav keyboard wraps between section chips", () => {
+  assert.equal(nextChip(0, 6, "ArrowRight"), 1);
+  assert.equal(nextChip(5, 6, "ArrowRight"), 0);
+  assert.equal(nextChip(0, 6, "ArrowLeft"), 5);
+  assert.equal(nextChip(3, 6, "Home"), 0);
+  assert.equal(nextChip(0, 6, "End"), 5);
+});

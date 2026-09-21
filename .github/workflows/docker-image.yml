@@ -257,6 +257,10 @@ jobs:
               sleep 2
               continue
             fi
+            if ! grep -q "market-results-status" /tmp/web.html || ! grep -q "aria-live" /tmp/web.html; then
+              sleep 2
+              continue
+            fi
             if ! curl -fsS http://127.0.0.1:3000/asset/bitcoin > /tmp/bitcoin.html; then
               sleep 2
               continue
@@ -318,6 +322,10 @@ jobs:
               continue
             fi
             if ! grep -q "asset-subnav" /tmp/bitcoin.html; then
+              sleep 2
+              continue
+            fi
+            if ! grep -q "aria-current" /tmp/bitcoin.html; then
               sleep 2
               continue
             fi
