@@ -7,6 +7,9 @@ export async function hydrateQuotes(
 ): Promise<{ byId: Map<string, MarketAsset>; source: string; stale?: boolean }> {
   const byId = new Map(seeded.map((asset) => [asset.id, asset]));
   const needed = [...new Set(ids.map((id) => id.trim().toLowerCase()).filter(Boolean))];
+  if (!needed.length && !seeded.length) {
+    return { byId, source: "unavailable", stale: false };
+  }
   const missingBefore = needed.filter((id) => !byId.has(id));
   let source = "unavailable";
   let stale = false;

@@ -80,7 +80,7 @@ export function PortfolioBoard({ initialCoin = "bitcoin" }: { initialCoin?: stri
           <div className="eyebrow">LOCAL HOLDINGS</div>
           <h2>Lots in this browser</h2>
         </div>
-        <StatusBadge source={source} />
+        {items.length ? <StatusBadge source={source} /> : <span className="muted">0 / {PORTFOLIO_LIMIT}</span>}
       </div>
       <p className="muted alerts-note">
         Add quantity plus optional total cost. P&amp;L uses this CoinGecko snapshot — CoinVigil does not invent prices,
