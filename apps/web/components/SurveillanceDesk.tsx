@@ -67,23 +67,16 @@ export function SurveillanceDesk({
     });
   }
 
-  if (!ready) {
-    return (
-      <section className="card desk-skeleton" aria-busy="true">
-        <div className="skeleton skeleton-chip" />
-        <div className="skeleton skeleton-title" />
-        <div className="skeleton skeleton-copy" />
-        <div className="skeleton skeleton-row" />
-        <div className="skeleton skeleton-row" />
-      </section>
-    );
-  }
-
   const emptyWatch = watched.length === 0;
-
-  return (
-    <section id="desk" className="surveillance-desk">
-      {emptyWatch ? (
+  const topCard = !ready ? (
+    <section className="card desk-skeleton" aria-busy="true">
+      <div className="skeleton skeleton-chip" />
+      <div className="skeleton skeleton-title" />
+      <div className="skeleton skeleton-copy" />
+      <div className="skeleton skeleton-row" />
+      <div className="skeleton skeleton-row" />
+    </section>
+  ) : emptyWatch ? (
         <section className="card onboard-card" aria-label="Get started">
           <div className="section-heading">
             <div>
@@ -129,7 +122,7 @@ export function SurveillanceDesk({
             Local only, no account. Free cap is 3 coins; local premium toggle raises it — not billing.
           </p>
         </section>
-      ) : (
+  ) : (
         <section className="card desk-status" aria-label="Your surveillance desk">
           <div className="section-heading">
             <div>
@@ -185,8 +178,11 @@ export function SurveillanceDesk({
             </ul>
           ) : null}
         </section>
-      )}
+  );
 
+  return (
+    <section id="desk" className="surveillance-desk">
+      {topCard}
       <div className="desk-grid">
         <WatchlistStrip assets={assets} />
         <AlertsStrip assets={assets} />
