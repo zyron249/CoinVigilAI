@@ -737,7 +737,9 @@ async def peek_universe_status() -> dict[str, Any]:
 
     last_good = await load_last_good("universe")
     if last_good:
-        snapshot = _snapshot_from_payload(last_good, stale=True)
+        age = _last_live_age_seconds(last_good.get("last_live_at") if isinstance(last_good.get("last_live_at"), str) else None)
+        fresh = age is not None and age <= _PARTIAL_REUSE_SECONDS
+        snapshot = _snapshot_from_payload(last_good, stale=not fresh)
         if snapshot:
             return from_snapshot(snapshot)
     return empty

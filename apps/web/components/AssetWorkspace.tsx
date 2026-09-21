@@ -38,7 +38,7 @@ export function AssetWorkspace({
 
   useEffect(() => {
     if (!workspaceHashId()) return;
-    queueWorkspaceScroll(tab === "chart" ? 180 : 0);
+    queueWorkspaceScroll(tab === "chart" ? 220 : 0);
   }, [tab]);
 
   useEffect(() => {
@@ -61,7 +61,7 @@ export function AssetWorkspace({
     const url = new URL(window.location.href);
     url.hash = hash;
     window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
-    queueWorkspaceScroll(next === "chart" ? 180 : 0);
+    queueWorkspaceScroll(next === "chart" ? 220 : 0);
   }
 
   return (

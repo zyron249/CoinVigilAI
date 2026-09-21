@@ -92,7 +92,12 @@ export function AssetSubnav({ compareHref }: { compareHref: string }) {
           aria-current={active === item.id ? "true" : undefined}
           onClick={(event: MouseEvent<HTMLAnchorElement>) => {
             if (item.id !== "chart-lab" && item.id !== "markets-tab") return;
-            queueWorkspaceScroll(item.id === "chart-lab" ? 180 : 0);
+            event.preventDefault();
+            const url = new URL(window.location.href);
+            url.hash = item.id;
+            window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
+            window.dispatchEvent(new HashChangeEvent("hashchange"));
+            queueWorkspaceScroll(item.id === "chart-lab" ? 220 : 0);
             event.currentTarget.blur();
           }}
         >

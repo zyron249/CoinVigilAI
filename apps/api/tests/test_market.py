@@ -62,6 +62,22 @@ async def test_peek_universe_status_never_calls_coingecko(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_peek_recent_last_good_is_not_labeled_stale(monkeypatch):
+    monkeypatch.setattr("app.services.market.httpx.AsyncClient", _FailingClient)
+    monkeypatch.setattr("app.services.market.cache_get", _noop_cache_get)
+    monkeypatch.setattr("app.services.market.cache_set", _noop_cache_set)
+    await save_last_good("universe", {
+        "items": [DEMO_MARKETS[0].model_dump()],
+        "source": "coingecko",
+        "last_live_at": "2099-01-01T00:00:00Z",
+    })
+    observed = await peek_universe_status()
+    assert observed["observed"] is True
+    assert observed["source"] == "coingecko"
+    assert observed["stale"] is False
+
+
+@pytest.mark.asyncio
 async def test_peek_reads_ttl_memory_cache_without_unpack_error(monkeypatch):
     monkeypatch.setattr("app.services.market.httpx.AsyncClient", _FailingClient)
     monkeypatch.setattr("app.services.market.cache_get", _noop_cache_get)
