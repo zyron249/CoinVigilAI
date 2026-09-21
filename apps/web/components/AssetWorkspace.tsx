@@ -44,7 +44,8 @@ export function AssetWorkspace({
         : "";
     if (!target) return;
     requestAnimationFrame(() => {
-      document.getElementById(target)?.scrollIntoView({ behavior: "auto", block: "start" });
+      (document.getElementById(target) || document.querySelector(".asset-workspace"))
+        ?.scrollIntoView({ behavior: "auto", block: "start" });
     });
   }, [tab]);
 
@@ -55,7 +56,7 @@ export function AssetWorkspace({
     url.hash = hash;
     window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
     requestAnimationFrame(() => {
-      document.getElementById(next === "markets" ? "markets-tab" : "chart-lab")
+      document.querySelector(".asset-workspace")
         ?.scrollIntoView({ behavior: "auto", block: "start" });
     });
   }
@@ -63,8 +64,8 @@ export function AssetWorkspace({
   return (
     <section className="asset-workspace">
       <div className="asset-workspace-anchors">
-        <div id="markets-tab" tabIndex={-1} />
-        <div id="chart-lab" tabIndex={-1} />
+        <div id="markets-tab" className="asset-workspace-anchor" tabIndex={-1} />
+        <div id="chart-lab" className="asset-workspace-anchor" tabIndex={-1} />
       </div>
       <div className="asset-tabs" role="tablist" aria-label="Asset views">
         <TabButton current={tab} id="markets" onSelect={selectTab}>Markets</TabButton>
