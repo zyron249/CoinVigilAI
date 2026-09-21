@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState, type KeyboardEvent } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent, type MouseEvent } from "react";
+import { scrollAssetWorkspace } from "../lib/scroll-workspace";
 
 const SECTIONS = [
   { id: "overview", href: "#overview", label: "Overview" },
@@ -89,6 +90,11 @@ export function AssetSubnav({ compareHref }: { compareHref: string }) {
           href={item.href}
           className={active === item.id ? "is-on" : undefined}
           aria-current={active === item.id ? "true" : undefined}
+          onClick={(event: MouseEvent<HTMLAnchorElement>) => {
+            if (item.id !== "chart-lab" && item.id !== "markets-tab") return;
+            window.setTimeout(() => { scrollAssetWorkspace(); }, 40);
+            event.currentTarget.blur();
+          }}
         >
           {item.label}
         </a>

@@ -4,6 +4,7 @@ import { useEffect, useState, type KeyboardEvent, type ReactNode } from "react";
 import type { AssetTickers, Candle } from "../lib/api";
 import { ExchangeMarkets } from "./ExchangeMarkets";
 import { ProChartLab } from "./ProChartLab";
+import { scrollAssetWorkspace } from "../lib/scroll-workspace";
 
 function tabFromHash(hash = ""): "markets" | "chart" {
   const value = hash.replace(/^#/, "");
@@ -43,10 +44,8 @@ export function AssetWorkspace({
         ? "markets-tab"
         : "";
     if (!target) return;
-    requestAnimationFrame(() => {
-      (document.getElementById(target) || document.querySelector(".asset-workspace"))
-        ?.scrollIntoView({ behavior: "auto", block: "start" });
-    });
+    const id = window.setTimeout(() => { scrollAssetWorkspace(); }, 40);
+    return () => window.clearTimeout(id);
   }, [tab]);
 
   function selectTab(next: "markets" | "chart") {
@@ -55,10 +54,7 @@ export function AssetWorkspace({
     const url = new URL(window.location.href);
     url.hash = hash;
     window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
-    requestAnimationFrame(() => {
-      document.querySelector(".asset-workspace")
-        ?.scrollIntoView({ behavior: "auto", block: "start" });
-    });
+    window.setTimeout(() => { scrollAssetWorkspace(); }, 40);
   }
 
   return (
