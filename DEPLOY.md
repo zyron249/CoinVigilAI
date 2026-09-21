@@ -33,9 +33,9 @@ Do not commit secrets. `sync: false` keys in `render.yaml` are filled in the Ren
 1. Push this branch (or `main` after merge) to GitHub.
 2. In Render: **New → Blueprint** and select `zyron249/CoinVigilAI`, or **New → Web Service** → Docker, root `Dockerfile`.
 3. Blueprint creates:
-   - **coinvigil** (web, Docker, health `/health`)
-   - **coinvigil-redis** (Key Value, internal-only)
-4. Use at least the **Standard** instance (this image runs Next + Python + nginx; 512MB Starter/Free can OOM. Free also spins down after idle).
+   - **coinvigil** (web, Docker, health `/health`, **Free** plan in `render.yaml` so Blueprint can apply without a card)
+   - **coinvigil-redis** (Key Value, **Free**, internal-only)
+4. **Free will likely OOM or spin down after idle** (this image runs Next + Python + nginx on 512MB). **Standard is still recommended** when a payment method is available. First go-live can try Free.
 5. Set dashboard env (Blueprint already lists these; paste secrets only):
    - `COINGECKO_API_KEY` — [CoinGecko Demo](https://www.coingecko.com/en/api/pricing)
    - optional `XAI_API_KEY` / `OPENAI_API_KEY` / others from `.env.example`
