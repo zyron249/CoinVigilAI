@@ -121,7 +121,7 @@ export function aggregateHoldings(
 }
 
 export function usePortfolio() {
-  const [items, setItems] = useState<Holding[]>([]);
+  const [items, setItems] = useState<Holding[]>(() => readHoldings());
 
   useEffect(() => {
     const sync = () => setItems(readHoldings());

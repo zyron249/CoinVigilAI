@@ -1,15 +1,15 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import type { MarketAsset } from "../lib/api";
+import type { MarketAsset, WatchlistSentiment } from "../lib/api";
 import { getAssetInsight, getWatchlistSentiment, postAlertNotify } from "../lib/api";
 import {
   ALERTS_LIMIT,
   DEFAULT_COOLDOWN_MINUTES,
-  alertStatusLabel,
   evaluateAlert,
   rememberVolume,
   readVolumeSeen,
+  rowStatusLabel,
   SENSITIVITY,
   useAlerts,
   type AlertAnalysis,
@@ -54,6 +54,7 @@ export function AlertsBoard({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [lastVolume, setLastVolume] = useState<Record<string, number>>({});
   const [now, setNow] = useState(() => Date.now());
+  const [sentiment, setSentiment] = useState<WatchlistSentiment | null>(null);
 
   useEffect(() => {
     if (!coinId && watched[0]) setCoinId(watched[0].id);
@@ -68,6 +69,21 @@ export function AlertsBoard({
     const tick = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(tick);
   }, []);
+
+  useEffect(() => {
+    const ids = watched.map((row) => row.id);
+    if (!ids.length) {
+      setSentiment(null);
+      return;
+    }
+    let cancelled = false;
+    getWatchlistSentiment(ids).then((payload) => {
+      if (!cancelled) setSentiment(payload);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [watched]);
 
   useEffect(() => {
     let active = true;
@@ -212,6 +228,15 @@ export function AlertsBoard({
         Price/volume rules run before any AI cost. History stays in this browser. Telegram bots are not implemented;
         optional HTTPS webhook is env-gated. No on-chain whale feed.
       </p>
+      {watched.length ? (
+        <p className="muted alerts-note" data-sentiment-peek>
+          {sentiment == null
+            ? "Headline sentiment: checking watchlist-related RSS — never a social score."
+            : sentiment.available
+              ? `Headline sentiment (${sentiment.engine}, ${sentiment.lean || "mixed"}): ${sentiment.matched ?? sentiment.items.length} watchlist-related RSS title${(sentiment.matched ?? sentiment.items.length) === 1 ? "" : "s"}. Not Twitter, not NLP, not a social score.`
+              : sentiment.reason || "sentiment unavailable. CoinVigil does not invent social scores."}
+        </p>
+      ) : null}
       {matching.length ? (
         <p className="alerts-fired-banner" role="status">
           {matching.length} watchlist rule{matching.length === 1 ? "" : "s"} matching this snapshot (in-tab + local history — no fake push).
@@ -263,7 +288,7 @@ export function AlertsBoard({
                   ) : null}
                 </div>
                 <div className="alert-actions">
-                  <span className={result.matching ? "pill" : "muted"}>{alertStatusLabel(result.status)}</span>
+                  <span className={result.matching ? "pill" : "muted"}>{rowStatusLabel(result.status, item, now)}</span>
                   <button
                     type="button"
                     className="ghost tool-button"

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import type { MarketAsset } from "../lib/api";
-import { alertStatusLabel, evaluateAlert, readVolumeSeen, useAlerts, type PriceAlert } from "../lib/alerts";
+import { evaluateAlert, readVolumeSeen, rowStatusLabel, useAlerts, type PriceAlert } from "../lib/alerts";
 import { hydrateQuotes } from "../lib/snapshot-quotes";
 import { useWatchlist } from "../lib/watchlist";
 import { formatPercent, formatUsd } from "../lib/format";
@@ -17,21 +17,43 @@ export function AlertsStrip({ assets }: { assets: MarketAsset[] }) {
   const { ids: watchIds } = useWatchlist();
   const [extra, setExtra] = useState<MarketAsset[]>([]);
   const [lastVolume, setLastVolume] = useState<Record<string, number>>({});
+  const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
-    setLastVolume(readVolumeSeen());
-    const known = new Set(assets.map((asset) => asset.id));
-    const missing = items.map((item) => item.coinId).filter((id) => watchIds.has(id) && !known.has(id));
-    if (!missing.length) {
-      setExtra([]);
-      return;
-    }
+    const tick = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(tick);
+  }, []);
+
+  useEffect(() => {
     let active = true;
-    hydrateQuotes(missing, assets).then(({ byId }) => {
-      if (active) setExtra([...byId.values()]);
-    });
+    let timer: number | undefined;
+    async function refresh() {
+      if (timer) window.clearTimeout(timer);
+      if (typeof document !== "undefined" && document.visibilityState === "hidden") {
+        timer = window.setTimeout(refresh, 30_000);
+        return;
+      }
+      setLastVolume(readVolumeSeen());
+      const ids = items.map((item) => item.coinId).filter((id) => watchIds.has(id));
+      if (!ids.length) {
+        if (active) setExtra([]);
+        timer = window.setTimeout(refresh, 10_000);
+        return;
+      }
+      const { byId } = await hydrateQuotes(ids, assets);
+      if (!active) return;
+      setExtra([...byId.values()]);
+      timer = window.setTimeout(refresh, 10_000);
+    }
+    void refresh();
+    const onVis = () => {
+      if (document.visibilityState === "visible") void refresh();
+    };
+    document.addEventListener("visibilitychange", onVis);
     return () => {
       active = false;
+      if (timer) window.clearTimeout(timer);
+      document.removeEventListener("visibilitychange", onVis);
     };
   }, [items, assets, watchIds]);
 
@@ -46,7 +68,7 @@ export function AlertsStrip({ assets }: { assets: MarketAsset[] }) {
     return evaluateAlert(
       item,
       { price: live?.current_price, change24h: live?.price_change_percentage_24h, volume: live?.total_volume },
-      { watched: watchIds.has(item.coinId), lastVolume: lastVolume[item.coinId] },
+      { watched: watchIds.has(item.coinId), lastVolume: lastVolume[item.coinId], now },
     ).matching;
   });
 
@@ -63,7 +85,7 @@ export function AlertsStrip({ assets }: { assets: MarketAsset[] }) {
         </div>
       </div>
       <p className="muted alerts-note">
-        Evaluated only for starred coins. Snapshot poll — no WebSocket. In-tab + local history — no push.
+        Evaluated only for starred coins. Snapshot poll — no WebSocket. In-tab + local history — Telegram is not implemented.
       </p>
       {items.length === 0 ? (
         <p className="muted alerts-note">No local rules yet. <Link href="/alerts">Create one</Link> for a watchlist coin.</p>
@@ -76,7 +98,7 @@ export function AlertsStrip({ assets }: { assets: MarketAsset[] }) {
             const result = evaluateAlert(
               item,
               { price: live?.current_price, change24h: live?.price_change_percentage_24h, volume: live?.total_volume },
-              { watched: watchIds.has(item.coinId), lastVolume: lastVolume[item.coinId] },
+              { watched: watchIds.has(item.coinId), lastVolume: lastVolume[item.coinId], now },
             );
             return (
               <li key={item.id} className="is-fired" data-alert-status={result.status}>
@@ -86,7 +108,7 @@ export function AlertsStrip({ assets }: { assets: MarketAsset[] }) {
                   <span className="muted">{live ? `${formatUsd(live.current_price)} · ${formatPercent(live.price_change_percentage_24h)}` : "Quote pending"}</span>
                   {item.note ? <span className="alert-note">{item.note.generated ? "AI" : "Heuristic"}: {item.note.text}</span> : null}
                 </div>
-                <span className="pill">{alertStatusLabel(result.status)}</span>
+                <span className="pill">{rowStatusLabel(result.status, item, now)}</span>
               </li>
             );
           })}

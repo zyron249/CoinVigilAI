@@ -69,7 +69,10 @@ export function AskPanel({
       </form>
       {!coinId && watched.length ? (
         <div className="ask-chips" aria-label="Ask about watchlist coins">
-          {watched.slice(0, 5).map((item) => (
+          {[...watched]
+            .sort((a, b) => (a.addedAt || "").localeCompare(b.addedAt || ""))
+            .slice(0, 5)
+            .map((item) => (
             <button
               key={item.id}
               type="button"

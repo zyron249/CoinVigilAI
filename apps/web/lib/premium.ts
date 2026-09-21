@@ -33,7 +33,7 @@ export function canAddWatch(count: number, premium: boolean): boolean {
 }
 
 export function usePremium() {
-  const [premium, setPremium] = useState(false);
+  const [premium, setPremium] = useState(() => readPremium());
 
   useEffect(() => {
     const sync = () => setPremium(readPremium());

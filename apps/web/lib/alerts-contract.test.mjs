@@ -110,20 +110,39 @@ test("watchlist coin can fire; volume prefilter blocks a quiet print", () => {
   assert.equal(loud.status, "fired");
 });
 
-function alertStatusLabel(status) {
+function cooldownRemainingLabel(row, now) {
+  if (!row || !row.lastNotifiedAt) return null;
+  const then = new Date(row.lastNotifiedAt).getTime();
+  const ms = then + row.cooldownMinutes * 60_000 - now;
+  if (ms <= 0) return null;
+  const sec = Math.ceil(ms / 1000);
+  if (sec < 60) return `${sec}s left`;
+  return `${Math.ceil(sec / 60)}m left`;
+}
+
+function rowStatusLabel(status, row, now) {
   if (status === "fired") return "Triggered";
-  if (status === "cooldown") return "Cooldown";
+  if (status === "cooldown") {
+    const left = cooldownRemainingLabel(row, now);
+    return left ? `Cooldown · ${left}` : "Cooldown";
+  }
   if (status === "muted") return "Muted";
-  if (status === "off-watchlist") return "Skipped";
-  if (status === "volume-prefilter") return "Held";
   return "Watching";
 }
 
+test("matching cooldown shows remaining time, not Watching or a fake push", () => {
+  const at = "2026-09-21T13:00:00.000Z";
+  const now = Date.parse("2026-09-21T13:03:00.000Z");
+  const row = { lastNotifiedAt: at, cooldownMinutes: 15 };
+  assert.equal(rowStatusLabel("cooldown", row, now), "Cooldown · 12m left");
+  assert.equal(rowStatusLabel("fired", row, now), "Triggered");
+});
+
 test("matching cooldown shows Cooldown, not Watching or a fake push", () => {
-  assert.equal(alertStatusLabel("fired"), "Triggered");
-  assert.equal(alertStatusLabel("cooldown"), "Cooldown");
-  assert.equal(alertStatusLabel("muted"), "Muted");
-  assert.equal(alertStatusLabel("watching"), "Watching");
+  assert.equal(rowStatusLabel("fired"), "Triggered");
+  assert.equal(rowStatusLabel("cooldown"), "Cooldown");
+  assert.equal(rowStatusLabel("muted"), "Muted");
+  assert.equal(rowStatusLabel("watching"), "Watching");
 });
 
 test("muted and cooldown rules do not re-notify", () => {

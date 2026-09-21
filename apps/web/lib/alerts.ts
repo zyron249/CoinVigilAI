@@ -200,8 +200,32 @@ export function evaluateAlert(
   return { matching: true, fired: true, status: "fired" };
 }
 
+export function cooldownRemainingMs(alert: PriceAlert, now = Date.now()): number {
+  if (!alert.lastNotifiedAt) return 0;
+  const then = new Date(alert.lastNotifiedAt).getTime();
+  if (Number.isNaN(then)) return 0;
+  return Math.max(0, then + alert.cooldownMinutes * 60_000 - now);
+}
+
+export function cooldownRemainingLabel(alert: PriceAlert, now = Date.now()): string | null {
+  const ms = cooldownRemainingMs(alert, now);
+  if (ms <= 0) return null;
+  const sec = Math.ceil(ms / 1000);
+  if (sec < 60) return `${sec}s left`;
+  return `${Math.ceil(sec / 60)}m left`;
+}
+
+export function rowStatusLabel(status: AlertEval["status"] | string, alert?: PriceAlert, now = Date.now()): string {
+  const base = alertStatusLabel(status);
+  if (status === "cooldown" && alert) {
+    const left = cooldownRemainingLabel(alert, now);
+    return left ? `${base} · ${left}` : base;
+  }
+  return base;
+}
+
 export function useAlerts() {
-  const [items, setItems] = useState<PriceAlert[]>([]);
+  const [items, setItems] = useState<PriceAlert[]>(() => readAlerts());
 
   useEffect(() => {
     const sync = () => setItems(readAlerts());

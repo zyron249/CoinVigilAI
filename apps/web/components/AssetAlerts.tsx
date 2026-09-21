@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { alertStatusLabel, evaluateAlert, readVolumeSeen, useAlerts } from "../lib/alerts";
+import { evaluateAlert, readVolumeSeen, rowStatusLabel, useAlerts } from "../lib/alerts";
 import { hydrateQuotes } from "../lib/snapshot-quotes";
 import { useWatchlist } from "../lib/watchlist";
 import { formatPercent, formatUsd } from "../lib/format";
@@ -27,10 +27,16 @@ export function AssetAlerts({
   const watched = ids.has(coinId);
   const lastVolume = readVolumeSeen()[coinId];
   const [quote, setQuote] = useState({ price, change24h, volume });
+  const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
     setQuote({ price, change24h, volume });
   }, [price, change24h, volume]);
+
+  useEffect(() => {
+    const tick = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(tick);
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -69,7 +75,7 @@ export function AssetAlerts({
   const matching = mine.filter((item) => evaluateAlert(
     item,
     quote,
-    { watched, lastVolume },
+    { watched, lastVolume, now },
   ).matching);
 
   return (
@@ -106,7 +112,7 @@ export function AssetAlerts({
       ) : (
         <ul className="alerts-list">
           {mine.map((item) => {
-            const result = evaluateAlert(item, quote, { watched, lastVolume });
+            const result = evaluateAlert(item, quote, { watched, lastVolume, now });
             return (
               <li
                 key={item.id}
@@ -119,7 +125,7 @@ export function AssetAlerts({
                   <span className="muted">{formatUsd(quote.price)}</span>
                   {result.matching && item.note ? <span className="alert-note">{item.note.text}</span> : null}
                 </div>
-                <span className={result.matching ? "pill" : "muted"}>{alertStatusLabel(result.status)}</span>
+                <span className={result.matching ? "pill" : "muted"}>{rowStatusLabel(result.status, item, now)}</span>
               </li>
             );
           })}

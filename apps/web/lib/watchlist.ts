@@ -77,8 +77,8 @@ export function toggleWatchItem(item: Omit<WatchItem, "addedAt">): { items: Watc
 }
 
 export function useWatchlist() {
-  const [items, setItems] = useState<WatchItem[]>([]);
-  const [premium, setPremiumState] = useState(false);
+  const [items, setItems] = useState<WatchItem[]>(() => readWatchlist());
+  const [premium, setPremiumState] = useState(() => readPremium());
 
   useEffect(() => {
     const sync = () => {

@@ -93,7 +93,7 @@ export function recordFire(
 }
 
 export function useAlertHistory() {
-  const [items, setItems] = useState<AlertHistoryItem[]>([]);
+  const [items, setItems] = useState<AlertHistoryItem[]>(() => readHistory());
 
   useEffect(() => {
     const sync = () => setItems(readHistory());
