@@ -6,8 +6,10 @@ import type { GlobalOverview, MarketMovers, MarketPage } from "../lib/api";
 import { getGlobalOverview, getMarket, getMovers } from "../lib/api";
 import { sourceLabel } from "../lib/format";
 import { writeMarketQuery } from "../lib/pagination";
+import { AlertsStrip } from "./AlertsStrip";
 import { AskPanel } from "./AskPanel";
 import { DemoRibbon } from "./DemoRibbon";
+import { PortfolioStrip } from "./PortfolioStrip";
 import { GlobalStrip } from "./GlobalStrip";
 import { MarketTable } from "./MarketTable";
 import { Movers } from "./Movers";
@@ -239,7 +241,9 @@ export function LiveBoard({
       <AskPanel compact heading="Ask CoinVigil" />
       <GlobalStrip overview={overview} checkedAt={checkedAt} />
       {brief}
+      <AlertsStrip assets={watchAssets} />
       <WatchlistStrip assets={watchAssets} />
+      <PortfolioStrip assets={watchAssets} />
       <section className="slice-grid" id="movers">
         <Movers gainers={movers.gainers} losers={movers.losers} source={movers.source} stale={movers.stale} />
         <div id="radar">{radar}</div>

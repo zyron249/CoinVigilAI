@@ -25,10 +25,14 @@ export function AskPanel({
     const next = question.trim();
     if (!next) return;
     setBusy(true);
-    const payload = await postAsk(next, coinId);
-    setResult(payload);
-    setBusy(false);
+    try {
+      setResult(await postAsk(next, coinId));
+    } finally {
+      setBusy(false);
+    }
   }
+
+  const failed = Boolean(result?.error || result?.engine === "unavailable");
 
   return (
     <section className={`card ask-card ${compact ? "ask-compact" : ""}`} id={coinId ? undefined : "ask-coinvigil"}>
@@ -40,8 +44,8 @@ export function AskPanel({
         {result ? <StatusBadge source={result.data_source} /> : null}
       </div>
       <p className="ask-kicker muted">
-        Natural-language market questions. Prices, caps, and volume come from read-only CoinGecko/news tools —
-        never invented. No buy/sell advice. Not financial advice.
+        You are interacting with AI. Natural-language market questions. Prices, caps, and volume come from read-only
+        CoinGecko/news tools — never invented. No buy/sell advice. Not financial advice.
       </p>
       <form
         className="ask-form"
@@ -63,8 +67,15 @@ export function AskPanel({
       </form>
       {result ? (
         <div className="ask-result" aria-live="polite">
+          {result.refused_advice ? (
+            <p className="ask-refused">No buy/sell advice or price prediction — tools can still quote the snapshot.</p>
+          ) : null}
           <p className="ask-engine muted">
-            {result.generated ? "AI-generated from tools" : "Heuristic tool answer — no live model vote"}
+            {failed
+              ? "Ask unavailable — no invented fill-in"
+              : result.generated
+                ? "AI-generated from tools"
+                : "Heuristic tool answer — no live model vote"}
             {result.engine ? ` · ${result.engine}` : ""}
             {result.tools_used.length ? ` · tools: ${result.tools_used.join(", ")}` : ""}
           </p>
@@ -83,7 +94,7 @@ export function AskPanel({
           {result.citations.length ? (
             <ul className="ask-cites">
               {result.citations.map((cite, index) => (
-                <li key={`${cite.kind}-${index}`}>
+                <li key={`${cite.kind}-${cite.label}-${index}`}>
                   {cite.url ? (
                     <a href={cite.url} target="_blank" rel="noopener noreferrer">{cite.label}</a>
                   ) : <span>{cite.label}</span>}

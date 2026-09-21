@@ -10,6 +10,7 @@ const LINKS = [
   { href: "/compare", label: "Compare" },
   { href: "/convert", label: "Convert" },
   { href: "/alerts", label: "Alerts" },
+  { href: "/portfolio", label: "Portfolio" },
   { href: "/#watchlist", label: "Watchlist" },
   { href: "/news", label: "News" },
   { href: "/status", label: "Status" },

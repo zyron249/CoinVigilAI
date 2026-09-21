@@ -1,3 +1,7 @@
+"use client";
+
+import { useEffect, useState } from "react";
+
 export const ALERTS_KEY = "coinvigil.alerts.v1";
 export const ALERTS_EVENT = "coinvigil:alerts";
 export const ALERTS_LIMIT = 20;
@@ -52,9 +56,55 @@ export function serializeAlerts(items: PriceAlert[]): string {
   return JSON.stringify({ items: items.slice(0, ALERTS_LIMIT) });
 }
 
+export function readAlerts(): PriceAlert[] {
+  if (typeof window === "undefined") return [];
+  return parseAlerts(window.localStorage.getItem(ALERTS_KEY));
+}
+
+export function writeAlerts(items: PriceAlert[]): PriceAlert[] {
+  const next = items.slice(0, ALERTS_LIMIT);
+  window.localStorage.setItem(ALERTS_KEY, serializeAlerts(next));
+  window.dispatchEvent(new CustomEvent(ALERTS_EVENT));
+  return next;
+}
+
 export function alertFired(alert: PriceAlert, price: number | null | undefined, change24h: number | null | undefined): boolean {
   if (alert.kind === "above") return price != null && price >= alert.threshold;
   if (alert.kind === "below") return price != null && price <= alert.threshold;
   if (alert.kind === "change_24h") return change24h != null && Math.abs(change24h) >= alert.threshold;
   return false;
+}
+
+export function useAlerts() {
+  const [items, setItems] = useState<PriceAlert[]>([]);
+
+  useEffect(() => {
+    const sync = () => setItems(readAlerts());
+    sync();
+    window.addEventListener("storage", sync);
+    window.addEventListener(ALERTS_EVENT, sync);
+    return () => {
+      window.removeEventListener("storage", sync);
+      window.removeEventListener(ALERTS_EVENT, sync);
+    };
+  }, []);
+
+  function add(item: Omit<PriceAlert, "id" | "createdAt"> & { id?: string }) {
+    const next: PriceAlert = {
+      ...item,
+      id: item.id || `${item.coinId}-${item.kind}-${item.threshold}-${Date.now()}`,
+      createdAt: new Date().toISOString(),
+    };
+    const saved = writeAlerts([next, ...items]);
+    setItems(saved);
+    return saved;
+  }
+
+  function remove(id: string) {
+    const saved = writeAlerts(items.filter((row) => row.id !== id));
+    setItems(saved);
+    return saved;
+  }
+
+  return { items, add, remove };
 }
