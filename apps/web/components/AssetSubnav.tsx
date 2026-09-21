@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState, type KeyboardEvent, type MouseEvent } from "react";
-import { scrollAssetWorkspace } from "../lib/scroll-workspace";
+import { queueWorkspaceScroll, stickyWorkspaceOffset } from "../lib/scroll-workspace";
 
 const SECTIONS = [
   { id: "overview", href: "#overview", label: "Overview" },
@@ -37,7 +37,7 @@ export function AssetSubnav({ compareHref }: { compareHref: string }) {
           .filter((entry): entry is IntersectionObserverEntry => Boolean(entry?.isIntersecting));
         if (visible[0]) setActive(visible[0].target.id);
       },
-      { rootMargin: "-160px 0px -60% 0px", threshold: [0, 0.15, 0.4] },
+      { rootMargin: `-${stickyWorkspaceOffset()}px 0px -60% 0px`, threshold: [0, 0.15, 0.4] },
     );
 
     function observeMounted() {
@@ -92,7 +92,12 @@ export function AssetSubnav({ compareHref }: { compareHref: string }) {
           aria-current={active === item.id ? "true" : undefined}
           onClick={(event: MouseEvent<HTMLAnchorElement>) => {
             if (item.id !== "chart-lab" && item.id !== "markets-tab") return;
-            window.setTimeout(() => { scrollAssetWorkspace(); }, 40);
+            event.preventDefault();
+            const url = new URL(window.location.href);
+            url.hash = item.id;
+            window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
+            window.dispatchEvent(new HashChangeEvent("hashchange"));
+            queueWorkspaceScroll(item.id === "chart-lab" ? 220 : 0);
             event.currentTarget.blur();
           }}
         >
