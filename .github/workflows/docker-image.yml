@@ -41,7 +41,7 @@ jobs:
         run: python -m pytest -q
 
       - name: Check local watchlist contract
-        run: node --test apps/web/lib/watchlist-contract.test.mjs apps/web/lib/project-links-contract.test.mjs
+        run: node --test apps/web/lib/watchlist-contract.test.mjs apps/web/lib/project-links-contract.test.mjs apps/web/lib/pagination-contract.test.mjs
 
       - name: Validate Python syntax
         run: python -m compileall -q apps/api/app apps/api/tests
@@ -253,6 +253,10 @@ jobs:
               sleep 2
               continue
             fi
+            if ! grep -q "Rows " /tmp/web.html && ! grep -q "page 1 of" /tmp/web.html; then
+              sleep 2
+              continue
+            fi
             if ! curl -fsS http://127.0.0.1:3000/asset/bitcoin > /tmp/bitcoin.html; then
               sleep 2
               continue
@@ -310,6 +314,14 @@ jobs:
               continue
             fi
             if ! grep -q "#chart-lab" /tmp/bitcoin.html; then
+              sleep 2
+              continue
+            fi
+            if ! grep -q "asset-subnav" /tmp/bitcoin.html; then
+              sleep 2
+              continue
+            fi
+            if ! grep -q "#markets-tab" /tmp/bitcoin.html; then
               sleep 2
               continue
             fi

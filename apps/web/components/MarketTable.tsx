@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { memo, useEffect, useState } from "react";
+import { memo } from "react";
 import type { MarketAsset, MarketPage } from "../lib/api";
 import { changeClass, formatCompact, formatCompactUsd, formatPercent, formatTimestamp, formatUsd } from "../lib/format";
+import { MARKET_LIMITS, pageWindow, rowRange } from "../lib/pagination";
 import { Sparkline } from "./Sparkline";
 import { StatusBadge } from "./StatusBadge";
 import { WatchButton } from "./WatchButton";
@@ -60,20 +61,18 @@ export function MarketTable({
   busy = false,
   refreshError,
   checkedAt,
+  draft,
+  onDraft,
   onQuery,
 }: {
   pageData: MarketPage;
   busy?: boolean;
   refreshError?: string | null;
   checkedAt?: string | null;
+  draft: string;
+  onDraft: (value: string) => void;
   onQuery: (next: { page?: number; limit?: number; sort?: string; order?: string; q?: string }) => void;
 }) {
-  const [draft, setDraft] = useState(pageData.query || "");
-
-  useEffect(() => {
-    setDraft(pageData.query || "");
-  }, [pageData.query]);
-
   function toggleSort(sort: string) {
     if (pageData.sort === sort) {
       onQuery({ sort, order: pageData.order === "desc" ? "asc" : "desc", page: 1 });
@@ -87,6 +86,8 @@ export function MarketTable({
   const lastLive = formatTimestamp(pageData.last_live_at);
   const asOf = formatTimestamp(pageData.as_of);
   const checked = formatTimestamp(checkedAt);
+  const range = rowRange(pageData.page, pageData.limit, pageData.total);
+  const pages = pageWindow(pageData.page, pageCount);
 
   return (
     <div className="card table-card">
@@ -100,8 +101,7 @@ export function MarketTable({
             className="market-search"
             onSubmit={(event) => {
               event.preventDefault();
-              const value = new FormData(event.currentTarget).get("q");
-              onQuery({ q: String(value || ""), page: 1 });
+              onQuery({ q: draft, page: 1 });
               document.getElementById("markets")?.scrollIntoView({ behavior: "smooth", block: "start" });
             }}
           >
@@ -111,19 +111,18 @@ export function MarketTable({
               name="q"
               type="search"
               value={draft}
-              onChange={(event) => setDraft(event.target.value)}
+              onChange={(event) => onDraft(event.target.value)}
               placeholder="Search name, symbol, or id"
               autoComplete="off"
-              disabled={busy}
+              aria-busy={busy}
             />
-            <button type="submit" className="ghost tool-button" disabled={busy}>Search</button>
-            {pageData.query ? (
+            <button type="submit" className="ghost tool-button">Search</button>
+            {pageData.query || draft ? (
               <button
                 type="button"
                 className="ghost tool-button"
-                disabled={busy}
                 onClick={() => {
-                  setDraft("");
+                  onDraft("");
                   onQuery({ q: "", page: 1 });
                 }}
               >
@@ -198,9 +197,11 @@ export function MarketTable({
       </div>
       <p className="table-swipe muted">Swipe sideways on small screens to see 1h/24h/7d, volume, supply, and 7d sparkline.</p>
       <div className="table-footer">
-        <div className="muted">
-          Showing {pageData.assets.length} of {pageData.total} matching assets
-          {pageData.universe_size ? ` · ${pageData.universe_size} CoinGecko-tracked in snapshot` : ""}
+        <div className="muted" aria-live="polite">
+          {range.start
+            ? `Rows ${range.start}–${range.end} of ${pageData.total} matching · page ${pageData.page} of ${pageCount}`
+            : `No rows on this page · page ${pageData.page} of ${pageCount}`}
+          {pageData.universe_size ? ` · ${pageData.universe_size} of ${pageData.coverage_target || 1000} CoinGecko-tracked in snapshot` : ""}
           {pageData.stale && lastLive ? ` · last live ${lastLive}` : asOf ? ` · last updated ${asOf}` : ""}
           {checked && checked !== asOf ? ` · checked ${checked}` : ""}
           {busy ? " · updating…" : ""}
@@ -212,12 +213,30 @@ export function MarketTable({
             aria-label="Rows per page"
             disabled={busy}
           >
-            {[20, 50, 100].map((size) => <option key={size} value={size}>{size} / page</option>)}
+            {MARKET_LIMITS.map((size) => <option key={size} value={size}>{size} / page</option>)}
           </select>
           <button type="button" className="ghost tool-button" disabled={pageData.page <= 1 || busy} onClick={() => onQuery({ page: pageData.page - 1 })}>
             Previous
           </button>
-          <span className="muted">Page {pageData.page} / {pageCount}</span>
+          <div className="pager-pages" role="navigation" aria-label="Rankings pages">
+            {pages.map((item, index) => (
+              item === "ellipsis" ? (
+                <span className="muted pager-ellipsis" key={`ellipsis-${index}`}>…</span>
+              ) : (
+                <button
+                  key={item}
+                  type="button"
+                  className={`ghost tool-button pager-page${item === pageData.page ? " is-on" : ""}`}
+                  aria-current={item === pageData.page ? "page" : undefined}
+                  aria-label={`Page ${item} of ${pageCount}`}
+                  disabled={busy}
+                  onClick={() => onQuery({ page: item })}
+                >
+                  {item}
+                </button>
+              )
+            ))}
+          </div>
           <button type="button" className="ghost tool-button" disabled={pageData.page >= pageCount || busy} onClick={() => onQuery({ page: pageData.page + 1 })}>
             Next
           </button>

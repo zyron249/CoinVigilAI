@@ -5,10 +5,28 @@ import { MarketBriefCard } from "../components/MarketBriefCard";
 import { Radar } from "../components/Radar";
 import { getCouncilStatus, getGlobalOverview, getMarket, getMarketBrief, getMovers, getRadar } from "../lib/api";
 import { sourceLabel } from "../lib/format";
+import { parseMarketQuery } from "../lib/pagination";
 
-export default async function Home() {
+function firstParam(value: string | string[] | undefined) {
+  if (Array.isArray(value)) return value[0];
+  return value;
+}
+
+export default async function Home({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const query = await searchParams;
+  const marketQuery = parseMarketQuery({
+    q: firstParam(query.q) || "",
+    page: firstParam(query.page),
+    limit: firstParam(query.limit),
+    sort: firstParam(query.sort),
+    order: firstParam(query.order),
+  });
   const [market, overview, movers, radar, council] = await Promise.all([
-    getMarket({ limit: 50, page: 1, sort: "market_cap", order: "desc" }),
+    getMarket(marketQuery),
     getGlobalOverview(),
     getMovers(5),
     getRadar(),
