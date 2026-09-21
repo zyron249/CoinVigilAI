@@ -167,7 +167,7 @@ export function ProChartLab({ coinId, symbol, candles, source, tickerSource }: P
     && (tickerSource === "coingecko" || tickerSource === "cache");
 
   return (
-    <section className="chart-lab card" id="chart-lab">
+    <section className="chart-lab card">
       <div className="chart-lab-head">
         <div>
           <div className="eyebrow">PRO CHART LAB</div>

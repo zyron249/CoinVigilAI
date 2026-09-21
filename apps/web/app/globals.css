@@ -130,6 +130,8 @@ nav { min-height: 72px; display: flex; align-items: center; justify-content: spa
   border-radius: 6px;
 }
 .asset-workspace { padding-top: 8px; }
+.asset-workspace-anchors { position: relative; height: 0; }
+.asset-workspace-anchors > div { position: absolute; width: 1px; height: 1px; }
 .asset-jump { display: flex; flex-wrap: wrap; gap: 8px 12px; margin: 10px 0 0; }
 .asset-jump a { font-size: 12px; font-weight: 700; color: var(--accent); }
 .asset-subnav {

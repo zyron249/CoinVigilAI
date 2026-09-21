@@ -131,7 +131,7 @@ export function ExchangeMarkets({
   const orderLabel = pageData.order === "asc" ? "ascending" : "descending";
 
   return (
-    <section className="card table-card exchange-card" id="markets-tab">
+    <section className="card table-card exchange-card">
       <div className="section-heading">
         <div>
           <div className="eyebrow">EXCHANGE MARKETS</div>

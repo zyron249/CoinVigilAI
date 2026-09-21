@@ -317,7 +317,11 @@ jobs:
               sleep 2
               continue
             fi
-            if ! grep -q "#chart-lab" /tmp/bitcoin.html; then
+            if ! grep -q 'id="chart-lab"' /tmp/bitcoin.html || ! grep -q 'id="markets-tab"' /tmp/bitcoin.html; then
+              sleep 2
+              continue
+            fi
+            if ! grep -q "asset-workspace-anchors" /tmp/bitcoin.html; then
               sleep 2
               continue
             fi

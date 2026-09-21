@@ -1,5 +1,6 @@
 import { getStackStatus } from "../../lib/api";
 import { StatusBadge } from "../../components/StatusBadge";
+import { StatusRefresh } from "../../components/StatusRefresh";
 
 export default async function StatusPage() {
   const status = await getStackStatus();
@@ -10,6 +11,7 @@ export default async function StatusPage() {
   const aiConfigured = status.ai?.configured_count ?? 0;
 
   return (
+    <StatusRefresh>
     <main id="content">
       <section className="page-hero">
         <div className="eyebrow hero-tag">STACK STATUS</div>
@@ -77,5 +79,6 @@ export default async function StatusPage() {
         </article>
       </section>
     </main>
+    </StatusRefresh>
   );
 }
