@@ -27,12 +27,13 @@ export function AssetSubnav({ compareHref }: { compareHref: string }) {
     const observed = new Map<string, IntersectionObserverEntry>();
     const observer = new IntersectionObserver(
       (entries) => {
+        for (const entry of entries) observed.set(entry.target.id, entry);
         const hash = window.location.hash.replace(/^#/, "");
-        if (SECTIONS.some((item) => item.id === hash)) {
+        const hashed = hash ? observed.get(hash) : undefined;
+        if (hashed?.isIntersecting && SECTIONS.some((item) => item.id === hash)) {
           setActive(hash);
           return;
         }
-        for (const entry of entries) observed.set(entry.target.id, entry);
         const visible = SECTIONS
           .map((item) => observed.get(item.id))
           .filter((entry): entry is IntersectionObserverEntry => Boolean(entry?.isIntersecting));

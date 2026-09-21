@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
 
 export const ALERTS_KEY = "coinvigil.alerts.v1";
 export const ALERTS_EVENT = "coinvigil:alerts";
 export const VOLUME_SEEN_KEY = "coinvigil.volume-seen.v1";
 export const ALERTS_LIMIT = 20;
+export const DEFAULT_COOLDOWN_MINUTES = 15;
 
 export type AlertKind = "above" | "below" | "change_24h";
 export type AlertSensitivity = "micro" | "normal" | "major";
@@ -28,6 +29,9 @@ export type PriceAlert = {
   sensitivity: AlertSensitivity;
   analysis: AlertAnalysis;
   volumeMultiplier: number | null;
+  muted: boolean;
+  cooldownMinutes: number;
+  lastNotifiedAt: string | null;
   note: AlertNote | null;
   createdAt: string;
 };
@@ -61,6 +65,7 @@ export function parseAlerts(raw: string | null): PriceAlert[] {
       const analysis = (["technical", "sentiment", "all"].includes(analysisRaw) ? analysisRaw : "technical") as AlertAnalysis;
       const volumeRaw = (row as PriceAlert).volumeMultiplier;
       const volumeMultiplier = volumeRaw == null ? null : Number(volumeRaw);
+      const cooldownRaw = Number((row as PriceAlert).cooldownMinutes);
       const noteRaw = (row as PriceAlert).note;
       items.push({
         id,
@@ -72,6 +77,9 @@ export function parseAlerts(raw: string | null): PriceAlert[] {
         sensitivity,
         analysis,
         volumeMultiplier: volumeMultiplier != null && Number.isFinite(volumeMultiplier) && volumeMultiplier > 0 ? volumeMultiplier : null,
+        muted: Boolean((row as PriceAlert).muted),
+        cooldownMinutes: Number.isFinite(cooldownRaw) && cooldownRaw > 0 ? Math.min(1440, Math.max(1, cooldownRaw)) : DEFAULT_COOLDOWN_MINUTES,
+        lastNotifiedAt: String((row as PriceAlert).lastNotifiedAt || "") || null,
         note: noteRaw && typeof noteRaw === "object" && noteRaw.text
           ? {
               text: String(noteRaw.text).slice(0, 800),
@@ -94,16 +102,27 @@ export function serializeAlerts(items: PriceAlert[]): string {
   return JSON.stringify({ items: items.slice(0, ALERTS_LIMIT) });
 }
 
+const EMPTY_ALERTS: PriceAlert[] = [];
+let alertsRaw: string | null | undefined;
+let alertsCache: PriceAlert[] = EMPTY_ALERTS;
+
 export function readAlerts(): PriceAlert[] {
-  if (typeof window === "undefined") return [];
-  return parseAlerts(window.localStorage.getItem(ALERTS_KEY));
+  if (typeof window === "undefined") return EMPTY_ALERTS;
+  const raw = window.localStorage.getItem(ALERTS_KEY);
+  if (raw === alertsRaw) return alertsCache;
+  alertsRaw = raw;
+  alertsCache = parseAlerts(raw);
+  return alertsCache;
 }
 
 export function writeAlerts(items: PriceAlert[]): PriceAlert[] {
   const next = items.slice(0, ALERTS_LIMIT);
-  window.localStorage.setItem(ALERTS_KEY, serializeAlerts(next));
+  const raw = serializeAlerts(next);
+  window.localStorage.setItem(ALERTS_KEY, raw);
+  alertsRaw = raw;
+  alertsCache = parseAlerts(raw);
   window.dispatchEvent(new CustomEvent(ALERTS_EVENT));
-  return next;
+  return alertsCache;
 }
 
 export function parseVolumeSeen(raw: string | null): Record<string, number> {
@@ -155,59 +174,128 @@ export function volumePrefilterPass(
 }
 
 export type AlertEval = {
+  matching: boolean;
   fired: boolean;
-  status: "fired" | "watching" | "off-watchlist" | "volume-prefilter";
+  status: "fired" | "watching" | "off-watchlist" | "volume-prefilter" | "muted" | "cooldown" | "demo";
 };
+
+export function clipNote(text: string, max = 420): string {
+  const raw = String(text || "").replace(/\s+/g, " ").trim();
+  if (raw.length <= max) return raw;
+  const cut = raw.slice(0, max - 1);
+  const breakAt = Math.max(cut.lastIndexOf(". "), cut.lastIndexOf("; "), cut.lastIndexOf(" "));
+  return `${(breakAt > max * 0.45 ? cut.slice(0, breakAt) : cut).trim()}…`;
+}
+
+export function alertStatusLabel(status: AlertEval["status"] | string): string {
+  if (status === "fired") return "Triggered";
+  if (status === "cooldown") return "Cooldown";
+  if (status === "muted") return "Muted";
+  if (status === "off-watchlist") return "Skipped";
+  if (status === "volume-prefilter") return "Held";
+  if (status === "demo") return "Demo — not firing";
+  return "Watching";
+}
+
+export function inCooldown(alert: PriceAlert, now = Date.now()): boolean {
+  if (!alert.lastNotifiedAt) return false;
+  const then = new Date(alert.lastNotifiedAt).getTime();
+  if (Number.isNaN(then)) return false;
+  return now - then < alert.cooldownMinutes * 60_000;
+}
+
+export const FIREABLE_QUOTE_SOURCES = new Set(["coingecko", "cache"]);
+
+export function isFireableQuoteSource(source?: string | null): boolean {
+  if (source == null) return true;
+  return FIREABLE_QUOTE_SOURCES.has(source);
+}
 
 export function evaluateAlert(
   alert: PriceAlert,
   quote: { price?: number | null; change24h?: number | null; volume?: number | null },
-  opts: { watched: boolean; lastVolume?: number | null },
+  opts: { watched: boolean; lastVolume?: number | null; now?: number; source?: string },
 ): AlertEval {
-  if (!opts.watched) return { fired: false, status: "off-watchlist" };
+  if (!opts.watched) return { matching: false, fired: false, status: "off-watchlist" };
+  if (alert.muted) return { matching: false, fired: false, status: "muted" };
   if (!volumePrefilterPass(alert.volumeMultiplier, quote.volume, opts.lastVolume)) {
-    return { fired: false, status: "volume-prefilter" };
+    return { matching: false, fired: false, status: "volume-prefilter" };
   }
-  const fired = alertFired(alert, quote.price, quote.change24h);
-  return { fired, status: fired ? "fired" : "watching" };
+  const matching = alertFired(alert, quote.price, quote.change24h);
+  if (!matching) return { matching: false, fired: false, status: "watching" };
+  if (opts.source === "demo") return { matching: true, fired: false, status: "demo" };
+  if (opts.source != null && !isFireableQuoteSource(opts.source)) {
+    return { matching: true, fired: false, status: "watching" };
+  }
+  if (inCooldown(alert, opts.now)) return { matching: true, fired: false, status: "cooldown" };
+  return { matching: true, fired: true, status: "fired" };
+}
+
+export function claimFire(alertId: string, now = Date.now()): string | null {
+  const items = readAlerts();
+  const current = items.find((row) => row.id === alertId);
+  if (!current || current.muted) return null;
+  if (inCooldown(current, now)) return null;
+  const at = new Date(now).toISOString();
+  writeAlerts(items.map((row) => (row.id === alertId ? { ...row, lastNotifiedAt: at } : row)));
+  return at;
+}
+
+export function cooldownRemainingMs(alert: PriceAlert, now = Date.now()): number {
+  if (!alert?.lastNotifiedAt) return 0;
+  const then = new Date(alert.lastNotifiedAt).getTime();
+  if (Number.isNaN(then)) return 0;
+  return Math.max(0, then + alert.cooldownMinutes * 60_000 - now);
+}
+
+export function cooldownRemainingLabel(alert: PriceAlert, now = Date.now()): string | null {
+  const ms = cooldownRemainingMs(alert, now);
+  if (ms <= 0) return null;
+  const sec = Math.ceil(ms / 1000);
+  if (sec < 60) return `${sec}s left`;
+  return `${Math.ceil(sec / 60)}m left`;
+}
+
+export function rowStatusLabel(status: AlertEval["status"] | string, alert?: PriceAlert, now = Date.now()): string {
+  const base = alertStatusLabel(status);
+  if (status === "cooldown" && alert) {
+    const left = cooldownRemainingLabel(alert, now);
+    return left ? `${base} · ${left}` : base;
+  }
+  return base;
+}
+
+function subscribeAlerts(onChange: () => void) {
+  window.addEventListener("storage", onChange);
+  window.addEventListener(ALERTS_EVENT, onChange);
+  return () => {
+    window.removeEventListener("storage", onChange);
+    window.removeEventListener(ALERTS_EVENT, onChange);
+  };
 }
 
 export function useAlerts() {
-  const [items, setItems] = useState<PriceAlert[]>([]);
+  const items = useSyncExternalStore(subscribeAlerts, readAlerts, () => EMPTY_ALERTS);
 
-  useEffect(() => {
-    const sync = () => setItems(readAlerts());
-    sync();
-    window.addEventListener("storage", sync);
-    window.addEventListener(ALERTS_EVENT, sync);
-    return () => {
-      window.removeEventListener("storage", sync);
-      window.removeEventListener(ALERTS_EVENT, sync);
-    };
-  }, []);
-
-  function add(item: Omit<PriceAlert, "id" | "createdAt" | "note"> & { id?: string; note?: AlertNote | null }) {
+  function add(item: Omit<PriceAlert, "id" | "createdAt" | "note" | "lastNotifiedAt"> & { id?: string; note?: AlertNote | null; lastNotifiedAt?: string | null }) {
     const next: PriceAlert = {
       ...item,
+      muted: Boolean(item.muted),
+      cooldownMinutes: item.cooldownMinutes || DEFAULT_COOLDOWN_MINUTES,
+      lastNotifiedAt: item.lastNotifiedAt ?? null,
       note: item.note ?? null,
       id: item.id || `${item.coinId}-${item.kind}-${item.threshold}-${Date.now()}`,
       createdAt: new Date().toISOString(),
     };
-    const saved = writeAlerts([next, ...items]);
-    setItems(saved);
-    return saved;
+    return writeAlerts([next, ...readAlerts()]);
   }
 
   function patch(id: string, partial: Partial<PriceAlert>) {
-    const saved = writeAlerts(items.map((row) => (row.id === id ? { ...row, ...partial } : row)));
-    setItems(saved);
-    return saved;
+    return writeAlerts(readAlerts().map((row) => (row.id === id ? { ...row, ...partial } : row)));
   }
 
   function remove(id: string) {
-    const saved = writeAlerts(items.filter((row) => row.id !== id));
-    setItems(saved);
-    return saved;
+    return writeAlerts(readAlerts().filter((row) => row.id !== id));
   }
 
   return { items, add, patch, remove };

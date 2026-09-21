@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
@@ -19,10 +19,13 @@ from app.services.market import (
     compare_assets,
     peek_universe_status,
     snap_ohlc_days,
+    get_universe_snapshot,
 )
 from app.services.news import get_news
+from app.services.notify import forward_alert, webhook_configured
 from app.services.project import get_asset_profile
 from app.services.risk import assess_risk
+from app.services.sentiment import watchlist_sentiment
 
 settings = get_settings()
 
@@ -92,6 +95,14 @@ async def public_status():
             "configured_count": len(configured),
             "supported": len(providers),
             "ask": "council" if configured else "heuristic-tools",
+        },
+        "webhook": {
+            "configured": webhook_configured(),
+            "kind": "https_post",
+            "telegram": False,
+            "discord_bot": False,
+            "token_required": bool(settings.alert_notify_token.strip()),
+            "note": "Optional ALERT_WEBHOOK_URL. Status never shows the URL. Telegram bots are not implemented.",
         },
     }
 
@@ -273,3 +284,26 @@ async def news(limit: int = Query(20, ge=1, le=100)):
             else "Set NEWS_RSS_URLS to public RSS feeds, or keep the documented CoinDesk + Cointelegraph defaults."
         ),
     }
+
+
+@app.get("/api/sentiment")
+async def sentiment(ids: str = Query("", max_length=400)):
+    snapshot = await get_universe_snapshot()
+    by_id = {asset.id.lower(): asset for asset in snapshot.assets}
+    coins = []
+    for raw in ids.split(","):
+        ident = raw.strip().lower()
+        if not ident:
+            continue
+        asset = by_id.get(ident)
+        coins.append({
+            "id": ident,
+            "symbol": (asset.symbol if asset else ident).lower(),
+            "name": asset.name if asset else ident.replace("-", " "),
+        })
+    return await watchlist_sentiment(coins)
+
+
+@app.post("/api/alerts/notify")
+async def alerts_notify(request: Request, body: dict):
+    return await forward_alert(body if isinstance(body, dict) else {}, request)

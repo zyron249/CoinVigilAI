@@ -41,7 +41,7 @@ jobs:
         run: python -m pytest -q
 
       - name: Check local watchlist contract
-        run: node --test apps/web/lib/watchlist-contract.test.mjs apps/web/lib/project-links-contract.test.mjs apps/web/lib/pagination-contract.test.mjs apps/web/lib/alerts-contract.test.mjs apps/web/lib/portfolio-contract.test.mjs
+        run: node --test apps/web/lib/watchlist-contract.test.mjs apps/web/lib/project-links-contract.test.mjs apps/web/lib/pagination-contract.test.mjs apps/web/lib/alerts-contract.test.mjs apps/web/lib/portfolio-contract.test.mjs apps/web/lib/sentiment-contract.test.mjs apps/web/lib/alert-history-contract.test.mjs
 
       - name: Validate Python syntax
         run: python -m compileall -q apps/api/app apps/api/tests
@@ -464,6 +464,14 @@ jobs:
               continue
             fi
             if ! grep -qi "no push" /tmp/alerts.html && ! grep -qi "watchlist" /tmp/alerts.html; then
+              sleep 2
+              continue
+            fi
+            if ! grep -qi "history" /tmp/alerts.html; then
+              sleep 2
+              continue
+            fi
+            if ! grep -qi "websocket" /tmp/alerts.html; then
               sleep 2
               continue
             fi

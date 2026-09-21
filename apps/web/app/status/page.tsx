@@ -79,8 +79,12 @@ export default async function StatusPage() {
           <span>Watchlist alerts</span>
           <strong>Watchlist-scoped</strong>
           <em>
-            Free cap 3 coins. Local premium toggle is not billing. In-tab only — Telegram/Discord/push
-            are a README path, not a fake send. No on-chain whale feed. Alerts stay in this browser.
+            Free cap 3 coins. Quotes poll the snapshot (no WebSocket). Local history in this browser.
+            Webhook {status.webhook?.configured ? "env is set — notify POSTs only when a rule fires" : "not configured (ALERT_WEBHOOK_URL empty)"}.
+            {status.webhook?.token_required
+              ? " Notify token is required on this instance (header never shown)."
+              : " ALERT_NOTIFY_TOKEN is optional — set it on internet-facing APIs."}
+            Telegram bots are not implemented. Local premium toggle is not billing. No on-chain whale feed.
           </em>
           <PremiumToggle />
         </article>

@@ -8,7 +8,7 @@ It is an informational research tool, not a production trading desk and not fina
 
 - FastAPI market rankings, global overview, movers, AI brief, radar, analysis, candle, news, and health endpoints
 - Next.js Markets homepage: sortable/paginated/searchable rankings of a CoinGecko-tracked snapshot (paginated `/coins/markets`, up to 1,000 by market cap — not every coin worldwide), jump-to-asset search, local browser watchlist (free cap 3 coins; local premium toggle to 25 — not billing), global strip, gainers/losers, AI Market Brief, Ask CoinVigil, and a USD converter
-- **Watchlist-scoped smart alerts** (in this browser only): price above/below, |24h|% change, optional volume-spike prefilter, sensitivity presets. Rules never evaluate off-list coins. When a rule fires, a short tool-grounded note (heuristic or AI, labeled) is attached. Not financial advice.
+- **Watchlist-scoped smart alerts** (in this browser): price above/below, |24h|% change, optional volume-spike prefilter, sensitivity, cooldown, mute, and a local fire history. Quotes poll the snapshot (no WebSocket). Headline-heuristic sentiment on watchlist-related RSS only — otherwise “sentiment unavailable”. Optional `ALERT_WEBHOOK_URL`. Not financial advice.
 - Asset pages with an About/overview (English CoinGecko description, genesis date when listed, categories), CoinGecko-listed contract addresses by chain when present, official website/community links grouped website → explorers → socials → repos, denser stats (ATH/ATL + dates, vol/mcap, circulating vs max, 24h range), a Markets tab of CoinGecko exchange tickers (venue/volume filters), Chart Lab with an unmistakable mixed Live/Demo banner when OHLC falls back, and AI analysis
 - Heuristic analysis and market brief when no AI keys are configured
 - Parallel AI Council adapters (including optional xAI Grok) when you add provider keys
@@ -19,7 +19,8 @@ It is an informational research tool, not a production trading desk and not fina
 ## What is not done yet
 
 - PostgreSQL is **not provisioned**. `/health` reports `postgres: not_provisioned`. Watchlists, alerts, and the premium flag are **localStorage in this browser only** — there are no accounts and no billing backend.
-- There is no push, Telegram bot, Discord bot, or WebSocket tick stream. Alerts evaluate in the open tab against the CoinGecko snapshot. See “Later delivery” below — CoinVigil does not fake those channels.
+- There is no WebSocket tick stream. Watchlist alerts poll the CoinGecko snapshot (about 10s while the tab is visible, slower backoff on errors, paused when hidden) and label quote age honestly.
+- Optional `ALERT_WEBHOOK_URL` can POST a fired payload. Telegram bots are not implemented. Push is not implemented.
 - There is no on-chain whale feed. Sentiment analysis is stubbed until an NLP model is wired. Social network features (comments, follow, cashtags) are not built.
 - Token factory contracts are **unaudited**. Token Studio stays disabled until you deploy a factory and set `NEXT_PUBLIC_FACTORY_*`.
 - Public CoinGecko is rate-limited. Without a key the API may show a labeled **demo snapshot** of a small BTC/ETH/SOL-led universe.
@@ -208,18 +209,18 @@ Pushes and pull requests against `main` run API unit tests (including mocked xAI
 
 ## Later delivery (not faked)
 
-Smart alerts stay **in-app** until a real channel exists. The intended path:
+Smart alerts stay **in-app** plus an optional HTTPS webhook:
 
 1. Keep the current rule engine (watchlist-only, price/volume prefilter before any LLM cost).
-2. Add a documented webhook or bot token in `.env` (`TELEGRAM_BOT_TOKEN` / Discord webhook) — never commit secrets.
-3. Fan out the same fired payload (coin, rule, grounded note, NFA) to that channel. If the token is missing, the UI keeps saying in-tab only.
+2. Set `ALERT_WEBHOOK_URL` to a Discord webhook or any HTTPS endpoint you control. Discord receives a `content` message; other URLs receive `{event, coin_id, note, ...}`. `POST /api/alerts/notify` forwards only when that env var is set, rate-limited to 30/hour. Set `ALERT_NOTIFY_TOKEN` on internet-facing APIs (header `X-CoinVigil-Notify`). `/api/status` reports `webhook.configured` and never shows the URL.
+3. Telegram bots are **not implemented**. Do not set a Telegram token and expect delivery.
 4. Browser push would need a service worker + VAPID keys and an explicit user gesture. Do not show a “sent” state without a delivery receipt.
 
-Until those env vars and workers exist, Status and Alerts must not claim Telegram, Discord, or push delivery.
+If `ALERT_WEBHOOK_URL` is empty, Status and Alerts must say in-app only. CoinVigil does not fake Discord, Telegram, or push.
 
 ## Product direction
 
-1. Real Telegram/Discord/push on top of the watchlist rule engine (see above)
+1. Optional webhook already exists (`ALERT_WEBHOOK_URL`). Telegram/push still need real channel work — do not fake them
 2. Optional persistence / snapshot history if a database is actually wired
 3. On-chain intelligence only when a real feed exists — never invented whale prints
 4. Phase 2: coin-page comments under AI data. Phase 3: profiles, follow, cashtags, proof-of-trade

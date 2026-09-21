@@ -1,11 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import { evaluateAlert, readVolumeSeen, useAlerts } from "../lib/alerts";
+import { useEffect, useMemo, useState } from "react";
+import { evaluateAlert, readVolumeSeen, rowStatusLabel, useAlerts } from "../lib/alerts";
+import { useAlertFires } from "../lib/alert-dispatch";
 import { hydrateQuotes } from "../lib/snapshot-quotes";
 import { useWatchlist } from "../lib/watchlist";
-import { formatPercent, formatUsd } from "../lib/format";
+import { formatPercent, formatUsd, sourceLabel } from "../lib/format";
 
 export function AssetAlerts({
   coinId,
@@ -27,44 +28,76 @@ export function AssetAlerts({
   const watched = ids.has(coinId);
   const lastVolume = readVolumeSeen()[coinId];
   const [quote, setQuote] = useState({ price, change24h, volume });
+  const [source, setSource] = useState("unavailable");
+  const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
     setQuote({ price, change24h, volume });
   }, [price, change24h, volume]);
 
   useEffect(() => {
+    const tick = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(tick);
+  }, []);
+
+  useEffect(() => {
     let active = true;
+    let timer: number | undefined;
     async function refresh() {
-      const { byId } = await hydrateQuotes([coinId]);
-      const live = byId.get(coinId);
-      if (!active || !live) return;
-      setQuote({
-        price: live.current_price,
-        change24h: live.price_change_percentage_24h,
-        volume: live.total_volume,
-      });
+      if (timer) window.clearTimeout(timer);
+      if (typeof document !== "undefined" && document.visibilityState === "hidden") {
+        timer = window.setTimeout(refresh, 30_000);
+        return;
+      }
+      const snap = await hydrateQuotes([coinId]);
+      const live = snap.byId.get(coinId);
+      if (!active) return;
+      setSource(snap.source);
+      if (live) {
+        setQuote({
+          price: live.current_price,
+          change24h: live.price_change_percentage_24h,
+          volume: live.total_volume,
+        });
+      }
+      timer = window.setTimeout(refresh, 10_000);
     }
     void refresh();
-    const timer = window.setInterval(refresh, 30_000);
+    const onVis = () => {
+      if (document.visibilityState === "visible") void refresh();
+    };
+    document.addEventListener("visibilitychange", onVis);
     return () => {
       active = false;
-      window.clearInterval(timer);
+      if (timer) window.clearTimeout(timer);
+      document.removeEventListener("visibilitychange", onVis);
     };
   }, [coinId]);
 
   const mine = items.filter((item) => item.coinId === coinId);
-  const fired = mine.filter((item) => evaluateAlert(
+  const matching = mine.filter((item) => evaluateAlert(
     item,
     quote,
-    { watched, lastVolume },
-  ).fired);
+    { watched, lastVolume, now, source },
+  ).matching);
+  const quoteMap = useMemo(() => {
+    const map = new Map();
+    map.set(coinId, { id: coinId, symbol, name, current_price: quote.price, price_change_percentage_24h: quote.change24h, total_volume: quote.volume });
+    return map;
+  }, [coinId, symbol, name, quote]);
+  useAlertFires(mine, quoteMap, {
+    watchIds: ids,
+    lastVolume: lastVolume != null ? { [coinId]: lastVolume } : {},
+    source,
+    now,
+  });
 
   return (
     <section className="card alerts-card asset-alerts" id="asset-alerts">
       <div className="section-heading">
         <div>
           <div className="eyebrow">WATCHLIST ALERTS</div>
-          <h2>{watched ? (fired.length ? "Triggered against this quote" : "Watch this level") : "Star this coin to alert"}</h2>
+          <h2>{watched ? (matching.length ? "Matching this snapshot" : "Watch this level") : "Star this coin to alert"}</h2>
         </div>
         {watched ? (
           <Link className="ghost tool-button" href={`/alerts?coin=${coinId}`}>New rule</Link>
@@ -73,9 +106,9 @@ export function AssetAlerts({
         )}
       </div>
       <p className="muted alerts-note">
-        {name} is {formatUsd(quote.price)} ({formatPercent(quote.change24h)} 24h) in this snapshot.
+        {name} is {formatUsd(quote.price)} ({formatPercent(quote.change24h)} 24h) · {sourceLabel(source).text}.
         {watched
-          ? " Rules for this starred coin evaluate in this tab only — no push."
+          ? " Rules for this starred coin poll the CoinGecko snapshot in this tab — no WebSocket, no push."
           : " Alerts never spam the whole market. Star it first (free cap 3)."}
         {" "}CoinVigil does not invent trip prices or on-chain whale prints.
       </p>
@@ -93,20 +126,20 @@ export function AssetAlerts({
       ) : (
         <ul className="alerts-list">
           {mine.map((item) => {
-            const result = evaluateAlert(item, quote, { watched, lastVolume });
+            const result = evaluateAlert(item, quote, { watched, lastVolume, now, source });
             return (
               <li
                 key={item.id}
-                className={result.fired ? "is-fired" : undefined}
+                className={result.matching ? "is-fired" : undefined}
                 data-alert-coin={item.coinId}
                 data-alert-status={result.status}
               >
                 <div className="alert-copy">
                   <strong>{item.kind === "change_24h" ? `|24h| ≥ ${item.threshold}%` : `${item.kind} ${formatUsd(item.threshold)}`}</strong>
                   <span className="muted">{formatUsd(quote.price)}</span>
-                  {result.fired && item.note ? <span className="alert-note">{item.note.text}</span> : null}
+                  {result.matching && item.note ? <span className="alert-note">{item.note.text}</span> : null}
                 </div>
-                <span className={result.fired ? "pill" : "muted"}>{result.fired ? "Triggered" : result.status === "off-watchlist" ? "Skipped" : "Watching"}</span>
+                <span className={result.matching ? "pill" : "muted"}>{rowStatusLabel(result.status, item, now)}</span>
               </li>
             );
           })}

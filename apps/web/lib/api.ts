@@ -263,10 +263,11 @@ function apiBase() {
   return process.env.API_INTERNAL_URL || process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 }
 
-async function request(path: string): Promise<Response> {
+async function request(path: string, init: RequestInit = {}): Promise<Response> {
   return fetch(`${apiBase()}${path}`, {
     cache: "no-store",
     signal: AbortSignal.timeout(FETCH_MS),
+    ...init,
   });
 }
 
@@ -611,6 +612,7 @@ export type StackStatus = {
   postgres?: string;
   news?: { feeds: number; hosts: string[]; using_defaults: boolean };
   ai?: { enabled: boolean; configured: string[]; configured_count: number; supported: number; ask?: string };
+  webhook?: { configured: boolean; kind?: string; telegram?: boolean; discord_bot?: boolean; token_required?: boolean; note?: string };
 };
 
 export async function getStackStatus(): Promise<StackStatus> {
@@ -758,5 +760,70 @@ export async function getConvert(amount: number, fromId: string, toId: string): 
     return await response.json();
   } catch {
     return empty;
+  }
+}
+
+export type WatchlistSentiment = {
+  available: boolean;
+  engine: string;
+  reason?: string | null;
+  lean?: string;
+  matched?: number;
+  net?: number;
+  items: Array<{ title: string; source: string; url?: string | null; coin_id?: string; polarity: number; lean: string }>;
+  note?: string;
+};
+
+export async function getWatchlistSentiment(ids: string[]): Promise<WatchlistSentiment> {
+  const empty: WatchlistSentiment = {
+    available: false,
+    engine: "headline-heuristic",
+    reason: "sentiment unavailable — the sentiment endpoint did not respond. CoinVigil does not invent social scores.",
+    items: [],
+  };
+  const cleaned = [...new Set(ids.map((id) => id.trim().toLowerCase()).filter(Boolean))].slice(0, 25);
+  if (!cleaned.length) {
+    return { ...empty, reason: "sentiment unavailable — no watchlist coins were provided. CoinVigil does not invent social scores." };
+  }
+  try {
+    const response = await request(`/api/sentiment?ids=${encodeURIComponent(cleaned.join(","))}`);
+    if (!response.ok) return empty;
+    const json = await response.json();
+    return {
+      available: Boolean(json.available),
+      engine: json.engine || "headline-heuristic",
+      reason: json.reason ?? null,
+      lean: json.lean,
+      matched: json.matched,
+      net: json.net,
+      items: Array.isArray(json.items) ? json.items : [],
+      note: json.note,
+    };
+  } catch {
+    return empty;
+  }
+}
+
+export async function postAlertNotify(payload: {
+  coin_id: string;
+  name: string;
+  symbol: string;
+  kind: string;
+  threshold: number;
+  note?: string;
+  at?: string;
+}): Promise<{ delivered: boolean; configured: boolean; reason?: string | null }> {
+  try {
+    const response = await request("/api/alerts/notify", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!response.ok) {
+      return { delivered: false, configured: false, reason: "Notify endpoint unavailable. In-app history still records the fire." };
+    }
+    return await response.json();
+  } catch {
+    return { delivered: false, configured: false, reason: "Notify endpoint unreachable. In-app history still records the fire." };
   }
 }

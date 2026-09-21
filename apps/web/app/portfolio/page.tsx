@@ -27,7 +27,8 @@ export default async function PortfolioPage({
       <PortfolioBoard initialCoin={coin} />
       <p className="coverage-note muted">
         This is not a broker and not a CMC clone. Research lists live on the{" "}
-        <Link href="/#watchlist">watchlist</Link>. Price rules live on <Link href="/alerts">Alerts</Link> (no push yet).
+        <Link href="/#watchlist">watchlist</Link>. Price rules live on <Link href="/alerts">Alerts</Link>
+        {" "}(in-app history; Telegram is not implemented).
       </p>
     </main>
   );

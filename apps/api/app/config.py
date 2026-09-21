@@ -18,6 +18,11 @@ class Settings(BaseSettings):
     # Unused. CoinVigil does not persist to Postgres in this build.
     database_url: str = ""
     redis_url: str = "redis://localhost:6379/0"
+    # Optional HTTPS endpoint (Discord webhook or your own). Never commit the URL.
+    # POST /api/alerts/notify forwards a fired watchlist payload only when this is set.
+    alert_webhook_url: str = ""
+    # Optional shared secret. When set, /api/alerts/notify requires header X-CoinVigil-Notify.
+    alert_notify_token: str = ""
     cors_allow_origins: str = "http://localhost:3000,http://127.0.0.1:3000"
     market_cache_ttl_seconds: int = 30
     # Optional Fear & Greed source (Alternative.me). Empty disables the lookup.

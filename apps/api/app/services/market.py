@@ -34,6 +34,7 @@ PAGE_GAP_AFTER_SKIP_SECONDS = 0.55
 PAGE_FILL_PASSES = 1
 PAGE_FILL_SLEEP_SECONDS = 0.9
 PAGE_BACKGROUND_FILL_SECONDS = 2.0
+_universe_fetch_lock = asyncio.Lock()
 # Short process cache so one dashboard render does not stampede CoinGecko
 # when Redis is down. Partial snapshots expire faster so the next tick can fill gaps.
 _MEMORY_TTL_SECONDS = 20.0
@@ -712,46 +713,53 @@ async def get_universe_snapshot() -> UniverseSnapshot:
     if isinstance(mem, tuple) and len(mem) == 2 and mem[0]:
         return UniverseSnapshot(list(mem[0]), mem[1])
 
-    cached = await cache_get(UNIVERSE_CACHE_KEY)
-    if isinstance(cached, dict) and _fresh_cache_payload(cached):
-        snapshot = _snapshot_from_payload(cached, stale=False)
-        if snapshot:
-            _memory_set(
-                "universe",
-                snapshot,
-                _MEMORY_TTL_PARTIAL_SECONDS if snapshot.partial else _MEMORY_TTL_SECONDS,
-            )
+    async with _universe_fetch_lock:
+        mem = _memory_get("universe")
+        if isinstance(mem, UniverseSnapshot) and mem.assets:
+            snapshot = _copy_snapshot(mem)
             _maybe_schedule_fill(snapshot)
             return snapshot
-    if isinstance(cached, list) and cached:
-        assets = [market_asset_from_payload(item) for item in cached if item.get("id")]
-        snapshot = UniverseSnapshot(assets, "cache")
-        _memory_set("universe", snapshot)
-        return snapshot
 
-    try:
-        snapshot = await _fetch_coingecko_market_universe()
-        if snapshot and snapshot.assets:
-            await _store_universe(snapshot)
-            _maybe_schedule_fill(snapshot)
-            return snapshot
-        logger.warning("CoinGecko markets returned an empty payload")
-        reason = "unreachable"
-    except Exception as exc:
-        reason = _fallback_reason(exc)
-        logger.warning("CoinGecko markets unavailable (%s); trying last live snapshot", type(exc).__name__)
-
-    last_good = await load_last_good("universe")
-    if last_good:
-        snapshot = _snapshot_from_payload(last_good, stale=True, fallback_reason=reason)
-        if snapshot:
+        cached = await cache_get(UNIVERSE_CACHE_KEY)
+        if isinstance(cached, dict) and _fresh_cache_payload(cached):
+            snapshot = _snapshot_from_payload(cached, stale=False)
+            if snapshot:
+                _memory_set(
+                    "universe",
+                    snapshot,
+                    _MEMORY_TTL_PARTIAL_SECONDS if snapshot.partial else _MEMORY_TTL_SECONDS,
+                )
+                _maybe_schedule_fill(snapshot)
+                return snapshot
+        if isinstance(cached, list) and cached:
+            assets = [market_asset_from_payload(item) for item in cached if item.get("id")]
+            snapshot = UniverseSnapshot(assets, "cache")
             _memory_set("universe", snapshot)
             return snapshot
 
-    demo = list(DEMO_MARKETS)
-    snapshot = UniverseSnapshot(demo, "demo", stale=False, fallback_reason=reason, partial=False)
-    _memory_set("universe", snapshot)
-    return snapshot
+        try:
+            snapshot = await _fetch_coingecko_market_universe()
+            if snapshot and snapshot.assets:
+                await _store_universe(snapshot)
+                _maybe_schedule_fill(snapshot)
+                return snapshot
+            logger.warning("CoinGecko markets returned an empty payload")
+            reason = "unreachable"
+        except Exception as exc:
+            reason = _fallback_reason(exc)
+            logger.warning("CoinGecko markets unavailable (%s); trying last live snapshot", type(exc).__name__)
+
+        last_good = await load_last_good("universe")
+        if last_good:
+            snapshot = _snapshot_from_payload(last_good, stale=True, fallback_reason=reason)
+            if snapshot:
+                _memory_set("universe", snapshot)
+                return snapshot
+
+        demo = list(DEMO_MARKETS)
+        snapshot = UniverseSnapshot(demo, "demo", stale=False, fallback_reason=reason, partial=False)
+        _memory_set("universe", snapshot)
+        return snapshot
 
 
 async def get_market_universe() -> tuple[list[MarketAsset], str]:
