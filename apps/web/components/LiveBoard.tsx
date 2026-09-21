@@ -26,6 +26,9 @@ export function LiveBoard({
   hero,
   brief,
   radar,
+  rail,
+  topCryptos,
+  radarStrip,
 }: {
   initialMarket: MarketPage;
   initialOverview: GlobalOverview;
@@ -33,6 +36,9 @@ export function LiveBoard({
   hero: ReactNode;
   brief: ReactNode;
   radar: ReactNode;
+  rail?: ReactNode;
+  topCryptos?: ReactNode;
+  radarStrip?: ReactNode;
 }) {
   const [market, setMarket] = useState(initialMarket);
   const [overview, setOverview] = useState(initialOverview);
@@ -240,29 +246,36 @@ export function LiveBoard({
       ) : null}
       <AskPanel compact heading="Ask CoinVigil" />
       <GlobalStrip overview={overview} checkedAt={checkedAt} />
-      {brief}
-      <AlertsStrip assets={watchAssets} />
-      <WatchlistStrip assets={watchAssets} />
-      <PortfolioStrip assets={watchAssets} />
-      <section className="slice-grid" id="movers">
-        <Movers gainers={movers.gainers} losers={movers.losers} source={movers.source} stale={movers.stale} />
-        <div id="radar">{radar}</div>
-      </section>
-      <p className="movers-footnote muted">
-        24h gainers are up; 24h losers are down. Ranked from the CoinVigil universe ({sourceLabel(movers.source, { stale: movers.stale }).text}).
-        Prices are never invented.
-      </p>
-      <section id="markets" className="markets-board">
-        <MarketTable
-          pageData={market}
-          busy={busy}
-          refreshError={refreshError}
-          checkedAt={checkedAt}
-          draft={draft}
-          onDraft={setDraft}
-          onQuery={(next) => { void loadMarket(next); }}
-        />
-      </section>
+      <div className="dash-grid">
+        <div className="dash-main">
+          {topCryptos}
+          {brief}
+          <AlertsStrip assets={watchAssets} />
+          <WatchlistStrip assets={watchAssets} />
+          <PortfolioStrip assets={watchAssets} />
+          {radarStrip}
+          <section className="slice-grid" id="movers">
+            <Movers gainers={movers.gainers} losers={movers.losers} source={movers.source} stale={movers.stale} />
+            <div id="radar-flags">{radar}</div>
+          </section>
+          <p className="movers-footnote muted">
+            24h gainers are up; 24h losers are down. Ranked from the CoinVigil universe ({sourceLabel(movers.source, { stale: movers.stale }).text}).
+            Prices are never invented.
+          </p>
+          <section id="markets" className="markets-board">
+            <MarketTable
+              pageData={market}
+              busy={busy}
+              refreshError={refreshError}
+              checkedAt={checkedAt}
+              draft={draft}
+              onDraft={setDraft}
+              onQuery={(next) => { void loadMarket(next); }}
+            />
+          </section>
+        </div>
+        {rail ? <aside className="dash-rail">{rail}</aside> : null}
+      </div>
     </>
   );
 }

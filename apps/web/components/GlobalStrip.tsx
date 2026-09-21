@@ -51,6 +51,9 @@ export function GlobalStrip({
             ) : item.note ? (
               <em>{item.note}</em>
             ) : null}
+            {item.label === "Fear & Greed" && overview.fear_greed_value != null ? (
+              <span className="fg-meter" style={{ ["--fg" as string]: overview.fear_greed_value }} />
+            ) : null}
           </div>
         ))}
         <div className="global-stat source-stat">
