@@ -11,6 +11,7 @@ from app.services.market import (
     get_markets_with_source,
     get_movers,
     get_ranked_markets,
+    get_universe_snapshot,
     market_asset_from_payload,
     peek_universe_status,
     save_last_good,
@@ -58,6 +59,19 @@ async def test_peek_universe_status_never_calls_coingecko(monkeypatch):
     assert observed["source"] == "cache"
     assert observed["stale"] is True
     assert observed["last_live_at"] == "2026-09-20T04:00:00Z"
+
+
+@pytest.mark.asyncio
+async def test_peek_reads_ttl_memory_cache_without_unpack_error(monkeypatch):
+    monkeypatch.setattr("app.services.market.httpx.AsyncClient", _FailingClient)
+    monkeypatch.setattr("app.services.market.cache_get", _noop_cache_get)
+    monkeypatch.setattr("app.services.market.cache_set", _noop_cache_set)
+    snapshot = await get_universe_snapshot()
+    peeked = await peek_universe_status()
+    assert snapshot.source == "demo"
+    assert peeked["observed"] is True
+    assert peeked["source"] == "demo"
+    assert peeked["fallback_reason"] == "unreachable"
 
 
 def test_parses_coingecko_percentage_aliases():

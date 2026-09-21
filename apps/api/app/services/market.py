@@ -38,7 +38,7 @@ PAGE_FILL_SLEEP_SECONDS = 0.4
 _MEMORY_TTL_SECONDS = 20.0
 _MEMORY_TTL_PARTIAL_SECONDS = 8.0
 _LAST_GOOD_TTL_SECONDS = 6 * 60 * 60
-_memory_cache: dict[str, tuple[float, Any]] = {}
+_memory_cache: dict[str, tuple[float, Any, float]] = {}
 _last_good: dict[str, dict[str, Any]] = {}
 SORT_FIELDS = {
     "rank": "market_cap_rank",
@@ -501,13 +501,11 @@ async def peek_universe_status() -> dict[str, Any]:
             "observed": True,
         }
 
-    mem_row = _memory_cache.get("universe")
-    if mem_row:
-        _stamped, mem = mem_row
-        if isinstance(mem, UniverseSnapshot) and mem.assets:
-            return from_snapshot(mem)
-        if isinstance(mem, tuple) and len(mem) == 2 and mem[0]:
-            return from_snapshot(UniverseSnapshot(list(mem[0]), mem[1]))
+    mem = _memory_get("universe")
+    if isinstance(mem, UniverseSnapshot) and mem.assets:
+        return from_snapshot(mem)
+    if isinstance(mem, tuple) and len(mem) == 2 and mem[0]:
+        return from_snapshot(UniverseSnapshot(list(mem[0]), mem[1]))
 
     cache_key = UNIVERSE_CACHE_KEY
     cached = await cache_get(cache_key)
