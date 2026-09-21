@@ -1,5 +1,4 @@
-import { SiteFooter } from "../components/SiteFooter";
-import { SiteHeader } from "../components/SiteHeader";
+import { AppChrome } from "../components/AppChrome";
 import "./globals.css";
 
 export const metadata = {
@@ -17,11 +16,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
       </head>
       <body>
         <a className="skip-link" href="#content">Skip to content</a>
-        <div className="shell">
-          <SiteHeader />
-          {children}
-          <SiteFooter />
-        </div>
+        <AppChrome>{children}</AppChrome>
       </body>
     </html>
   );

@@ -1,9 +1,14 @@
 import Link from "next/link";
 import { CouncilRoster } from "../components/CouncilRoster";
 import { LiveBoard } from "../components/LiveBoard";
+import { LiveChartPanel } from "../components/LiveChartPanel";
 import { MarketBriefCard } from "../components/MarketBriefCard";
+import { NewsRail } from "../components/NewsRail";
+import { NewsletterCard } from "../components/NewsletterCard";
 import { Radar } from "../components/Radar";
-import { getCouncilStatus, getGlobalOverview, getMarket, getMarketBrief, getMovers, getRadar } from "../lib/api";
+import { TokenRadarStrip } from "../components/TokenRadarStrip";
+import { TopCryptos } from "../components/TopCryptos";
+import { getCouncilStatus, getGlobalOverview, getMarket, getMarketBrief, getMovers, getNews, getRadar } from "../lib/api";
 import { sourceLabel } from "../lib/format";
 import { parseMarketQuery } from "../lib/pagination";
 
@@ -25,12 +30,13 @@ export default async function Home({
     sort: firstParam(query.sort),
     order: firstParam(query.order),
   });
-  const [market, overview, movers, radar, council] = await Promise.all([
+  const [market, overview, movers, radar, council, news] = await Promise.all([
     getMarket(marketQuery),
     getGlobalOverview(),
     getMovers(5),
     getRadar(),
     getCouncilStatus(),
+    getNews(),
   ]);
   const brief = council.configured === 0 ? await getMarketBrief() : null;
   const leadAsset = market.assets[0];
@@ -43,27 +49,45 @@ export default async function Home({
         initialOverview={overview}
         initialMovers={movers}
         hero={(
-          <section className="markets-hero">
+          <section className="dash-hero">
             <div>
               <div className="eyebrow hero-tag">CRYPTOCURRENCY RANKINGS</div>
-              <h1>Markets, with an <span>AI brief</span>.</h1>
+              <h1>Smarter Crypto Decisions <span>with AI</span>.</h1>
               <p>
+                Live CoinGecko snapshot, multi-model analysis when keys are set, and watchlist alerts — all in one desk.
                 Ranked CoinGecko-tracked assets (paginated `/coins/markets`, {market.universe_size} of {market.coverage_target || 1000} in this snapshot).
-                Search above the table, then jump straight to an asset. CoinVigil does not claim every coin on earth.
-                The brief is labeled heuristic or AI-generated. Not CoinMarketCap, and not financial advice.
+                Not CoinMarketCap. Informational research only — not financial advice.
               </p>
+              <div className="hero-actions">
+                <Link className="nav-cta" href="/#markets">Explore Markets</Link>
+                <Link className="ghost tool-button" href="/ask">See AI Analysis</Link>
+              </div>
             </div>
-            <aside className="disclaimer-banner">
-              <strong>Data tool, not investment advice.</strong>
-              <span>
-                Source is {marketSource.text}. Live and cached rows come from CoinGecko.
-                Demo prices are synthetic stand-ins used only when CoinGecko is unreachable.
-              </span>
+            <aside className="hero-visual">
+              <div className="orb-wrap" aria-hidden="true">
+                <div className="orb"><span className="orb-core">AI</span></div>
+              </div>
+              <div className="disclaimer-banner">
+                <strong>Data tool, not investment advice.</strong>
+                <span>
+                  Source is {marketSource.text}. Live and cached rows come from CoinGecko.
+                  Demo prices are synthetic stand-ins used only when CoinGecko is unreachable.
+                </span>
+              </div>
             </aside>
           </section>
         )}
         brief={<MarketBriefCard initial={brief} refresh={council.configured > 0} />}
         radar={<Radar signals={radar} />}
+        topCryptos={<TopCryptos assets={market.assets} />}
+        radarStrip={<TokenRadarStrip signals={radar} gainers={movers.gainers} />}
+        rail={(
+          <>
+            <LiveChartPanel assets={market.assets} />
+            <NewsRail items={news.items} message={news.message} />
+            <NewsletterCard />
+          </>
+        )}
       />
 
       <CouncilRoster

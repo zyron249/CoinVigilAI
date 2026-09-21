@@ -1,0 +1,56 @@
+# CoinVigil AI — Render Blueprint
+# One public URL: nginx fronts Next.js and FastAPI. Optional Redis cache.
+# Docs: DEPLOY.md
+
+services:
+  - type: web
+    name: coinvigil
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    plan: standard
+    healthCheckPath: /health
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: CORS_ALLOW_ORIGINS
+        value: https://coinvigilai.com,https://www.coinvigilai.com
+      - key: NEXT_PUBLIC_API_URL
+        value: same-origin
+      - key: API_INTERNAL_URL
+        value: http://127.0.0.1:8000
+      - key: FEAR_GREED_URL
+        value: https://api.alternative.me/fng/?limit=1
+      - key: AI_COUNCIL_ENABLED
+        value: "true"
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: coinvigil-redis
+          property: connectionString
+      - key: COINGECKO_API_KEY
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: XAI_API_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: MISTRAL_API_KEY
+        sync: false
+      - key: DEEPSEEK_API_KEY
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: PERPLEXITY_API_KEY
+        sync: false
+      - key: OPENROUTER_API_KEY
+        sync: false
+
+  - type: keyvalue
+    name: coinvigil-redis
+    plan: starter
+    maxmemoryPolicy: allkeys-lru
+    ipAllowList: []

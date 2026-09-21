@@ -1,3 +1,5 @@
+import { resolveApiBase } from "./api-base";
+
 export type MarketAsset = {
   id: string;
   symbol: string;
@@ -257,10 +259,11 @@ function freshnessFrom(json: Partial<Freshness> | null | undefined): Freshness {
 }
 
 function apiBase() {
-  if (typeof window !== "undefined") {
-    return process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-  }
-  return process.env.API_INTERNAL_URL || process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+  return resolveApiBase(
+    typeof window !== "undefined",
+    process.env.NEXT_PUBLIC_API_URL,
+    process.env.API_INTERNAL_URL,
+  );
 }
 
 async function request(path: string, init: RequestInit = {}): Promise<Response> {

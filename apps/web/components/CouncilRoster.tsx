@@ -22,14 +22,21 @@ export function CouncilRoster({
       <div className="section-heading">
         <div>
           <div className="eyebrow">AI COUNCIL</div>
-          <h2>Optional multi-model analysis</h2>
+          <h2>AI Token Analysis</h2>
         </div>
         <span className="muted">{configured} of {supported} providers configured</span>
       </div>
       <p className="council-copy">
-        Grok (xAI) and the other council models vote only when their API keys are set.
-        Missing keys are skipped and demo mode keeps using the quantitative fallback.
+        {configured === 0
+          ? `Models offline — ${configured} of ${supported} keys set. Heuristic tools only. CoinVigil does not fake a BULLISH 78% multi-model vote.`
+          : `Grok (xAI) and the other council models vote only when their API keys are set. Missing keys are skipped.`}
       </p>
+      {configured === 0 ? (
+        <div className="consensus-offline">
+          <strong>No live consensus</strong>
+          <span>Use the labeled market brief. Fake GPT-4/Claude rows are not shown.</span>
+        </div>
+      ) : null}
       <div className="council-providers">
         {providers.map((provider) => {
           const result = resultByProvider.get(provider.provider);
