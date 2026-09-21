@@ -212,7 +212,7 @@ Pushes and pull requests against `main` run API unit tests (including mocked xAI
 Smart alerts stay **in-app** plus an optional HTTPS webhook:
 
 1. Keep the current rule engine (watchlist-only, price/volume prefilter before any LLM cost).
-2. Set `ALERT_WEBHOOK_URL` to a Discord webhook or any HTTPS endpoint you control. `POST /api/alerts/notify` forwards the fired payload only when that env var is set. `/api/status` reports `webhook.configured` and never shows the URL.
+2. Set `ALERT_WEBHOOK_URL` to a Discord webhook or any HTTPS endpoint you control. Discord receives a `content` message; other URLs receive `{event, coin_id, note, ...}`. `POST /api/alerts/notify` forwards only when that env var is set, rate-limited to 30/hour. Set `ALERT_NOTIFY_TOKEN` on internet-facing APIs (header `X-CoinVigil-Notify`). `/api/status` reports `webhook.configured` and never shows the URL.
 3. Telegram bots are **not implemented**. Do not set a Telegram token and expect delivery.
 4. Browser push would need a service worker + VAPID keys and an explicit user gesture. Do not show a “sent” state without a delivery receipt.
 

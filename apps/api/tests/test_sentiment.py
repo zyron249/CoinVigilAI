@@ -30,6 +30,13 @@ def test_watchlist_headline_can_lean_without_nlp():
     assert out["items"][0]["coin_id"] == "bitcoin"
 
 
+def test_generic_coin_name_does_not_eat_english():
+    from app.services.sentiment import headline_matches_coin
+    coin = {"id": "flow", "symbol": "flow", "name": "Flow"}
+    assert headline_matches_coin("Cash flow surges after refunds", coin) is False
+    assert headline_matches_coin("FLOW rallies after mainnet", coin) is True
+
+
 @pytest.mark.asyncio
 async def test_empty_rss_is_unavailable(monkeypatch):
     async def fake_news(limit=30):

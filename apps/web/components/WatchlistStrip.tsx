@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import type { MarketAsset } from "../lib/api";
-import { changeClass, formatPercent, formatUsd } from "../lib/format";
+import { changeClass, formatAge, formatPercent, formatUsd, sourceLabel } from "../lib/format";
 import { hydrateQuotes } from "../lib/snapshot-quotes";
 import { useWatchlist } from "../lib/watchlist";
 import { PremiumToggle } from "./PremiumToggle";
@@ -16,6 +16,15 @@ function companionId(id: string) {
 export function WatchlistStrip({ assets }: { assets: MarketAsset[] }) {
   const { items, cap, atCap, premium } = useWatchlist();
   const [extra, setExtra] = useState<MarketAsset[]>([]);
+  const [source, setSource] = useState("unavailable");
+  const [stale, setStale] = useState(false);
+  const [checkedAt, setCheckedAt] = useState<string | null>(null);
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    const tick = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(tick);
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -31,9 +40,12 @@ export function WatchlistStrip({ assets }: { assets: MarketAsset[] }) {
         if (active) setExtra([]);
         return;
       }
-      const { byId } = await hydrateQuotes(ids, assets);
+      const snap = await hydrateQuotes(ids, assets);
       if (!active) return;
-      setExtra([...byId.values()]);
+      setExtra([...snap.byId.values()]);
+      setSource(snap.source);
+      setStale(Boolean(snap.stale));
+      setCheckedAt(snap.checkedAt);
       timer = window.setTimeout(refresh, 10_000);
     }
     void refresh();
@@ -71,7 +83,10 @@ export function WatchlistStrip({ assets }: { assets: MarketAsset[] }) {
           <Link className="ghost tool-button" href={compareHref}>
             {items.length >= 2 ? "Compare watched" : "Open Compare"}
           </Link>
-          <span className="muted">{items.length} / {cap}</span>
+          <span className="muted">
+            {items.length} / {cap}
+            {items.length ? ` · ${sourceLabel(source, { stale }).text} · ${formatAge(checkedAt, now)}` : ""}
+          </span>
         </div>
       </div>
       <p className="muted alerts-note">

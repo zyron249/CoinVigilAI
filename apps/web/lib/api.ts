@@ -612,7 +612,7 @@ export type StackStatus = {
   postgres?: string;
   news?: { feeds: number; hosts: string[]; using_defaults: boolean };
   ai?: { enabled: boolean; configured: string[]; configured_count: number; supported: number; ask?: string };
-  webhook?: { configured: boolean; kind?: string; telegram?: boolean; discord_bot?: boolean; note?: string };
+  webhook?: { configured: boolean; kind?: string; telegram?: boolean; discord_bot?: boolean; token_required?: boolean; note?: string };
 };
 
 export async function getStackStatus(): Promise<StackStatus> {

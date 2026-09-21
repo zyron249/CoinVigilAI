@@ -117,9 +117,12 @@ export function readAlerts(): PriceAlert[] {
 
 export function writeAlerts(items: PriceAlert[]): PriceAlert[] {
   const next = items.slice(0, ALERTS_LIMIT);
-  window.localStorage.setItem(ALERTS_KEY, serializeAlerts(next));
+  const raw = serializeAlerts(next);
+  window.localStorage.setItem(ALERTS_KEY, raw);
+  alertsRaw = raw;
+  alertsCache = parseAlerts(raw);
   window.dispatchEvent(new CustomEvent(ALERTS_EVENT));
-  return next;
+  return alertsCache;
 }
 
 export function parseVolumeSeen(raw: string | null): Record<string, number> {
@@ -173,7 +176,7 @@ export function volumePrefilterPass(
 export type AlertEval = {
   matching: boolean;
   fired: boolean;
-  status: "fired" | "watching" | "off-watchlist" | "volume-prefilter" | "muted" | "cooldown";
+  status: "fired" | "watching" | "off-watchlist" | "volume-prefilter" | "muted" | "cooldown" | "demo";
 };
 
 export function alertStatusLabel(status: AlertEval["status"] | string): string {
@@ -182,6 +185,7 @@ export function alertStatusLabel(status: AlertEval["status"] | string): string {
   if (status === "muted") return "Muted";
   if (status === "off-watchlist") return "Skipped";
   if (status === "volume-prefilter") return "Held";
+  if (status === "demo") return "Demo — not firing";
   return "Watching";
 }
 
@@ -192,10 +196,17 @@ export function inCooldown(alert: PriceAlert, now = Date.now()): boolean {
   return now - then < alert.cooldownMinutes * 60_000;
 }
 
+export const FIREABLE_QUOTE_SOURCES = new Set(["coingecko", "cache"]);
+
+export function isFireableQuoteSource(source?: string | null): boolean {
+  if (source == null) return true;
+  return FIREABLE_QUOTE_SOURCES.has(source);
+}
+
 export function evaluateAlert(
   alert: PriceAlert,
   quote: { price?: number | null; change24h?: number | null; volume?: number | null },
-  opts: { watched: boolean; lastVolume?: number | null; now?: number },
+  opts: { watched: boolean; lastVolume?: number | null; now?: number; source?: string },
 ): AlertEval {
   if (!opts.watched) return { matching: false, fired: false, status: "off-watchlist" };
   if (alert.muted) return { matching: false, fired: false, status: "muted" };
@@ -204,8 +215,22 @@ export function evaluateAlert(
   }
   const matching = alertFired(alert, quote.price, quote.change24h);
   if (!matching) return { matching: false, fired: false, status: "watching" };
+  if (opts.source === "demo") return { matching: true, fired: false, status: "demo" };
+  if (opts.source != null && !isFireableQuoteSource(opts.source)) {
+    return { matching: true, fired: false, status: "watching" };
+  }
   if (inCooldown(alert, opts.now)) return { matching: true, fired: false, status: "cooldown" };
   return { matching: true, fired: true, status: "fired" };
+}
+
+export function claimFire(alertId: string, now = Date.now()): string | null {
+  const items = readAlerts();
+  const current = items.find((row) => row.id === alertId);
+  if (!current || current.muted) return null;
+  if (inCooldown(current, now)) return null;
+  const at = new Date(now).toISOString();
+  writeAlerts(items.map((row) => (row.id === alertId ? { ...row, lastNotifiedAt: at } : row)));
+  return at;
 }
 
 export function cooldownRemainingMs(alert: PriceAlert, now = Date.now()): number {

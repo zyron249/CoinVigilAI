@@ -1,11 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { evaluateAlert, readVolumeSeen, rowStatusLabel, useAlerts } from "../lib/alerts";
+import { useAlertFires } from "../lib/alert-dispatch";
 import { hydrateQuotes } from "../lib/snapshot-quotes";
 import { useWatchlist } from "../lib/watchlist";
-import { formatPercent, formatUsd } from "../lib/format";
+import { formatPercent, formatUsd, sourceLabel } from "../lib/format";
 
 export function AssetAlerts({
   coinId,
@@ -27,6 +28,7 @@ export function AssetAlerts({
   const watched = ids.has(coinId);
   const lastVolume = readVolumeSeen()[coinId];
   const [quote, setQuote] = useState({ price, change24h, volume });
+  const [source, setSource] = useState("unavailable");
   const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
@@ -47,9 +49,10 @@ export function AssetAlerts({
         timer = window.setTimeout(refresh, 30_000);
         return;
       }
-      const { byId } = await hydrateQuotes([coinId]);
-      const live = byId.get(coinId);
+      const snap = await hydrateQuotes([coinId]);
+      const live = snap.byId.get(coinId);
       if (!active) return;
+      setSource(snap.source);
       if (live) {
         setQuote({
           price: live.current_price,
@@ -75,8 +78,19 @@ export function AssetAlerts({
   const matching = mine.filter((item) => evaluateAlert(
     item,
     quote,
-    { watched, lastVolume, now },
+    { watched, lastVolume, now, source },
   ).matching);
+  const quoteMap = useMemo(() => {
+    const map = new Map();
+    map.set(coinId, { id: coinId, symbol, name, current_price: quote.price, price_change_percentage_24h: quote.change24h, total_volume: quote.volume });
+    return map;
+  }, [coinId, symbol, name, quote]);
+  useAlertFires(mine, quoteMap, {
+    watchIds: ids,
+    lastVolume: lastVolume != null ? { [coinId]: lastVolume } : {},
+    source,
+    now,
+  });
 
   return (
     <section className="card alerts-card asset-alerts" id="asset-alerts">
@@ -92,7 +106,7 @@ export function AssetAlerts({
         )}
       </div>
       <p className="muted alerts-note">
-        {name} is {formatUsd(quote.price)} ({formatPercent(quote.change24h)} 24h) in this snapshot.
+        {name} is {formatUsd(quote.price)} ({formatPercent(quote.change24h)} 24h) · {sourceLabel(source).text}.
         {watched
           ? " Rules for this starred coin poll the CoinGecko snapshot in this tab — no WebSocket, no push."
           : " Alerts never spam the whole market. Star it first (free cap 3)."}
@@ -112,7 +126,7 @@ export function AssetAlerts({
       ) : (
         <ul className="alerts-list">
           {mine.map((item) => {
-            const result = evaluateAlert(item, quote, { watched, lastVolume, now });
+            const result = evaluateAlert(item, quote, { watched, lastVolume, now, source });
             return (
               <li
                 key={item.id}

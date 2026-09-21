@@ -60,9 +60,12 @@ export function parseHistory(raw: string | null): AlertHistoryItem[] {
 
 export function writeHistory(items: AlertHistoryItem[]): AlertHistoryItem[] {
   const next = items.slice(0, HISTORY_LIMIT);
-  window.localStorage.setItem(HISTORY_KEY, JSON.stringify({ items: next }));
+  const raw = JSON.stringify({ items: next });
+  window.localStorage.setItem(HISTORY_KEY, raw);
+  historyRaw = raw;
+  historyCache = parseHistory(raw);
   window.dispatchEvent(new CustomEvent(HISTORY_EVENT));
-  return next;
+  return historyCache;
 }
 
 const EMPTY_HISTORY: AlertHistoryItem[] = [];
@@ -84,15 +87,23 @@ export function recordFire(
   note: AlertNote | null,
   delivered = false,
 ): AlertHistoryItem[] {
+  const now = Date.now();
+  const existing = readHistory().find((row) => row.alertId === alert.id);
+  if (existing) {
+    const then = new Date(existing.at).getTime();
+    if (!Number.isNaN(then) && now - then < alert.cooldownMinutes * 60_000) {
+      return readHistory();
+    }
+  }
   const item: AlertHistoryItem = {
-    id: `${alert.id}-${Date.now()}`,
+    id: `${alert.id}-${now}`,
     alertId: alert.id,
     coinId: alert.coinId,
     symbol: alert.symbol,
     name: alert.name,
     kind: alert.kind,
     threshold: alert.threshold,
-    at: new Date().toISOString(),
+    at: new Date(now).toISOString(),
     price: price ?? null,
     note,
     delivered,

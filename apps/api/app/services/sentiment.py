@@ -13,6 +13,11 @@ BEARISH = {
     "hack", "lawsuit", "outflow", "outflows", "selloff", "fraud", "ban",
 }
 TOKEN_RE = re.compile(r"[a-z0-9]+")
+# Short English words that are also coin names — require the ticker, not "cash flow".
+GENERIC_COIN_WORDS = {
+    "flow", "near", "one", "ocean", "gas", "ton", "dash", "core", "beam",
+    "move", "mask", "super", "link", "cake", "injective", "compound", "maker",
+}
 
 
 def headline_polarity(title: str) -> int:
@@ -26,16 +31,33 @@ def headline_polarity(title: str) -> int:
     return 0
 
 
+def _bounded_phrase(text: str, phrase: str) -> bool:
+    needle = (phrase or "").strip().lower()
+    if len(needle) < 3:
+        return False
+    pattern = re.escape(needle).replace(r"\-", r"[\s\-]+").replace(r"\ ", r"[\s\-]+")
+    return re.search(rf"(?<![a-z0-9]){pattern}(?![a-z0-9])", text) is not None
+
+
 def headline_matches_coin(title: str, coin: dict[str, str]) -> bool:
-    text = f" {(title or '').lower()} "
+    raw = title or ""
+    text = f" {raw.lower()} "
     ident = (coin.get("id") or "").lower()
     name = (coin.get("name") or "").lower()
     symbol = (coin.get("symbol") or "").lower()
-    if ident and ident.replace("-", " ") in text.replace("-", " "):
+    ident_phrase = ident.replace("-", " ")
+    generic = ident_phrase in GENERIC_COIN_WORDS or name in GENERIC_COIN_WORDS
+    if symbol and len(symbol) >= 3:
+        if generic:
+            if re.search(rf"\b{re.escape(symbol.upper())}\b", raw) or re.search(rf"\${re.escape(symbol)}\b", text):
+                return True
+        elif re.search(rf"\b{re.escape(symbol)}\b", text):
+            return True
+    if generic:
+        return False
+    if ident_phrase and _bounded_phrase(text, ident_phrase):
         return True
-    if name and len(name) >= 3 and name in text:
-        return True
-    if symbol and len(symbol) >= 3 and re.search(rf"\b{re.escape(symbol)}\b", text):
+    if name and _bounded_phrase(text, name):
         return True
     return False
 

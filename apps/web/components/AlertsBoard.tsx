@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { MarketAsset, WatchlistSentiment } from "../lib/api";
-import { getAssetInsight, getWatchlistSentiment, postAlertNotify } from "../lib/api";
+import { getWatchlistSentiment } from "../lib/api";
 import {
   ALERTS_LIMIT,
   DEFAULT_COOLDOWN_MINUTES,
@@ -17,7 +17,7 @@ import {
   type AlertSensitivity,
   type PriceAlert,
 } from "../lib/alerts";
-import { recordFire } from "../lib/alert-history";
+import { useAlertFires } from "../lib/alert-dispatch";
 import { hydrateQuotes } from "../lib/snapshot-quotes";
 import { useWatchlist } from "../lib/watchlist";
 import { formatAge, formatPercent, formatUsd, sourceLabel } from "../lib/format";
@@ -131,57 +131,12 @@ export function AlertsBoard({
     return evaluateAlert(
       item,
       { price: live?.current_price, change24h: live?.price_change_percentage_24h, volume: live?.total_volume },
-      { watched: watchIds.has(item.coinId), lastVolume: lastVolume[item.coinId], now },
+      { watched: watchIds.has(item.coinId), lastVolume: lastVolume[item.coinId], now, source },
     );
   }
 
   const matching = items.filter((item) => evalRow(item).matching);
-  const notifyIds = items.filter((item) => evalRow(item).fired).map((item) => item.id).join(",");
-
-  useEffect(() => {
-    if (!notifyIds) return;
-    let cancelled = false;
-    async function attachAndRecord() {
-      const wantSentiment = items.some((item) => notifyIds.split(",").includes(item.id) && (item.analysis === "sentiment" || item.analysis === "all"));
-      const sentiment = wantSentiment
-        ? await getWatchlistSentiment(watched.map((row) => row.id))
-        : null;
-      for (const item of items) {
-        if (!notifyIds.split(",").includes(item.id)) continue;
-        const insight = await getAssetInsight(item.coinId);
-        if (cancelled) return;
-        let extra = " No on-chain whale feed on this instance — CoinVigil does not invent whale prints.";
-        if (item.analysis === "sentiment" || item.analysis === "all") {
-          extra = sentiment?.available
-            ? ` Headline sentiment (${sentiment.engine}, ${sentiment.lean}): ${sentiment.items.slice(0, 2).map((row) => row.title).join(" · ") || "matched RSS"}. ${sentiment.note || ""}`
-            : ` ${sentiment?.reason || "sentiment unavailable"}.`;
-        }
-        const note = {
-          text: `${insight.answer}${extra}`.slice(0, 800),
-          engine: insight.engine || "heuristic-tools",
-          generated: Boolean(insight.generated),
-          at: new Date().toISOString(),
-        };
-        const delivery = await postAlertNotify({
-          coin_id: item.coinId,
-          name: item.name,
-          symbol: item.symbol,
-          kind: item.kind,
-          threshold: item.threshold,
-          note: note.text,
-          at: note.at,
-        });
-        if (cancelled) return;
-        recordFire(item, byId.get(item.coinId)?.current_price, note, delivery.delivered);
-        patch(item.id, { note, lastNotifiedAt: note.at });
-      }
-    }
-    void attachAndRecord();
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [notifyIds]);
+  useAlertFires(items, byId, { watchIds, lastVolume, source, now });
 
   function applySensitivity(next: AlertSensitivity) {
     setSensitivity(next);

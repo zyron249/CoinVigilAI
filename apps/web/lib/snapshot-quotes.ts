@@ -2,7 +2,6 @@ import type { MarketAsset } from "./api";
 import { getMarket } from "./api";
 
 const MARKET_PAGE_LIMIT = 100;
-const DIRECT_LOOKUP_CAP = 25;
 
 function ingest(
   byId: Map<string, MarketAsset>,
@@ -47,13 +46,9 @@ export async function hydrateQuotes(
     if (page.error) error = page.error;
   }
 
-  const missing = needed.filter((id) => !byId.has(id));
-  if (missing.length && missing.length <= DIRECT_LOOKUP_CAP) {
-    const hits = await Promise.all(missing.map((id) => getMarket({ limit: 5, page: 1, q: id })));
-    for (const page of hits) take(page);
-  } else if (missing.length || !seeded.length) {
-    const page = await getMarket({ limit: MARKET_PAGE_LIMIT, page: 1 });
-    take(page);
+  if (needed.length) {
+    // Always take page 1 so source (coingecko|cache|demo) is honest, even when ids are seeded.
+    take(await getMarket({ limit: MARKET_PAGE_LIMIT, page: 1 }));
     let pageNo = 2;
     while (needed.some((id) => !byId.has(id)) && pageNo <= 4) {
       const more = await getMarket({ limit: MARKET_PAGE_LIMIT, page: pageNo });
@@ -62,12 +57,10 @@ export async function hydrateQuotes(
       pageNo += 1;
     }
     const still = needed.filter((id) => !byId.has(id));
-    const extras = await Promise.all(still.map((id) => getMarket({ limit: 5, page: 1, q: id })));
-    for (const extra of extras) take(extra);
+    for (const id of still) {
+      take(await getMarket({ limit: 5, page: 1, q: id }));
+    }
   }
 
-  if (source === "unavailable" && [...byId.values()].some((asset) => asset.current_price != null)) {
-    source = "cache";
-  }
   return { byId, source, stale, asOf, lastLiveAt, checkedAt, error };
 }

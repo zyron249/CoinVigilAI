@@ -1164,3 +1164,26 @@ async def test_compare_never_invents_missing_and_skips_demo_mix(monkeypatch):
     assert empty.missing == []
     assert "invent" in empty.note.lower()
 
+
+@pytest.mark.asyncio
+async def test_cold_universe_fetch_runs_once_under_lock(monkeypatch):
+    import asyncio
+    from app.services.market import UniverseSnapshot, clear_market_memory_cache
+
+    fetches = {"n": 0}
+
+    async def fake_fetch():
+        fetches["n"] += 1
+        await asyncio.sleep(0.05)
+        return UniverseSnapshot(list(DEMO_MARKETS), "coingecko", last_live_at="2026-09-21T00:00:00Z")
+
+    clear_market_memory_cache()
+    monkeypatch.setattr("app.services.market.cache_get", _noop_cache_get)
+    monkeypatch.setattr("app.services.market.cache_set", _noop_cache_set)
+    monkeypatch.setattr("app.services.market._fetch_coingecko_market_universe", fake_fetch)
+    first, second = await asyncio.gather(get_universe_snapshot(), get_universe_snapshot())
+    assert fetches["n"] == 1
+    assert first.source == "coingecko"
+    assert second.source == "coingecko"
+    assert first.assets and second.assets
+

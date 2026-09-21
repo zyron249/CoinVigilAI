@@ -14,11 +14,27 @@ function headlinePolarity(title) {
 }
 
 function matchesCoin(title, coin) {
-  const text = ` ${String(title || "").toLowerCase()} `;
-  if (coin.id && text.includes(coin.id.replace(/-/g, " "))) return true;
-  if (coin.name && coin.name.length >= 3 && text.includes(coin.name.toLowerCase())) return true;
-  if (coin.symbol && coin.symbol.length >= 3 && new RegExp(`\\b${coin.symbol}\\b`, "i").test(text)) return true;
-  return false;
+  const raw = String(title || "");
+  const text = ` ${raw.toLowerCase()} `;
+  const generic = new Set(["flow", "near", "one", "ocean", "gas", "ton", "dash"]);
+  const ident = String(coin.id || "").replace(/-/g, " ");
+  const name = String(coin.name || "").toLowerCase();
+  const symbol = String(coin.symbol || "").toLowerCase();
+  const isGeneric = generic.has(ident) || generic.has(name);
+  if (symbol && symbol.length >= 3) {
+    if (isGeneric) {
+      if (new RegExp(`\\b${symbol.toUpperCase()}\\b`).test(raw) || new RegExp(`\\$${symbol}\\b`, "i").test(text)) return true;
+    } else if (new RegExp(`\\b${symbol}\\b`, "i").test(text)) {
+      return true;
+    }
+  }
+  if (isGeneric) return false;
+  const bounded = (needle) => {
+    if (!needle || needle.length < 3) return false;
+    const pattern = needle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\\-/g, "[\\s\\-]+").replace(/\\ /g, "[\\s\\-]+");
+    return new RegExp(`(?<![a-z0-9])${pattern}(?![a-z0-9])`).test(text);
+  };
+  return bounded(ident) || bounded(name);
 }
 
 function score(coins, headlines) {
@@ -58,4 +74,12 @@ test("watchlist-related RSS titles can lean without pretending to be NLP", () =>
   );
   assert.equal(out.available, true);
   assert.equal(out.lean, "bullish");
+});
+
+test("generic coin names do not score unrelated English headlines", () => {
+  const out = score(
+    [{ id: "flow", symbol: "flow", name: "flow" }],
+    [{ title: "Cash flow surges after tax refunds" }],
+  );
+  assert.equal(out.available, false);
 });

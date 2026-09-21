@@ -38,6 +38,7 @@ def test_public_status_has_no_secrets_and_no_postgres():
     assert body["market"]["key_configured"] is False
     assert body["webhook"]["configured"] is False
     assert body["webhook"]["telegram"] is False
+    assert body["webhook"]["token_required"] is False
     assert "discord.com/api/webhooks" not in dumped
     assert "hooks.slack.com" not in dumped
 
@@ -385,5 +386,89 @@ def test_notify_posts_when_webhook_configured(monkeypatch):
     assert body["delivered"] is True
     assert body["configured"] is True
     monkeypatch.delenv("ALERT_WEBHOOK_URL", raising=False)
+    get_settings.cache_clear()
+
+
+def test_discord_webhook_sends_content(monkeypatch):
+    captured = {}
+
+    class FakeResponse:
+        status_code = 204
+
+    class FakeClient:
+        def __init__(self, *args, **kwargs):
+            pass
+        async def __aenter__(self):
+            return self
+        async def __aexit__(self, *args):
+            return False
+        async def post(self, url, json):
+            captured["url"] = url
+            captured["json"] = json
+            return FakeResponse()
+
+    monkeypatch.setenv("ALERT_WEBHOOK_URL", "https://discord.com/api/webhooks/123/abc")
+    from app.config import get_settings
+    get_settings.cache_clear()
+    monkeypatch.setattr("app.services.notify.httpx.AsyncClient", FakeClient)
+    response = client.post("/api/alerts/notify", json={
+        "coin_id": "bitcoin",
+        "name": "Bitcoin",
+        "kind": "above",
+        "threshold": 1,
+        "note": "fixture note",
+    })
+    assert response.status_code == 200
+    assert response.json()["delivered"] is True
+    assert "content" in captured["json"]
+    assert "event" not in captured["json"]
+    assert "Bitcoin" in captured["json"]["content"]
+    monkeypatch.delenv("ALERT_WEBHOOK_URL", raising=False)
+    get_settings.cache_clear()
+
+
+def test_notify_token_rejects_without_header(monkeypatch):
+    monkeypatch.setenv("ALERT_WEBHOOK_URL", "https://example.com/webhook")
+    monkeypatch.setenv("ALERT_NOTIFY_TOKEN", "secret-token")
+    from app.config import get_settings
+    get_settings.cache_clear()
+    response = client.post("/api/alerts/notify", json={"coin_id": "bitcoin", "kind": "above", "threshold": 1})
+    assert response.status_code == 200
+    body = response.json()
+    assert body["delivered"] is False
+    assert "token" in body["reason"].lower()
+    monkeypatch.delenv("ALERT_WEBHOOK_URL", raising=False)
+    monkeypatch.delenv("ALERT_NOTIFY_TOKEN", raising=False)
+    get_settings.cache_clear()
+
+
+def test_notify_token_accepts_matching_header(monkeypatch):
+    class FakeResponse:
+        status_code = 204
+
+    class FakeClient:
+        def __init__(self, *args, **kwargs):
+            pass
+        async def __aenter__(self):
+            return self
+        async def __aexit__(self, *args):
+            return False
+        async def post(self, url, json):
+            return FakeResponse()
+
+    monkeypatch.setenv("ALERT_WEBHOOK_URL", "https://example.com/webhook")
+    monkeypatch.setenv("ALERT_NOTIFY_TOKEN", "secret-token")
+    from app.config import get_settings
+    get_settings.cache_clear()
+    monkeypatch.setattr("app.services.notify.httpx.AsyncClient", FakeClient)
+    response = client.post(
+        "/api/alerts/notify",
+        json={"coin_id": "bitcoin", "kind": "above", "threshold": 1},
+        headers={"X-CoinVigil-Notify": "secret-token"},
+    )
+    assert response.status_code == 200
+    assert response.json()["delivered"] is True
+    monkeypatch.delenv("ALERT_WEBHOOK_URL", raising=False)
+    monkeypatch.delenv("ALERT_NOTIFY_TOKEN", raising=False)
     get_settings.cache_clear()
 

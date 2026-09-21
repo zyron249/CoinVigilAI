@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
@@ -101,6 +101,7 @@ async def public_status():
             "kind": "https_post",
             "telegram": False,
             "discord_bot": False,
+            "token_required": bool(settings.alert_notify_token.strip()),
             "note": "Optional ALERT_WEBHOOK_URL. Status never shows the URL. Telegram bots are not implemented.",
         },
     }
@@ -304,5 +305,5 @@ async def sentiment(ids: str = Query("", max_length=400)):
 
 
 @app.post("/api/alerts/notify")
-async def alerts_notify(body: dict):
-    return await forward_alert(body if isinstance(body, dict) else {})
+async def alerts_notify(request: Request, body: dict):
+    return await forward_alert(body if isinstance(body, dict) else {}, request)

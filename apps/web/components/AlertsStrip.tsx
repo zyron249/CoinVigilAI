@@ -4,9 +4,10 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import type { MarketAsset } from "../lib/api";
 import { evaluateAlert, readVolumeSeen, rowStatusLabel, useAlerts, type PriceAlert } from "../lib/alerts";
+import { useAlertFires } from "../lib/alert-dispatch";
 import { hydrateQuotes } from "../lib/snapshot-quotes";
 import { useWatchlist } from "../lib/watchlist";
-import { formatPercent, formatUsd } from "../lib/format";
+import { formatPercent, formatUsd, sourceLabel } from "../lib/format";
 
 function ruleLabel(item: PriceAlert) {
   return item.kind === "change_24h" ? `|24h| ≥ ${item.threshold}%` : `${item.kind} ${formatUsd(item.threshold)}`;
@@ -16,6 +17,7 @@ export function AlertsStrip({ assets }: { assets: MarketAsset[] }) {
   const { items } = useAlerts();
   const { ids: watchIds } = useWatchlist();
   const [extra, setExtra] = useState<MarketAsset[]>([]);
+  const [source, setSource] = useState("unavailable");
   const [lastVolume, setLastVolume] = useState<Record<string, number>>({});
   const [now, setNow] = useState(() => Date.now());
 
@@ -40,9 +42,10 @@ export function AlertsStrip({ assets }: { assets: MarketAsset[] }) {
         timer = window.setTimeout(refresh, 10_000);
         return;
       }
-      const { byId } = await hydrateQuotes(ids, assets);
+      const snap = await hydrateQuotes(ids, assets);
       if (!active) return;
-      setExtra([...byId.values()]);
+      setExtra([...snap.byId.values()]);
+      setSource(snap.source);
       timer = window.setTimeout(refresh, 10_000);
     }
     void refresh();
@@ -68,9 +71,11 @@ export function AlertsStrip({ assets }: { assets: MarketAsset[] }) {
     return evaluateAlert(
       item,
       { price: live?.current_price, change24h: live?.price_change_percentage_24h, volume: live?.total_volume },
-      { watched: watchIds.has(item.coinId), lastVolume: lastVolume[item.coinId], now },
+      { watched: watchIds.has(item.coinId), lastVolume: lastVolume[item.coinId], now, source },
     ).matching;
   });
+  useAlertFires(items, byId, { watchIds, lastVolume, source, now });
+  const tone = sourceLabel(source);
 
   return (
     <section id="alerts-dock" className="card alerts-card alerts-dock">
@@ -85,7 +90,7 @@ export function AlertsStrip({ assets }: { assets: MarketAsset[] }) {
         </div>
       </div>
       <p className="muted alerts-note">
-        Evaluated only for starred coins. Snapshot poll — no WebSocket. In-tab + local history — Telegram is not implemented.
+        Evaluated only for starred coins. Snapshot poll ({tone.text}) — no WebSocket. In-tab + local history — Telegram is not implemented.
       </p>
       {items.length === 0 ? (
         <p className="muted alerts-note">No local rules yet. <Link href="/alerts">Create one</Link> for a watchlist coin.</p>
@@ -98,7 +103,7 @@ export function AlertsStrip({ assets }: { assets: MarketAsset[] }) {
             const result = evaluateAlert(
               item,
               { price: live?.current_price, change24h: live?.price_change_percentage_24h, volume: live?.total_volume },
-              { watched: watchIds.has(item.coinId), lastVolume: lastVolume[item.coinId], now },
+              { watched: watchIds.has(item.coinId), lastVolume: lastVolume[item.coinId], now, source },
             );
             return (
               <li key={item.id} className="is-fired" data-alert-status={result.status}>

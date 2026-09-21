@@ -4,6 +4,11 @@ import Link from "next/link";
 import { formatAge, formatUsd } from "../lib/format";
 import { useAlertHistory } from "../lib/alert-history";
 
+function historyRule(row: { kind: string; threshold: number }) {
+  if (row.kind === "change_24h") return `|24h| ≥ ${row.threshold}%`;
+  return `${row.kind} ${formatUsd(row.threshold)}`;
+}
+
 export function AlertHistory() {
   const { items, clear } = useAlertHistory();
   return (
@@ -31,7 +36,7 @@ export function AlertHistory() {
           {items.map((row) => (
             <li key={row.id} data-history-coin={row.coinId}>
               <div className="alert-copy">
-                <strong><Link href={`/asset/${row.coinId}`}>{row.name}</Link> <span className="muted">{row.kind} {formatUsd(row.threshold)}</span></strong>
+                <strong><Link href={`/asset/${row.coinId}`}>{row.name}</Link> <span className="muted">{historyRule(row)}</span></strong>
                 <span className="muted">{formatAge(row.at)} · {row.price != null ? formatUsd(row.price) : "quote unknown"} · {row.delivered ? "webhook delivered" : "in-app only"}</span>
                 {row.note ? <span className="alert-note">{row.note.text}</span> : null}
               </div>

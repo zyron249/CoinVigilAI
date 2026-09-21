@@ -56,6 +56,10 @@ function evaluateAlert(alert, quote, opts) {
   }
   const matching = alertFired(alert, quote.price, quote.change24h);
   if (!matching) return { matching: false, fired: false, status: "watching" };
+  if (opts.source === "demo") return { matching: true, fired: false, status: "demo" };
+  if (opts.source != null && opts.source !== "coingecko" && opts.source !== "cache") {
+    return { matching: true, fired: false, status: "watching" };
+  }
   if (opts.cooldown) return { matching: true, fired: false, status: "cooldown" };
   return { matching: true, fired: true, status: "fired" };
 }
@@ -143,6 +147,22 @@ test("matching cooldown shows Cooldown, not Watching or a fake push", () => {
   assert.equal(rowStatusLabel("cooldown"), "Cooldown");
   assert.equal(rowStatusLabel("muted"), "Muted");
   assert.equal(rowStatusLabel("watching"), "Watching");
+});
+
+test("demo snapshots match visually but never notify", () => {
+  const alert = { kind: "above", threshold: 1, volumeMultiplier: null };
+  const evald = evaluateAlert(alert, { price: 85000, change24h: 5, volume: 1e9 }, { watched: true, lastVolume: 1e9, source: "demo" });
+  assert.equal(evald.matching, true);
+  assert.equal(evald.fired, false);
+  assert.equal(evald.status, "demo");
+});
+
+test("unavailable quotes match visually but never notify", () => {
+  const alert = { kind: "above", threshold: 1, volumeMultiplier: null };
+  const evald = evaluateAlert(alert, { price: 85000, change24h: 5, volume: 1e9 }, { watched: true, lastVolume: 1e9, source: "unavailable" });
+  assert.equal(evald.matching, true);
+  assert.equal(evald.fired, false);
+  assert.equal(evald.status, "watching");
 });
 
 test("muted and cooldown rules do not re-notify", () => {
