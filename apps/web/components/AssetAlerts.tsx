@@ -102,14 +102,14 @@ export function AssetAlerts({
         {watched ? (
           <Link className="ghost tool-button" href={`/alerts?coin=${coinId}`}>New rule</Link>
         ) : (
-          <Link className="ghost tool-button" href="/#watchlist">Open watchlist</Link>
+          <Link className="ghost tool-button" href="/#desk">Open desk</Link>
         )}
       </div>
       <p className="muted alerts-note">
         {name} is {formatUsd(quote.price)} ({formatPercent(quote.change24h)} 24h) · {sourceLabel(source).text}.
         {watched
-          ? " Rules for this starred coin poll the CoinGecko snapshot in this tab — no WebSocket, no push."
-          : " Alerts never spam the whole market. Star it first (free cap 3)."}
+          ? " Rules for this starred coin poll the CoinGecko snapshot in this tab — no WebSocket. Delivery is in-app; Telegram and Discord are not implemented."
+          : " Alerts never spam the whole market. Star it first (free cap 3). Telegram and Discord are not implemented."}
         {" "}CoinVigil does not invent trip prices or on-chain whale prints.
       </p>
       {!watched ? (

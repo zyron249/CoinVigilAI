@@ -9,6 +9,7 @@ export default function TokenStudioPage() {
         <p>
           Configure a standard token, connect your own wallet, review the permissions and sign the deployment yourself.
           CoinVigil never receives a seed phrase or private key. Factory contracts are unaudited — research only, not financial advice.
+          Phase 1 of this product is watchlist surveillance (alerts + Ask), not token creation — this studio is an opt-in tool, not the homepage CTA.
         </p>
       </section>
 

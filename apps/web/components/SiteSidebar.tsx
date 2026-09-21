@@ -6,15 +6,15 @@ import { useSidebar } from "./sidebar-context";
 
 const PRIMARY = [
   { href: "/", label: "Dashboard", icon: "grid" },
-  { href: "/#markets", label: "Markets", icon: "list" },
-  { href: "/ask", label: "AI Analysis", icon: "spark" },
-  { href: "/#radar", label: "Token Radar", icon: "radar" },
-  { href: "/news", label: "News", icon: "news" },
   { href: "/#watchlist", label: "Watchlist", icon: "star" },
+  { href: "/alerts", label: "Alerts", icon: "bell" },
+  { href: "/ask", label: "Ask CoinVigil", icon: "spark" },
+  { href: "/#markets", label: "Markets", icon: "list" },
+  { href: "/news", label: "News", icon: "news" },
 ];
 
 const SECONDARY = [
-  { href: "/alerts", label: "Alerts", icon: "bell" },
+  { href: "/#radar", label: "Token Radar", icon: "radar" },
   { href: "/portfolio", label: "Portfolio", icon: "bag" },
   { href: "/compare", label: "Compare", icon: "list" },
   { href: "/convert", label: "Convert", icon: "radar" },
@@ -55,7 +55,7 @@ export function SiteSidebar() {
           Close
         </button>
       </div>
-      <p className="sidebar-kicker">Smarter crypto decisions</p>
+      <p className="sidebar-kicker">Your coins, not the whole market</p>
       <nav className="sidebar-nav">
         {PRIMARY.map((link) => (
           <Link
@@ -91,7 +91,7 @@ export function SiteSidebar() {
           <span>Token Studio</span>
         </Link>
         <p>v0.4.0 · CoinGecko snapshot</p>
-        <p>Not financial advice. Alerts and holdings are live pages — not “soon”.</p>
+        <p>Not financial advice. Alerts fire in this browser. Token Studio is not a Phase 1 CTA.</p>
       </div>
     </aside>
   );

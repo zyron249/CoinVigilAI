@@ -32,7 +32,14 @@ export function AssetInsight({ coinId }: { coinId: string }) {
 
   return (
     <div className="insight-stack" id="ai-insight">
-      {busy && !insight ? <p className="muted insight-loading">Loading a tool-grounded TLDR…</p> : null}
+      {busy && !insight ? (
+        <section className="card insight-card desk-skeleton" id="ai-insight-tldr" aria-busy="true">
+          <div className="skeleton skeleton-chip" />
+          <div className="skeleton skeleton-title" />
+          <div className="skeleton skeleton-copy" />
+          <div className="skeleton skeleton-row" />
+        </section>
+      ) : null}
       {!busy && (!insight || failed) ? (
         <section className="card insight-card" id="ai-insight-tldr">
           <div className="section-heading">

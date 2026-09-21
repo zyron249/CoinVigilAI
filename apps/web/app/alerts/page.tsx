@@ -22,15 +22,15 @@ export default async function AlertsPage({
         <div className="eyebrow hero-tag">ALERTS</div>
         <h1>Watchlist only.<br /><span>Never the whole market.</span></h1>
         <p>
-          Smart alerts prefilter price and volume on coins you star, then attach a short tool-grounded note.
-          Quotes poll the CoinGecko snapshot — there is no WebSocket tick stream. Fires land in local history.
-          Free watchlist is 3 coins. Optional HTTPS webhook via ALERT_WEBHOOK_URL; Telegram is not implemented.
-          In-app only — no push unless a configured webhook actually delivers. Informational research, not financial advice.
+          Create a watchlist rule, keep the active list here, and read fire history with timestamps.
+          Quotes poll the CoinGecko snapshot — there is no WebSocket tick stream. Delivery is in-app in this browser;
+          optional HTTPS webhook via ALERT_WEBHOOK_URL. Telegram and Discord are not implemented.
+          Free watchlist is 3 coins. Informational research, not financial advice.
         </p>
       </section>
       <AlertsBoard initialCoin={coin} initialKind={kind} />
       <p className="coverage-note muted">
-        Star coins on the <Link href="/#watchlist">watchlist</Link>. Holdings remain a <Link href="/portfolio">light stub</Link>
+        Star coins on the <Link href="/#desk">desk</Link>. Holdings remain a <Link href="/portfolio">light stub</Link>
         {" "}(no custody). CoinVigil has no accounts and does not invent on-chain whale prints.
       </p>
     </main>

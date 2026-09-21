@@ -82,23 +82,26 @@ export function AlertsStrip({ assets }: { assets: MarketAsset[] }) {
       <div className="section-heading">
         <div>
           <div className="eyebrow">WATCHLIST ALERTS</div>
-          <h2>{matching.length ? `${matching.length} matching on your list` : "Watchlist-scoped only"}</h2>
+          <h2>
+            {items.length
+              ? `${items.length} active · ${matching.length} matching`
+              : "Watchlist-scoped only"}
+          </h2>
         </div>
         <div className="table-tools">
           <Link className="ghost tool-button" href="/alerts#alert-history">History</Link>
-          <Link className="ghost tool-button" href="/alerts">{items.length} rules</Link>
+          <Link className="ghost tool-button" href="/alerts#create-alert">{items.length ? `${items.length} rules` : "Create rule"}</Link>
         </div>
       </div>
       <p className="muted alerts-note">
-        Evaluated only for starred coins. Snapshot poll ({tone.text}) — no WebSocket. In-tab + local history — Telegram is not implemented.
+        Evaluated only for starred coins. Snapshot poll ({tone.text}) — no WebSocket.
+        Delivery is in-app in this browser; Telegram and Discord are not implemented.
       </p>
       {items.length === 0 ? (
-        <p className="muted alerts-note">No local rules yet. <Link href="/alerts">Create one</Link> for a watchlist coin.</p>
-      ) : matching.length === 0 ? (
-        <p className="muted alerts-note">No watchlist rules matching this snapshot. Off-list coins are never alerted.</p>
+        <p className="muted alerts-note">No local rules yet. <Link href="/alerts#create-alert">Create a watchlist alert</Link> for a starred coin.</p>
       ) : (
         <ul className="alerts-list">
-          {matching.slice(0, 4).map((item) => {
+          {items.slice(0, 5).map((item) => {
             const live = byId.get(item.coinId);
             const result = evaluateAlert(
               item,
@@ -106,14 +109,14 @@ export function AlertsStrip({ assets }: { assets: MarketAsset[] }) {
               { watched: watchIds.has(item.coinId), lastVolume: lastVolume[item.coinId], now, source },
             );
             return (
-              <li key={item.id} className="is-fired" data-alert-status={result.status}>
+              <li key={item.id} className={result.matching ? "is-fired" : undefined} data-alert-status={result.status}>
                 <div className="alert-copy">
                   <strong><Link href={`/asset/${item.coinId}`}>{live?.name || item.name}</Link></strong>
                   <span className="muted">{ruleLabel(item)}</span>
                   <span className="muted">{live ? `${formatUsd(live.current_price)} · ${formatPercent(live.price_change_percentage_24h)}` : "Quote pending"}</span>
-                  {item.note ? <span className="alert-note">{item.note.generated ? "AI" : "Heuristic"}: {item.note.text}</span> : null}
+                  {result.matching && item.note ? <span className="alert-note">{item.note.generated ? "AI" : "Heuristic"}: {item.note.text}</span> : null}
                 </div>
-                <span className="pill">{rowStatusLabel(result.status, item, now)}</span>
+                <span className={result.matching ? "pill" : "muted"}>{rowStatusLabel(result.status, item, now)}</span>
               </li>
             );
           })}

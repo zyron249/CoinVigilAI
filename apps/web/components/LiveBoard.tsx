@@ -6,14 +6,12 @@ import type { GlobalOverview, MarketMovers, MarketPage } from "../lib/api";
 import { getGlobalOverview, getMarket, getMovers } from "../lib/api";
 import { sourceLabel } from "../lib/format";
 import { writeMarketQuery } from "../lib/pagination";
-import { AlertsStrip } from "./AlertsStrip";
-import { AskPanel } from "./AskPanel";
 import { DemoRibbon } from "./DemoRibbon";
 import { PortfolioStrip } from "./PortfolioStrip";
 import { GlobalStrip } from "./GlobalStrip";
 import { MarketTable } from "./MarketTable";
 import { Movers } from "./Movers";
-import { WatchlistStrip } from "./WatchlistStrip";
+import { SurveillanceDesk } from "./SurveillanceDesk";
 
 const POLL_MS = 30_000;
 const MIN_TICK_MS = 8_000;
@@ -170,6 +168,12 @@ export function LiveBoard({
         stale={market.stale}
         fallbackReason={market.fallback_reason}
       />
+      <SurveillanceDesk
+        assets={watchAssets}
+        movers={movers}
+        source={market.source}
+        stale={market.stale}
+      />
       {hero}
       <GlobalStrip overview={overview} checkedAt={checkedAt} />
       <section className="card finder-dock is-compact" id="find-asset" aria-label="Find a CoinGecko-tracked asset">
@@ -258,15 +262,12 @@ export function LiveBoard({
       </section>
       <div className="dash-grid">
         <div className="dash-main">
-          <AskPanel compact heading="Ask CoinVigil" />
           {topCryptos}
           {brief}
           {radarStrip}
         </div>
         {rail ? <aside className="dash-rail">{rail}</aside> : null}
       </div>
-      <AlertsStrip assets={watchAssets} />
-      <WatchlistStrip assets={watchAssets} />
       <PortfolioStrip assets={watchAssets} />
       <section className="slice-grid" id="movers">
         <Movers gainers={movers.gainers} losers={movers.losers} source={movers.source} stale={movers.stale} />

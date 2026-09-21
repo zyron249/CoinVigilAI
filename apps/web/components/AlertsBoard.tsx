@@ -174,14 +174,15 @@ export function AlertsBoard({
       <div className="section-heading">
         <div>
           <div className="eyebrow">WATCHLIST ALERTS</div>
-          <h2>Rule-based prefilter, then a grounded note</h2>
+          <h2>Active rules — create, list, mute</h2>
         </div>
         <span className="muted">{items.length} / {ALERTS_LIMIT} · {tone.text} · poll {formatAge(checkedAt, now)}</span>
       </div>
       <p className="muted alerts-note">
-        Only coins on your watchlist are evaluated. Quotes poll the CoinGecko snapshot (no WebSocket tick stream).
-        Price/volume rules run before any AI cost. History stays in this browser. Telegram bots are not implemented;
-        optional HTTPS webhook is env-gated. No on-chain whale feed.
+        Create a watchlist rule, then read active status and fire history below. Only starred coins are evaluated.
+        Quotes poll the CoinGecko snapshot (no WebSocket tick stream). Price/volume rules run before any AI cost.
+        Delivery is in-app in this browser, plus an optional HTTPS webhook when ALERT_WEBHOOK_URL is set.
+        Telegram and Discord are not implemented. No on-chain whale feed.
       </p>
       {watched.length ? (
         <p className="muted alerts-note" data-sentiment-peek>
@@ -201,7 +202,7 @@ export function AlertsBoard({
         watched.length ? (
           <div className="empty empty-panel">
             <strong>No watchlist rules yet</strong>
-            <p>Create a price, 24h-change, or volume-prefiltered rule for a starred coin.</p>
+            <p>Use the form below: pick a starred coin, choose price above/below or |24h| %, then save. Fires land in history with timestamps.</p>
           </div>
         ) : null
       ) : (
@@ -279,18 +280,21 @@ export function AlertsBoard({
         <div className="empty empty-panel">
           <strong>Star a coin first</strong>
           <p>
-            Smart alerts are watchlist-scoped. Open <Link href="/#watchlist">Markets → Watchlist</Link> and star up to 3
-            coins on the free tier.
+            Smart alerts are watchlist-scoped. Open <Link href="/#desk">Watchlist → rules → smart alerts → Ask</Link> and
+            star 1–3 coins on the free tier.
           </p>
         </div>
       ) : (
         <form
+          id="create-alert"
           className="alerts-form smart-form"
+          aria-label="Create watchlist alert"
           onSubmit={(event) => {
             event.preventDefault();
             saveAlert();
           }}
         >
+          <p className="form-legend">{editingId ? "Edit this watchlist rule" : "Create watchlist alert"}</p>
           <label>
             Watchlist coin
             <select value={coinId} onChange={(event) => setCoinId(event.target.value)}>
@@ -352,7 +356,7 @@ export function AlertsBoard({
             <input type="checkbox" checked={muted} onChange={(event) => setMuted(event.target.checked)} />
             <span className="muted">{muted ? "Will not fire" : "Off"}</span>
           </label>
-          <button type="submit">{editingId ? "Save edit" : "Save locally"}</button>
+          <button type="submit">{editingId ? "Save rule changes" : "Save a watchlist rule"}</button>
         </form>
       )}
     </section>

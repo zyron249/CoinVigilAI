@@ -46,8 +46,8 @@ export function AskPanel({
         {result ? <StatusBadge source={result.data_source} /> : null}
       </div>
       <p className="ask-kicker muted">
-        You are interacting with AI. Natural-language market questions. Prices, caps, and volume come from read-only
-        CoinGecko/news tools — never invented. No buy/sell advice. Not financial advice.
+        You are interacting with AI. Ask about watchlist coins when you have them starred — prices, caps, and volume
+        come from read-only CoinGecko/news tools, never invented. No buy/sell advice. Not financial advice.
       </p>
       <form
         className="ask-form"
@@ -63,7 +63,13 @@ export function AskPanel({
           onChange={(event) => setDraft(event.target.value)}
           maxLength={500}
           rows={compact ? 2 : 3}
-          placeholder={coinId ? `Ask about ${coinId} — tools supply the numbers` : "e.g. What is bitcoin's price and 24h change?"}
+          placeholder={
+            coinId
+              ? `Ask about ${coinId} — tools supply the numbers`
+              : watched.length
+                ? "e.g. What moved on my watchlist?"
+                : "e.g. What is bitcoin's price and 24h change?"
+          }
         />
         <button type="submit" disabled={busy || !draft.trim()}>{busy ? "Checking tools…" : "Ask"}</button>
       </form>
@@ -82,6 +88,17 @@ export function AskPanel({
               Ask {item.symbol.toUpperCase()}
             </button>
           ))}
+        </div>
+      ) : !coinId ? (
+        <p className="muted ask-kicker">
+          Star 1–3 coins on the desk, then these chips ask tools about <strong>your</strong> list. General snapshot questions still work.
+        </p>
+      ) : null}
+      {busy && !result ? (
+        <div className="ask-result" aria-busy="true">
+          <div className="skeleton skeleton-copy" />
+          <div className="skeleton skeleton-row" />
+          <div className="skeleton skeleton-row" />
         </div>
       ) : null}
       {result ? (
