@@ -32,14 +32,23 @@ export function useAlertFires(
 
   useEffect(() => {
     if (!notifyIds || !isFireableQuoteSource(opts.source)) return;
-    let cancelled = false;
+    let stopClaiming = false;
     async function attachAndRecord() {
       const ids = notifyIds.split(",");
       const claimed: PriceAlert[] = [];
       for (const item of items) {
+        if (stopClaiming) break;
         if (!ids.includes(item.id)) continue;
         if (!claimFire(item.id)) continue;
         claimed.push(item);
+        const pending: AlertNote = {
+          text: "Rule matched this snapshot. Loading a tool-grounded note… CoinVigil does not invent prices or whale prints.",
+          engine: "heuristic-tools",
+          generated: false,
+          at: new Date().toISOString(),
+        };
+        recordFire(item, quotes.get(item.coinId)?.current_price, pending, false);
+        patch(item.id, { note: pending });
       }
       if (!claimed.length) return;
       const wantSentiment = claimed.some((item) => item.analysis === "sentiment" || item.analysis === "all");
@@ -52,7 +61,6 @@ export function useAlertFires(
         }
       }
       for (const item of claimed) {
-        if (cancelled) return;
         let extra = " No on-chain whale feed on this instance — CoinVigil does not invent whale prints.";
         if (item.analysis === "sentiment" || item.analysis === "all") {
           extra = sentiment?.available
@@ -85,14 +93,13 @@ export function useAlertFires(
         } catch {
           delivered = false;
         }
-        if (cancelled) return;
         recordFire(item, quotes.get(item.coinId)?.current_price, note, delivered);
         patch(item.id, { note });
       }
     }
     void attachAndRecord();
     return () => {
-      cancelled = true;
+      stopClaiming = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [notifyIds, opts.source]);

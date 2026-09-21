@@ -92,7 +92,7 @@ export function recordFire(
   if (existing) {
     const then = new Date(existing.at).getTime();
     if (!Number.isNaN(then) && now - then < alert.cooldownMinutes * 60_000) {
-      return readHistory();
+      return patchLatestFire(alert.id, { note, delivered, price: price ?? existing.price });
     }
   }
   const item: AlertHistoryItem = {
@@ -109,6 +109,18 @@ export function recordFire(
     delivered,
   };
   return writeHistory([item, ...readHistory()].slice(0, HISTORY_LIMIT));
+}
+
+export function patchLatestFire(
+  alertId: string,
+  partial: Partial<Pick<AlertHistoryItem, "note" | "delivered" | "price">>,
+): AlertHistoryItem[] {
+  const items = readHistory();
+  const index = items.findIndex((row) => row.alertId === alertId);
+  if (index < 0) return items;
+  const next = items.slice();
+  next[index] = { ...next[index], ...partial };
+  return writeHistory(next);
 }
 
 function subscribeHistory(onChange: () => void) {

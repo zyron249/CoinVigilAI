@@ -279,15 +279,15 @@ export function useAlerts() {
       id: item.id || `${item.coinId}-${item.kind}-${item.threshold}-${Date.now()}`,
       createdAt: new Date().toISOString(),
     };
-    return writeAlerts([next, ...items]);
+    return writeAlerts([next, ...readAlerts()]);
   }
 
   function patch(id: string, partial: Partial<PriceAlert>) {
-    return writeAlerts(items.map((row) => (row.id === id ? { ...row, ...partial } : row)));
+    return writeAlerts(readAlerts().map((row) => (row.id === id ? { ...row, ...partial } : row)));
   }
 
   function remove(id: string) {
-    return writeAlerts(items.filter((row) => row.id !== id));
+    return writeAlerts(readAlerts().filter((row) => row.id !== id));
   }
 
   return { items, add, patch, remove };
