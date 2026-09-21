@@ -3,13 +3,14 @@
 import Link from "next/link";
 import { memo } from "react";
 import type { MarketAsset, MarketPage } from "../lib/api";
-import { changeClass, formatCompact, formatCompactUsd, formatPercent, formatTimestamp, formatUsd } from "../lib/format";
+import { changeClass, formatCompactUsd, formatPercent, formatTimestamp, formatUsd } from "../lib/format";
 import { MARKET_LIMITS, pageWindow, rowRange, searchAnnouncement } from "../lib/pagination";
 import { Sparkline } from "./Sparkline";
 import { StatusBadge } from "./StatusBadge";
 import { WatchButton } from "./WatchButton";
 
 const COLUMNS: { key: string; label: string; sort?: string }[] = [
+  { key: "watch", label: "" },
   { key: "rank", label: "#", sort: "rank" },
   { key: "name", label: "Name", sort: "name" },
   { key: "price", label: "Price", sort: "price" },
@@ -18,30 +19,26 @@ const COLUMNS: { key: string; label: string; sort?: string }[] = [
   { key: "change_7d", label: "7d", sort: "change_7d" },
   { key: "market_cap", label: "Market cap", sort: "market_cap" },
   { key: "volume", label: "Volume (24h)", sort: "volume" },
-  { key: "supply", label: "Circulating supply" },
   { key: "spark", label: "Last 7 days" },
 ];
 
 const MarketRow = memo(function MarketRow({ asset }: { asset: MarketAsset }) {
+  const spark = asset.sparkline_7d;
   return (
     <tr className="market-row">
-      <td>{asset.market_cap_rank ?? "—"}</td>
+      <td className="watch-cell">
+        <WatchButton id={asset.id} symbol={asset.symbol} name={asset.name} compact />
+      </td>
+      <td className="rank-cell">{asset.market_cap_rank ?? "—"}</td>
       <td>
         <div className="asset-cell">
-          <WatchButton id={asset.id} symbol={asset.symbol} name={asset.name} compact />
           {asset.image
-            ? <img src={asset.image} alt="" width={28} height={28} />
+            ? <img src={asset.image} alt="" width={20} height={20} />
             : <div className="coin-placeholder" aria-hidden="true" />}
-          <div>
-            <Link className="asset-link" href={`/asset/${asset.id}`}>
-              <strong>{asset.name}</strong>
-              <span>{asset.symbol.toUpperCase()}</span>
-            </Link>
-            <nav className="asset-row-jumps" aria-label={`${asset.name} sections`}>
-              <Link href={`/asset/${asset.id}#overview`}>Overview</Link>
-              <Link href={`/asset/${asset.id}#contracts`}>Contracts</Link>
-            </nav>
-          </div>
+          <Link className="asset-link" href={`/asset/${asset.id}`}>
+            <strong>{asset.name}</strong>
+            <span>{asset.symbol.toUpperCase()}</span>
+          </Link>
         </div>
       </td>
       <td>{formatUsd(asset.current_price)}</td>
@@ -50,8 +47,9 @@ const MarketRow = memo(function MarketRow({ asset }: { asset: MarketAsset }) {
       <td className={changeClass(asset.price_change_percentage_7d)}>{formatPercent(asset.price_change_percentage_7d)}</td>
       <td>{formatCompactUsd(asset.market_cap)}</td>
       <td>{formatCompactUsd(asset.total_volume)}</td>
-      <td>{formatCompact(asset.circulating_supply)} {asset.symbol.toUpperCase()}</td>
-      <td><Sparkline values={asset.sparkline_7d} /></td>
+      <td className="spark-cell">
+        {spark && spark.length >= 2 ? <Sparkline values={spark} width={96} height={24} /> : <span className="muted">—</span>}
+      </td>
     </tr>
   );
 });
@@ -207,7 +205,7 @@ export function MarketTable({
         )}
         {busy ? <div className="table-progress muted">Updating rankings…</div> : null}
       </div>
-      <p className="table-swipe muted">Swipe sideways on small screens to see 1h/24h/7d, volume, supply, and 7d sparkline.</p>
+      <p className="table-swipe muted">Swipe sideways on small screens to see 1h/24h/7d, volume, and 7d sparkline.</p>
       <div className="table-footer">
         <div className="muted">
           {range.start

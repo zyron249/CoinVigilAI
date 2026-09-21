@@ -6,10 +6,11 @@ import { ExchangeMarkets } from "./ExchangeMarkets";
 import { ProChartLab } from "./ProChartLab";
 import { scrollAssetWorkspace } from "../lib/scroll-workspace";
 
-function tabFromHash(hash = ""): "markets" | "chart" {
+function tabFromHash(hash = ""): "markets" | "chart" | null {
   const value = hash.replace(/^#/, "");
   if (value === "chart" || value === "chart-lab") return "chart";
-  return "markets";
+  if (value === "markets" || value === "markets-tab") return "markets";
+  return null;
 }
 
 export function AssetWorkspace({
@@ -25,11 +26,12 @@ export function AssetWorkspace({
   candles: Candle[];
   candleSource: string;
 }) {
-  const [tab, setTab] = useState<"markets" | "chart">("markets");
+  const [tab, setTab] = useState<"markets" | "chart">("chart");
 
   useEffect(() => {
     function applyHash() {
-      setTab(tabFromHash(window.location.hash));
+      const next = tabFromHash(window.location.hash);
+      if (next) setTab(next);
     }
     applyHash();
     window.addEventListener("hashchange", applyHash);
@@ -64,24 +66,32 @@ export function AssetWorkspace({
         <div id="chart-lab" className="asset-workspace-anchor" tabIndex={-1} />
       </div>
       <div className="asset-tabs" role="tablist" aria-label="Asset views">
-        <TabButton current={tab} id="markets" onSelect={selectTab}>Markets</TabButton>
         <TabButton current={tab} id="chart" onSelect={selectTab}>Chart</TabButton>
+        <TabButton current={tab} id="markets" onSelect={selectTab}>Markets</TabButton>
       </div>
-      {tab === "markets" ? (
-        <div role="tabpanel" id="panel-markets" aria-labelledby="tab-markets">
-          <ExchangeMarkets coinId={coinId} symbol={symbol} initial={tickers} />
-        </div>
-      ) : (
-        <div role="tabpanel" id="panel-chart" aria-labelledby="tab-chart">
-          <ProChartLab
-            coinId={coinId}
-            symbol={symbol}
-            candles={candles}
-            source={candleSource}
-            tickerSource={tickers.source}
-          />
-        </div>
-      )}
+      <div
+        role="tabpanel"
+        id="panel-chart"
+        aria-labelledby="tab-chart"
+        hidden={tab !== "chart"}
+      >
+        <ProChartLab
+          key={coinId}
+          coinId={coinId}
+          symbol={symbol}
+          candles={candles}
+          source={candleSource}
+          tickerSource={tickers.source}
+        />
+      </div>
+      <div
+        role="tabpanel"
+        id="panel-markets"
+        aria-labelledby="tab-markets"
+        hidden={tab !== "markets"}
+      >
+        <ExchangeMarkets coinId={coinId} symbol={symbol} initial={tickers} />
+      </div>
     </section>
   );
 }

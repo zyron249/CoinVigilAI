@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { getCandles, type Candle } from "../lib/api";
 import { sourceLabel } from "../lib/format";
-import type { Candle } from "../lib/api";
 
 type ProChartLabProps = {
   coinId: string;
@@ -11,6 +11,14 @@ type ProChartLabProps = {
   source: string;
   tickerSource?: string;
 };
+
+const RANGES: { id: string; label: string; days: number }[] = [
+  { id: "1h", label: "1H", days: 1 },
+  { id: "24h", label: "24H", days: 1 },
+  { id: "7d", label: "7D", days: 7 },
+  { id: "30d", label: "30D", days: 30 },
+  { id: "1y", label: "1Y", days: 365 },
+];
 
 function pricePrecision(candles: Candle[]) {
   const last = candles.at(-1)?.close ?? 1;
@@ -25,12 +33,31 @@ export function ProChartLab({ coinId, symbol, candles, source, tickerSource }: P
   const chartRef = useRef<any>(null);
   const disposeRef = useRef<((container: HTMLElement) => void) | null>(null);
   const [drawing, setDrawing] = useState<string | null>(null);
+  const [range, setRange] = useState("24h");
+  const [series, setSeries] = useState(candles);
+  const [seriesSource, setSeriesSource] = useState(source);
+  const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState(candles.length ? "Loading chart…" : "No candles in this snapshot");
+  const days = RANGES.find((row) => row.id === range)?.days ?? 1;
+
+  useEffect(() => {
+    let active = true;
+    setBusy(true);
+    getCandles(coinId, days).then((payload) => {
+      if (!active) return;
+      setSeries(payload.data);
+      setSeriesSource(payload.source);
+      setBusy(false);
+    });
+    return () => {
+      active = false;
+    };
+  }, [coinId, days]);
 
   useEffect(() => {
     let active = true;
     const container = containerRef.current;
-    if (!container || candles.length === 0) {
+    if (!container || series.length === 0) {
       setDrawing(null);
       setStatus("No candles in this snapshot");
       return;
@@ -58,20 +85,20 @@ export function ProChartLab({ coinId, symbol, candles, source, tickerSource }: P
 
       chart.setSymbol({
         ticker: symbol.toUpperCase(),
-        pricePrecision: pricePrecision(candles),
+        pricePrecision: pricePrecision(series),
         volumePrecision: 2,
       });
       chart.setPeriod({ span: 1, type: "day" });
       chart.setDataLoader({
         getBars: ({ callback }: any) => {
-          callback(candles, { forward: false, backward: false });
+          callback(series, { forward: false, backward: false });
         },
       });
       chart.createIndicator({ name: "MA", paneId: "candle_pane" }, true);
 
       chartRef.current = chart;
       disposeRef.current = lib.dispose;
-      setStatus(`${symbol.toUpperCase()} · ${candles.length} candles · ${sourceLabel(source).text}`);
+      setStatus(`${symbol.toUpperCase()} · ${series.length} candles · ${sourceLabel(seriesSource).text}`);
     })().catch((error) => {
       setStatus(`Chart error: ${error instanceof Error ? error.message : "unknown"}`);
     });
@@ -84,7 +111,7 @@ export function ProChartLab({ coinId, symbol, candles, source, tickerSource }: P
       }
       chartRef.current = null;
     };
-  }, [candles, symbol, source]);
+  }, [series, symbol, seriesSource]);
 
   useEffect(() => {
     if (!drawing) return;
@@ -162,8 +189,8 @@ export function ProChartLab({ coinId, symbol, candles, source, tickerSource }: P
     setStatus("Chart PNG exported");
   }
 
-  const empty = candles.length === 0;
-  const mixed = (source === "demo" || source === "unavailable")
+  const empty = series.length === 0;
+  const mixed = (seriesSource === "demo" || seriesSource === "unavailable")
     && (tickerSource === "coingecko" || tickerSource === "cache");
 
   return (
@@ -173,8 +200,25 @@ export function ProChartLab({ coinId, symbol, candles, source, tickerSource }: P
           <div className="eyebrow">PRO CHART LAB</div>
           <h2>{symbol.toUpperCase()} technical workspace</h2>
         </div>
-        <span className="chart-status" role="status">{status}</span>
+        <span className="chart-status" role="status">{busy ? "Loading OHLC…" : status}</span>
       </div>
+      <div className="chart-ranges" role="tablist" aria-label="Chart range">
+        {RANGES.map((row) => (
+          <button
+            key={row.id}
+            type="button"
+            className={`ghost tool-button ${range === row.id ? "is-on" : ""}`}
+            onClick={() => setRange(row.id)}
+          >
+            {row.label}
+          </button>
+        ))}
+      </div>
+      <p className="muted chart-honest">
+        CoinGecko OHLC for the selected range — not a TradingView widget, not a WebSocket tick stream.
+        {range === "1h" ? " 1H uses the same 1-day OHLC snap as 24H (CoinGecko does not give true hourly ticks here)." : ""}
+        {sourceLabel(seriesSource).demo ? " Demo candles are labeled, never live." : ""}
+      </p>
       {mixed ? (
         <div className="source-ribbon demo-ribbon mixed-ribbon" role="status">
           <strong>Mixed snapshot: live listings, demo candles.</strong>
