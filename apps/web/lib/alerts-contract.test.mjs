@@ -90,6 +90,13 @@ test("non-watchlist coins never alert even if the price rule matches", () => {
   assert.equal(evald.status, "off-watchlist");
 });
 
+test("watchlist price rule fires when volume prefilter is off", () => {
+  const alert = { kind: "above", threshold: 1, volumeMultiplier: null };
+  const evald = evaluateAlert(alert, { price: 85000, change24h: 5, volume: 1e9 }, { watched: true, lastVolume: 1e9 });
+  assert.equal(evald.fired, true);
+  assert.equal(evald.status, "fired");
+});
+
 test("watchlist coin can fire; volume prefilter blocks a quiet print", () => {
   const alert = { kind: "above", threshold: 1, volumeMultiplier: 2 };
   const quiet = evaluateAlert(alert, { price: 85000, change24h: 5, volume: 1e9 }, { watched: true, lastVolume: 1e9 });

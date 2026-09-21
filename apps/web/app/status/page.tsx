@@ -79,8 +79,8 @@ export default async function StatusPage() {
           <span>Watchlist alerts</span>
           <strong>Watchlist-scoped</strong>
           <em>
-            Free cap 3 coins. Local premium toggle is not billing and is not Telegram/Discord/push.
-            No on-chain whale feed. Alerts stay in this browser.
+            Free cap 3 coins. Local premium toggle is not billing. In-tab only — Telegram/Discord/push
+            are a README path, not a fake send. No on-chain whale feed. Alerts stay in this browser.
           </em>
           <PremiumToggle />
         </article>

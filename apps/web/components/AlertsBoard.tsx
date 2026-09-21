@@ -167,6 +167,80 @@ export function AlertsBoard({
         Only coins on your watchlist are evaluated — CoinVigil does not spam the whole market. Price/volume rules run
         before any AI cost. In-tab only; Telegram/Discord/push are documented later, not faked. No on-chain whale feed.
       </p>
+      {fired.length ? (
+        <p className="alerts-fired-banner" role="status">
+          {fired.length} watchlist rule{fired.length === 1 ? "" : "s"} triggered in this snapshot (in-tab only — no push).
+        </p>
+      ) : null}
+      {items.length === 0 ? (
+        watched.length ? (
+          <div className="empty empty-panel">
+            <strong>No watchlist rules yet</strong>
+            <p>Create a price, 24h-change, or volume-prefiltered rule for a starred coin.</p>
+          </div>
+        ) : null
+      ) : (
+        <ul className="alerts-list">
+          {items.map((item) => {
+            const live = byId.get(item.coinId);
+            const result = evalRow(item);
+            return (
+              <li
+                key={item.id}
+                className={result.fired ? "is-fired" : undefined}
+                data-alert-coin={item.coinId}
+                data-alert-status={result.status}
+              >
+                <div className="alert-copy">
+                  <strong>
+                    <Link href={`/asset/${item.coinId}`}>{live?.name || item.name}</Link>
+                    {" "}
+                    <span className="muted">{item.sensitivity} · {item.analysis}</span>
+                  </strong>
+                  <span className="muted">{ruleLabel(item)}</span>
+                  <span className="muted">
+                    {result.status === "off-watchlist"
+                      ? "Off watchlist — not evaluated (never spam the whole market)"
+                      : result.status === "volume-prefilter"
+                        ? "Volume prefilter held this back vs last-seen 24h volume"
+                        : live
+                          ? `${formatUsd(live.current_price)} · ${formatPercent(live.price_change_percentage_24h)}`
+                          : "Not in this snapshot yet"}
+                  </span>
+                  {result.fired && item.note ? (
+                    <span className="alert-note">
+                      {item.note.generated ? "AI-generated from tools" : "Heuristic tools"} · {item.note.engine}: {item.note.text}
+                    </span>
+                  ) : result.fired ? (
+                    <span className="muted">Loading a tool-grounded note…</span>
+                  ) : null}
+                </div>
+                <div className="alert-actions">
+                  <span className={result.fired ? "pill" : "muted"}>
+                    {result.fired ? "Triggered" : result.status === "off-watchlist" ? "Skipped" : "Watching"}
+                  </span>
+                  <button
+                    type="button"
+                    className="ghost tool-button"
+                    onClick={() => {
+                      setEditingId(item.id);
+                      setCoinId(item.coinId);
+                      setKind(item.kind);
+                      setThreshold(String(item.threshold));
+                      setSensitivity(item.sensitivity);
+                      setAnalysis(item.analysis);
+                      setVolumeOn(item.volumeMultiplier != null);
+                    }}
+                  >
+                    Edit
+                  </button>
+                  <button type="button" className="ghost tool-button" onClick={() => remove(item.id)}>Delete</button>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
       {watched.length === 0 ? (
         <div className="empty empty-panel">
           <strong>Star a coin first</strong>
@@ -233,75 +307,6 @@ export function AlertsBoard({
           </label>
           <button type="submit">{editingId ? "Save edit" : "Save locally"}</button>
         </form>
-      )}
-      {fired.length ? (
-        <p className="alerts-fired-banner" role="status">
-          {fired.length} watchlist rule{fired.length === 1 ? "" : "s"} triggered in this snapshot (in-tab only — no push).
-        </p>
-      ) : null}
-      {items.length === 0 ? (
-        watched.length ? (
-          <div className="empty empty-panel">
-            <strong>No watchlist rules yet</strong>
-            <p>Create a price, 24h-change, or volume-prefiltered rule for a starred coin.</p>
-          </div>
-        ) : null
-      ) : (
-        <ul className="alerts-list">
-          {items.map((item) => {
-            const live = byId.get(item.coinId);
-            const result = evalRow(item);
-            return (
-              <li key={item.id} className={result.fired ? "is-fired" : undefined}>
-                <div className="alert-copy">
-                  <strong>
-                    <Link href={`/asset/${item.coinId}`}>{live?.name || item.name}</Link>
-                    {" "}
-                    <span className="muted">{item.sensitivity} · {item.analysis}</span>
-                  </strong>
-                  <span className="muted">{ruleLabel(item)}</span>
-                  <span className="muted">
-                    {result.status === "off-watchlist"
-                      ? "Off watchlist — not evaluated (never spam the whole market)"
-                      : result.status === "volume-prefilter"
-                        ? "Volume prefilter held this back vs last-seen 24h volume"
-                        : live
-                          ? `${formatUsd(live.current_price)} · ${formatPercent(live.price_change_percentage_24h)}`
-                          : "Not in this snapshot yet"}
-                  </span>
-                  {result.fired && item.note ? (
-                    <span className="alert-note">
-                      {item.note.generated ? "AI-generated from tools" : "Heuristic tools"} · {item.note.engine}: {item.note.text}
-                    </span>
-                  ) : result.fired ? (
-                    <span className="muted">Loading a tool-grounded note…</span>
-                  ) : null}
-                </div>
-                <div className="alert-actions">
-                  <span className={result.fired ? "pill" : "muted"}>
-                    {result.fired ? "Triggered" : result.status === "off-watchlist" ? "Skipped" : "Watching"}
-                  </span>
-                  <button
-                    type="button"
-                    className="ghost tool-button"
-                    onClick={() => {
-                      setEditingId(item.id);
-                      setCoinId(item.coinId);
-                      setKind(item.kind);
-                      setThreshold(String(item.threshold));
-                      setSensitivity(item.sensitivity);
-                      setAnalysis(item.analysis);
-                      setVolumeOn(item.volumeMultiplier != null);
-                    }}
-                  >
-                    Edit
-                  </button>
-                  <button type="button" className="ghost tool-button" onClick={() => remove(item.id)}>Delete</button>
-                </div>
-              </li>
-            );
-          })}
-        </ul>
       )}
     </section>
   );

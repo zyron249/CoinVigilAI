@@ -229,7 +229,16 @@ nav { min-height: 72px; display: flex; align-items: center; justify-content: spa
 .smart-form { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .checkbox-label { flex-direction: row; align-items: center; gap: 8px; }
 .ask-chips, .preset-row { display: flex; flex-wrap: wrap; gap: 8px; padding: 0 20px 14px; }
-.alert-note { color: var(--text); font-size: 13px; line-height: 1.5; }
+.alert-note {
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.5;
+  display: block;
+  flex-basis: 100%;
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
 .premium-toggle { display: flex; gap: 8px; align-items: flex-start; padding: 0 20px 12px; font-size: 13px; color: var(--muted); }
 .premium-toggle.compact { padding: 8px 0 0; }
 .premium-toggle input { margin-top: 3px; }
