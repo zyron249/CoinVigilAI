@@ -105,6 +105,7 @@ export function LiveChartPanel({ assets }: { assets: MarketAsset[] }) {
       </div>
       <p className="muted chart-honest">
         CoinGecko OHLC for the selected range — not a TradingView widget, not a WebSocket tick stream.
+        {range === "1h" ? " 1H uses the same 1-day OHLC snap as 1D (CoinGecko does not give true hourly ticks here)." : ""}
         {live ? ` ${formatPercent(live.price_change_percentage_24h)} 24h in the rankings snapshot.` : ""}
         {sourceLabel(source).demo ? " Demo candles are labeled, never live." : ""}
       </p>

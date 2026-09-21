@@ -41,10 +41,21 @@ jobs:
         run: python -m pytest -q
 
       - name: Check local watchlist contract
-        run: node --test apps/web/lib/watchlist-contract.test.mjs apps/web/lib/project-links-contract.test.mjs apps/web/lib/pagination-contract.test.mjs apps/web/lib/alerts-contract.test.mjs apps/web/lib/portfolio-contract.test.mjs apps/web/lib/sentiment-contract.test.mjs apps/web/lib/alert-history-contract.test.mjs
+        run: node --test apps/web/lib/watchlist-contract.test.mjs apps/web/lib/project-links-contract.test.mjs apps/web/lib/pagination-contract.test.mjs apps/web/lib/alerts-contract.test.mjs apps/web/lib/portfolio-contract.test.mjs apps/web/lib/sentiment-contract.test.mjs apps/web/lib/alert-history-contract.test.mjs apps/web/lib/api-base-contract.test.mjs
 
       - name: Validate Python syntax
         run: python -m compileall -q apps/api/app apps/api/tests
+
+      - name: Validate production deploy files
+        run: |
+          sh -n deploy/start.sh
+          test -f Dockerfile
+          test -f render.yaml
+          test -f DEPLOY.md
+          grep -q "healthCheckPath: /health" render.yaml
+          grep -q "listen \${PUBLIC_PORT}" deploy/nginx.conf.template
+          grep -q "coinvigilai.com" DEPLOY.md
+          grep -q "same-origin" Dockerfile
 
       - name: Validate Docker Compose configuration
         run: |

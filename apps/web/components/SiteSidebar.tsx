@@ -46,10 +46,15 @@ export function SiteSidebar() {
 
   return (
     <aside id="site-sidebar" className={`site-sidebar ${open ? "open" : ""}`} aria-label="Primary">
-      <Link className="brand sidebar-brand" href="/" onClick={() => setOpen(false)}>
-        <span className="brand-mark">V</span>
-        <span>CoinVigil <b>AI</b></span>
-      </Link>
+      <div className="sidebar-brand-row">
+        <Link className="brand sidebar-brand" href="/" onClick={() => setOpen(false)}>
+          <span className="brand-mark">V</span>
+          <span>CoinVigil <b>AI</b></span>
+        </Link>
+        <button type="button" className="sidebar-close ghost" onClick={() => setOpen(false)}>
+          Close
+        </button>
+      </div>
       <p className="sidebar-kicker">Smarter crypto decisions</p>
       <nav className="sidebar-nav">
         {PRIMARY.map((link) => (

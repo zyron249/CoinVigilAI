@@ -14,6 +14,7 @@ It is an informational research tool, not a production trading desk and not fina
 - Parallel AI Council adapters (including optional xAI Grok) when you add provider keys
 - Redis used as a short TTL cache plus a 6-hour last-live snapshot when CoinGecko rate-limits
 - Docker Compose for API + web + Redis (Postgres is not started and is not used)
+- Production path: one Render Docker service (nginx + Next + FastAPI on `$PORT`) plus optional Redis — see `DEPLOY.md` / `render.yaml`
 - GitHub Actions: unit tests, contract tests, image builds, and stack smoke tests
 
 ## What is not done yet
@@ -205,7 +206,7 @@ Pushes and pull requests against `main` run API unit tests (including mocked xAI
 
 - Enabling many AI providers increases cost. Latency is usually the slowest configured provider, up to `AI_REQUEST_TIMEOUT_SECONDS`.
 - CoinGecko's keyless pool is roughly 10–30 calls/minute. Prefer `COINGECKO_API_KEY` (see “Raising CoinGecko rate limits” above) and keep Redis up so the dashboard does not stampede the public API. Client refresh reuses the 20s in-process universe cache. `/status` reports `key_configured` without revealing the secret.
-- CORS defaults to localhost. Set `CORS_ALLOW_ORIGINS` before exposing the API.
+- CORS defaults to localhost. Set `CORS_ALLOW_ORIGINS` before exposing the API (production: `https://coinvigilai.com,https://www.coinvigilai.com` — `DEPLOY.md`).
 
 ## Later delivery (not faked)
 
@@ -225,7 +226,7 @@ If `ALERT_WEBHOOK_URL` is empty, Status and Alerts must say in-app only. CoinVig
 3. On-chain intelligence only when a real feed exists — never invented whale prints
 4. Phase 2: coin-page comments under AI data. Phase 3: profiles, follow, cashtags, proof-of-trade
 5. Model evaluation and provider routing
-6. Production observability and a real deploy path
+6. Production: Render Docker + custom domain (see `DEPLOY.md`)
 
 ## Disclaimer
 

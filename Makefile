@@ -8,6 +8,7 @@ help:
 	@echo "  make web     Local Next.js on :3000"
 	@echo "  make doctor  GET /api/status (stack must already be running)"
 	@echo "  make test    API + contract tests"
+	@echo "  Production:  see DEPLOY.md (Render Docker + Namecheap DNS)"
 
 env:
 	@test -f .env || cp .env.example .env
