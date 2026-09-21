@@ -95,6 +95,8 @@ class MarketBrief(BaseModel):
     data_source: str
     providers_requested: list[str] = Field(default_factory=list)
     providers_responded: list[str] = Field(default_factory=list)
+    grounded: bool = True
+    tools_used: list[str] = Field(default_factory=list)
     disclaimer: str = (
         "Informational research only — not financial advice."
     )
@@ -236,3 +238,55 @@ class RadarSignal(BaseModel):
     severity: str
     change_24h: float
     risk_score: int
+
+
+class AskCitation(BaseModel):
+    kind: str
+    label: str
+    detail: str | None = None
+    url: str | None = None
+
+
+class AskAnswer(BaseModel):
+    question: str
+    answer: str
+    engine: str
+    generated: bool
+    interacting_with_ai: bool = True
+    tools_used: list[str] = Field(default_factory=list)
+    citations: list[AskCitation] = Field(default_factory=list)
+    quotes: list[dict] = Field(default_factory=list)
+    data_source: str = "unknown"
+    coin_id: str | None = None
+    refused_advice: bool = False
+    providers_requested: list[str] = Field(default_factory=list)
+    providers_responded: list[str] = Field(default_factory=list)
+    disclaimer: str = (
+        "You are interacting with CoinVigil AI. Informational research only — not financial advice. "
+        "Prices, caps, and volume come from read-only tools, never invented."
+    )
+
+
+class AskRequest(BaseModel):
+    question: str = Field(..., min_length=1, max_length=500)
+    coin_id: str | None = Field(default=None, max_length=80)
+
+
+class ConvertQuote(BaseModel):
+    amount: float
+    from_id: str
+    from_symbol: str
+    from_name: str
+    from_price_usd: float | None = None
+    to_id: str
+    to_symbol: str
+    to_name: str
+    to_price_usd: float | None = None
+    value: float | None = None
+    rate: float | None = None
+    source: str
+    missing: list[str] = Field(default_factory=list)
+    stale: bool = False
+    last_live_at: str | None = None
+    note: str
+    disclaimer: str = "Informational research only — not financial advice. Quotes are not an offer to trade."

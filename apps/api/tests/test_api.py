@@ -272,3 +272,62 @@ def test_compare_endpoint_caps_and_never_invents(monkeypatch):
     assert "api_key" not in dumped
     assert "coinmarketcap" not in dumped
 
+
+def test_ask_endpoint_is_tool_grounded_and_labeled_ai(monkeypatch):
+    from app.models import AskAnswer, AskCitation
+
+    async def fake_ask(question: str, coin_id: str | None = None, insight: bool = False):
+        return AskAnswer(
+            question=question,
+            answer="Bitcoin is $1.00 in this demo snapshot.",
+            engine="heuristic-tools",
+            generated=False,
+            tools_used=["screen_markets", "get_asset_quote", "get_news"],
+            citations=[AskCitation(kind="quote", label="Bitcoin quote", detail="demo")],
+            quotes=[{"id": "bitcoin", "price_usd": 1, "source": "demo"}],
+            data_source="demo",
+            coin_id="bitcoin",
+        )
+
+    monkeypatch.setattr("app.main.answer_ask", fake_ask)
+    response = client.post("/api/ai/ask", json={"question": "What is bitcoin's price?"})
+    assert response.status_code == 200
+    body = response.json()
+    assert body["interacting_with_ai"] is True
+    assert body["generated"] is False
+    assert "get_asset_quote" in body["tools_used"]
+    assert "not financial advice" in body["disclaimer"].lower()
+    assert "interacting with" in body["disclaimer"].lower()
+    dumped = str(body).lower()
+    assert "api_key" not in dumped
+
+
+def test_convert_endpoint_uses_query_aliases(monkeypatch):
+    from app.models import ConvertQuote
+
+    async def fake_convert(amount: float, from_id: str, to_id: str):
+        return ConvertQuote(
+            amount=amount,
+            from_id=from_id,
+            from_symbol="BTC",
+            from_name="Bitcoin",
+            from_price_usd=100,
+            to_id=to_id,
+            to_symbol="USD",
+            to_name="US Dollar",
+            to_price_usd=1,
+            value=amount * 100,
+            rate=100,
+            source="demo",
+            note="Demo conversion — not invented.",
+        )
+
+    monkeypatch.setattr("app.main.convert_quote", fake_convert)
+    response = client.get("/api/convert?from=bitcoin&to=usd&amount=2")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["value"] == 200
+    assert body["from_id"] == "bitcoin"
+    assert "invent" in body["note"].lower()
+    assert "not financial advice" in body["disclaimer"].lower()
+

@@ -2,10 +2,12 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
-from app.models import AssetAnalysis, AssetCompare, AssetProfile, AssetTickers, GlobalOverview, MarketBrief, MarketMovers, RadarSignal, RankedMarkets
+from app.models import AskAnswer, AskRequest, AssetAnalysis, AssetCompare, AssetProfile, AssetTickers, ConvertQuote, GlobalOverview, MarketBrief, MarketMovers, RadarSignal, RankedMarkets
 from app.services.ai import deterministic_view, provider_status, run_ai_council
+from app.services.ask import answer_ask
 from app.services.brief import build_market_brief
 from app.services.cache import redis_status
+from app.services.convert import convert_quote
 from app.services.market import (
     get_asset_with_source,
     get_candles,
@@ -89,6 +91,7 @@ async def public_status():
             "configured": configured,
             "configured_count": len(configured),
             "supported": len(providers),
+            "ask": "council" if configured else "heuristic-tools",
         },
     }
 
@@ -103,7 +106,29 @@ async def ai_council_status():
         "configured": sum(1 for provider in providers if provider["configured"]),
         "providers": providers,
         "mode": "parallel_weighted_consensus",
+        "ask": "natural-language tools; numeric claims from CoinGecko/news only",
     }
+
+
+@app.post("/api/ai/ask", response_model=AskAnswer)
+async def ai_ask(body: AskRequest):
+    return await answer_ask(body.question, body.coin_id)
+
+
+@app.get("/api/assets/{coin_id}/insight", response_model=AskAnswer)
+async def asset_insight(coin_id: str):
+    asset, _source = await get_asset_with_source(coin_id)
+    name = asset.name if asset else coin_id
+    return await answer_ask(f"What moved for {name} in this snapshot?", coin_id, insight=True)
+
+
+@app.get("/api/convert", response_model=ConvertQuote)
+async def convert(
+    amount: float = Query(1, gt=0, le=1_000_000_000_000),
+    from_id: str = Query("bitcoin", alias="from", max_length=80),
+    to_id: str = Query("usd", alias="to", max_length=80),
+):
+    return await convert_quote(float(amount), from_id, to_id)
 
 
 @app.get("/api/market", response_model=RankedMarkets)

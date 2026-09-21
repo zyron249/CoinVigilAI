@@ -55,8 +55,10 @@ export default async function StatusPage() {
           <strong className={`tone-${aiConfigured ? "live" : "cache"}`}>{aiConfigured} / {status.ai?.supported ?? 0} keys set</strong>
           <em>
             {aiConfigured
-              ? `Configured adapters: ${status.ai?.configured.join(", ")}.`
-              : "No keys set — briefs and analysis use the heuristic engine."}
+              ? `Configured adapters: ${status.ai?.configured.join(", ")}. Ask CoinVigil can synthesize tool facts with those models.`
+              : "No keys set — Ask, briefs, and analysis use heuristic tools, never fake live model output."}
+            {" "}
+            Ask mode: {status.ai?.ask || "heuristic-tools"}. You are told when text is AI-generated. Not financial advice.
           </em>
         </article>
         <article className="card status-card">

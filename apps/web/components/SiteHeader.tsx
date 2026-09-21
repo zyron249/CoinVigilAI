@@ -6,7 +6,10 @@ import { useEffect, useId, useRef, useState } from "react";
 
 const LINKS = [
   { href: "/", label: "Markets" },
+  { href: "/ask", label: "Ask" },
   { href: "/compare", label: "Compare" },
+  { href: "/convert", label: "Convert" },
+  { href: "/alerts", label: "Alerts" },
   { href: "/#watchlist", label: "Watchlist" },
   { href: "/news", label: "News" },
   { href: "/status", label: "Status" },

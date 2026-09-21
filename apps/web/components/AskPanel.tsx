@@ -1,0 +1,100 @@
+"use client";
+
+import { useState } from "react";
+import type { AskAnswer } from "../lib/api";
+import { postAsk } from "../lib/api";
+import { formatPercent, formatUsd } from "../lib/format";
+import { StatusBadge } from "./StatusBadge";
+
+export function AskPanel({
+  coinId,
+  initial,
+  compact = false,
+  heading = "Ask CoinVigil",
+}: {
+  coinId?: string;
+  initial?: AskAnswer | null;
+  compact?: boolean;
+  heading?: string;
+}) {
+  const [draft, setDraft] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState<AskAnswer | null>(initial ?? null);
+
+  async function submit(question: string) {
+    const next = question.trim();
+    if (!next) return;
+    setBusy(true);
+    const payload = await postAsk(next, coinId);
+    setResult(payload);
+    setBusy(false);
+  }
+
+  return (
+    <section className={`card ask-card ${compact ? "ask-compact" : ""}`} id={coinId ? undefined : "ask-coinvigil"}>
+      <div className="section-heading">
+        <div>
+          <div className="eyebrow">{heading}</div>
+          <h2>{compact ? "Tool-grounded Q&A" : "You are talking to an AI"}</h2>
+        </div>
+        {result ? <StatusBadge source={result.data_source} /> : null}
+      </div>
+      <p className="ask-kicker muted">
+        Natural-language market questions. Prices, caps, and volume come from read-only CoinGecko/news tools —
+        never invented. No buy/sell advice. Not financial advice.
+      </p>
+      <form
+        className="ask-form"
+        onSubmit={(event) => {
+          event.preventDefault();
+          void submit(draft);
+        }}
+      >
+        <label className="sr-only" htmlFor={coinId ? `ask-${coinId}` : "ask-q"}>Ask a market question</label>
+        <textarea
+          id={coinId ? `ask-${coinId}` : "ask-q"}
+          value={draft}
+          onChange={(event) => setDraft(event.target.value)}
+          maxLength={500}
+          rows={compact ? 2 : 3}
+          placeholder={coinId ? `Ask about ${coinId} — tools supply the numbers` : "e.g. What is bitcoin's price and 24h change?"}
+        />
+        <button type="submit" disabled={busy || !draft.trim()}>{busy ? "Checking tools…" : "Ask"}</button>
+      </form>
+      {result ? (
+        <div className="ask-result" aria-live="polite">
+          <p className="ask-engine muted">
+            {result.generated ? "AI-generated from tools" : "Heuristic tool answer — no live model vote"}
+            {result.engine ? ` · ${result.engine}` : ""}
+            {result.tools_used.length ? ` · tools: ${result.tools_used.join(", ")}` : ""}
+          </p>
+          <p>{result.answer}</p>
+          {result.quotes.length ? (
+            <ul className="ask-quotes">
+              {result.quotes.slice(0, 4).map((row) => (
+                <li key={row.id || row.symbol}>
+                  <strong>{row.name || row.id}</strong>
+                  <span>{formatUsd(row.price_usd ?? null)}</span>
+                  <span>{formatPercent(row.change_24h ?? null)} 24h</span>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+          {result.citations.length ? (
+            <ul className="ask-cites">
+              {result.citations.map((cite, index) => (
+                <li key={`${cite.kind}-${index}`}>
+                  {cite.url ? (
+                    <a href={cite.url} target="_blank" rel="noopener noreferrer">{cite.label}</a>
+                  ) : <span>{cite.label}</span>}
+                  {cite.detail ? <em> · {cite.detail}</em> : null}
+                </li>
+              ))}
+            </ul>
+          ) : null}
+          <p className="brief-disclaimer">{result.disclaimer}</p>
+        </div>
+      ) : null}
+    </section>
+  );
+}

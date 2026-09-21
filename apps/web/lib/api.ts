@@ -81,6 +81,8 @@ export type MarketBrief = {
   data_source: string;
   providers_requested: string[];
   providers_responded: string[];
+  grounded?: boolean;
+  tools_used?: string[];
   disclaimer: string;
 };
 
@@ -608,7 +610,7 @@ export type StackStatus = {
   };
   postgres?: string;
   news?: { feeds: number; hosts: string[]; using_defaults: boolean };
-  ai?: { enabled: boolean; configured: string[]; configured_count: number; supported: number };
+  ai?: { enabled: boolean; configured: string[]; configured_count: number; supported: number; ask?: string };
 };
 
 export async function getStackStatus(): Promise<StackStatus> {
@@ -630,5 +632,131 @@ export async function getCandles(coinId: string, days = 90): Promise<{ data: Can
     return { data: json.data ?? [], source: json.source ?? "unknown" };
   } catch {
     return { data: [], source: "unavailable" };
+  }
+}
+
+export type AskCitation = {
+  kind: string;
+  label: string;
+  detail?: string | null;
+  url?: string | null;
+};
+
+export type AskAnswer = {
+  question: string;
+  answer: string;
+  engine: string;
+  generated: boolean;
+  interacting_with_ai: boolean;
+  tools_used: string[];
+  citations: AskCitation[];
+  quotes: Array<{
+    id?: string;
+    symbol?: string;
+    name?: string;
+    price_usd?: number | null;
+    change_24h?: number | null;
+    market_cap?: number | null;
+    volume_24h?: number | null;
+    source?: string;
+  }>;
+  data_source: string;
+  coin_id?: string | null;
+  refused_advice?: boolean;
+  providers_requested?: string[];
+  providers_responded?: string[];
+  disclaimer: string;
+  error?: string | null;
+};
+
+const ASK_EMPTY: AskAnswer = {
+  question: "",
+  answer: "Ask is unavailable. CoinVigil does not invent an answer when tools cannot run.",
+  engine: "unavailable",
+  generated: false,
+  interacting_with_ai: true,
+  tools_used: [],
+  citations: [],
+  quotes: [],
+  data_source: "unavailable",
+  disclaimer: "You are interacting with CoinVigil AI. Informational research only — not financial advice.",
+  error: "Ask is unavailable.",
+};
+
+export async function postAsk(question: string, coinId?: string): Promise<AskAnswer> {
+  try {
+    const response = await fetch(`${apiBase()}/api/ai/ask`, {
+      method: "POST",
+      cache: "no-store",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ question, coin_id: coinId || undefined }),
+      signal: AbortSignal.timeout(20_000),
+    });
+    if (!response.ok) return { ...ASK_EMPTY, question };
+    return await response.json();
+  } catch {
+    return { ...ASK_EMPTY, question };
+  }
+}
+
+export async function getAssetInsight(coinId: string): Promise<AskAnswer> {
+  try {
+    const response = await fetch(`${apiBase()}/api/assets/${encodeURIComponent(coinId)}/insight`, {
+      cache: "no-store",
+      signal: AbortSignal.timeout(20_000),
+    });
+    if (!response.ok) return { ...ASK_EMPTY, coin_id: coinId };
+    return await response.json();
+  } catch {
+    return { ...ASK_EMPTY, coin_id: coinId };
+  }
+}
+
+export type ConvertQuote = {
+  amount: number;
+  from_id: string;
+  from_symbol: string;
+  from_name: string;
+  from_price_usd?: number | null;
+  to_id: string;
+  to_symbol: string;
+  to_name: string;
+  to_price_usd?: number | null;
+  value?: number | null;
+  rate?: number | null;
+  source: string;
+  missing: string[];
+  stale?: boolean;
+  last_live_at?: string | null;
+  note: string;
+  disclaimer: string;
+};
+
+export async function getConvert(amount: number, fromId: string, toId: string): Promise<ConvertQuote> {
+  const empty: ConvertQuote = {
+    amount,
+    from_id: fromId,
+    from_symbol: fromId.toUpperCase(),
+    from_name: fromId,
+    to_id: toId,
+    to_symbol: toId.toUpperCase(),
+    to_name: toId,
+    value: null,
+    source: "unavailable",
+    missing: [fromId, toId],
+    note: "Conversion is unavailable. CoinVigil does not invent FX rates.",
+    disclaimer: "Informational research only — not financial advice.",
+  };
+  try {
+    const search = new URLSearchParams({
+      amount: String(amount),
+      from: fromId,
+      to: toId,
+    });
+    const response = await request(`/api/convert?${search}`);
+    if (!response.ok) return empty;
+    return await response.json();
+  } catch {
+    return empty;
   }
 }
