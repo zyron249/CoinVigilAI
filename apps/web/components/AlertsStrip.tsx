@@ -65,7 +65,7 @@ export function AlertsStrip({ assets }: { assets: MarketAsset[] }) {
             return (
               <li key={item.id} className="is-fired">
                 <div className="alert-copy">
-                  <strong><Link href={`/asset/${item.coinId}`}>{item.name}</Link></strong>
+                  <strong><Link href={`/asset/${item.coinId}`}>{live?.name || item.name}</Link></strong>
                   <span className="muted">{ruleLabel(item)}</span>
                   <span className="muted">{live ? `${formatUsd(live.current_price)} · ${formatPercent(live.price_change_percentage_24h)}` : "Quote pending"}</span>
                 </div>

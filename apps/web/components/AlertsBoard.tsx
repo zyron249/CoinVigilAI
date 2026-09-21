@@ -114,7 +114,7 @@ export function AlertsBoard({
               <li key={item.id} className={on ? "is-fired" : undefined}>
                 <div className="alert-copy">
                   <strong>
-                    <Link href={`/asset/${item.coinId}`}>{item.name}</Link>
+                    <Link href={`/asset/${item.coinId}`}>{live?.name || item.name}</Link>
                   </strong>
                   <span className="muted">
                     {item.kind === "change_24h" ? `|24h| ≥ ${item.threshold}%` : `${item.kind} ${formatUsd(item.threshold)}`}

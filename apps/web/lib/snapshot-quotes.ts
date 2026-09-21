@@ -19,7 +19,13 @@ export async function hydrateQuotes(
   const still = needed.filter((id) => !byId.has(id)).slice(0, 8);
   await Promise.all(still.map(async (id) => {
     const analysis = await getAssetAnalysis(id);
-    if (analysis?.asset) byId.set(analysis.asset.id, analysis.asset);
+    if (analysis?.asset) {
+      byId.set(analysis.asset.id, analysis.asset);
+      if (source === "unavailable" && analysis.data_source) source = analysis.data_source;
+    }
   }));
+  if (source === "unavailable" && [...byId.values()].some((asset) => asset.current_price != null)) {
+    source = "cache";
+  }
   return { byId, source, stale };
 }

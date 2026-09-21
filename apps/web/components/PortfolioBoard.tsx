@@ -140,7 +140,7 @@ export function PortfolioBoard({ initialCoin = "bitcoin" }: { initialCoin?: stri
               <li key={row.id}>
                 <div className="alert-copy">
                   <strong>
-                    <Link href={`/asset/${row.coinId}`}>{row.name}</Link>
+                    <Link href={`/asset/${row.coinId}`}>{live?.name || row.name}</Link>
                     {" "}
                     <span className="muted">{row.qty} {(live?.symbol || row.symbol).toUpperCase()}</span>
                   </strong>
