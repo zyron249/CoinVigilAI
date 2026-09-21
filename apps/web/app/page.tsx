@@ -4,7 +4,6 @@ import { LiveBoard } from "../components/LiveBoard";
 import { MarketBriefCard } from "../components/MarketBriefCard";
 import { Radar } from "../components/Radar";
 import { getCouncilStatus, getGlobalOverview, getMarket, getMarketBrief, getMovers, getRadar } from "../lib/api";
-import { sourceLabel } from "../lib/format";
 import { parseMarketQuery } from "../lib/pagination";
 
 function firstParam(value: string | string[] | undefined) {
@@ -34,32 +33,42 @@ export default async function Home({
   ]);
   const brief = council.configured === 0 ? await getMarketBrief() : null;
   const leadAsset = market.assets[0];
-  const marketSource = sourceLabel(market.source, { stale: market.stale });
 
   return (
-    <main id="content">
+    <main id="content" className="home-dashboard">
       <LiveBoard
         initialMarket={market}
         initialOverview={overview}
         initialMovers={movers}
         hero={(
-          <section className="markets-hero">
-            <div>
-              <div className="eyebrow hero-tag">CRYPTOCURRENCY RANKINGS</div>
-              <h1>Markets, with an <span>AI brief</span>.</h1>
+          <section className="hero hero-dashboard">
+            <div className="hero-copy">
+              <div className="eyebrow hero-tag">AI-POWERED CRYPTO INTELLIGENCE</div>
+              <h1>Smarter crypto decisions <span>with AI</span>.</h1>
               <p>
-                Ranked CoinGecko-tracked assets (paginated `/coins/markets`, {market.universe_size} of {market.coverage_target || 1000} in this snapshot).
-                Search above the table, then jump straight to an asset. CoinVigil does not claim every coin on earth.
-                The brief is labeled heuristic or AI-generated. Not CoinMarketCap, and not financial advice.
+                Live market data, multi-model AI analysis, risk scoring and global crypto intelligence —
+                brought together in one decision workspace.
               </p>
+              <div className="hero-actions">
+                <a className="button-link" href="#markets">Explore Markets</a>
+                <Link className="button-link ghost" href="/ask">See AI Analysis</Link>
+              </div>
+              <div className="hero-proof">
+                <span>Real-time market data</span>
+                <span>Multi-model AI council</span>
+                <span>Risk-aware analysis</span>
+              </div>
             </div>
-            <aside className="disclaimer-banner">
-              <strong>Data tool, not investment advice.</strong>
-              <span>
-                Source is {marketSource.text}. Live and cached rows come from CoinGecko.
-                Demo prices are synthetic stand-ins used only when CoinGecko is unreachable.
-              </span>
-            </aside>
+            <div className="orb-wrap" aria-hidden="true">
+              <div className="orb">
+                <div className="orb-ring orb-ring-one" />
+                <div className="orb-ring orb-ring-two" />
+                <div className="orb-core">AI</div>
+                <span className="orb-label orb-label-one">Market data</span>
+                <span className="orb-label orb-label-two">AI insights</span>
+                <span className="orb-label orb-label-three">Risk signals</span>
+              </div>
+            </div>
           </section>
         )}
         brief={<MarketBriefCard initial={brief} refresh={council.configured > 0} />}
@@ -76,22 +85,22 @@ export default async function Home({
         <Link className="card feature-card" href={leadAsset ? `/asset/${leadAsset.id}#markets-tab` : "#markets"}>
           <div className="eyebrow">EXCHANGE MARKETS</div>
           <h3>See where it trades</h3>
-          <p>Open an asset to list CoinGecko venues, pairs, volume, and trust scores. Filter, sort, and share the URL. CoinVigil does not scrape every exchange website.</p>
+          <p>Open an asset to inspect trading venues, pairs, volume and trust signals without leaving CoinVigilAI.</p>
         </Link>
         <Link className="card feature-card" href="/compare?ids=bitcoin,ethereum">
           <div className="eyebrow">COMPARE</div>
-          <h3>Two or three assets</h3>
-          <p>Side-by-side price, change, cap, volume, and 7d spark from this CoinGecko snapshot. Missing coins stay empty — never invented.</p>
+          <h3>Compare assets fast</h3>
+          <p>Review price, momentum, market cap, volume and recent performance side by side.</p>
         </Link>
         <Link className="card feature-card" href={leadAsset ? `/asset/${leadAsset.id}#chart-lab` : "#markets"}>
           <div className="eyebrow">PRO CHART LAB</div>
-          <h3>Draw, measure and analyze</h3>
-          <p>Interactive candlesticks, trend lines, horizontal levels, Fibonacci, brush tools, indicators and PNG export.</p>
+          <h3>Draw and analyze</h3>
+          <p>Use candlesticks, trend tools, levels, Fibonacci overlays, indicators and exports.</p>
         </Link>
         <Link className="card feature-card" href="/token-studio">
           <div className="eyebrow">TOKEN STUDIO</div>
           <h3>Create on-chain</h3>
-          <p>Configure a standard token and sign the deployment from your own wallet on supported EVM chains.</p>
+          <p>Configure a token and deploy it from your own wallet on supported EVM networks.</p>
         </Link>
       </section>
     </main>
