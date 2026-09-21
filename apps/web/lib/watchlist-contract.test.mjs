@@ -1,9 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-const LIMIT = 40;
+const FREE = 3;
+const PREMIUM = 25;
 
-function parseWatchlist(raw) {
+function parseWatchlist(raw, limit = PREMIUM) {
   if (!raw) return [];
   try {
     const parsed = JSON.parse(raw);
@@ -22,12 +23,16 @@ function parseWatchlist(raw) {
         name: String(row.name || id).slice(0, 80),
         addedAt: String(row.addedAt || ""),
       });
-      if (items.length >= LIMIT) break;
+      if (items.length >= limit) break;
     }
     return items;
   } catch {
     return [];
   }
+}
+
+function canAddWatch(count, premium) {
+  return count < (premium ? PREMIUM : FREE);
 }
 
 test("empty and junk payloads stay empty", () => {
@@ -51,7 +56,14 @@ test("accepts envelope or bare array and dedupes ids", () => {
   assert.equal(items[1].id, "ethereum");
 });
 
-test("caps the list so a huge localStorage blob cannot stampede the UI", () => {
+test("caps storage at the premium ceiling", () => {
   const items = Array.from({ length: 80 }, (_, index) => ({ id: `coin-${index}`, symbol: "x", name: "Coin" }));
-  assert.equal(parseWatchlist(JSON.stringify({ items })).length, 40);
+  assert.equal(parseWatchlist(JSON.stringify({ items })).length, PREMIUM);
+});
+
+test("free tier blocks the 4th coin; premium can add past 3", () => {
+  assert.equal(canAddWatch(3, false), false);
+  assert.equal(canAddWatch(2, false), true);
+  assert.equal(canAddWatch(3, true), true);
+  assert.equal(canAddWatch(25, true), false);
 });

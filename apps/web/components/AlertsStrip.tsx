@@ -3,8 +3,9 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import type { MarketAsset } from "../lib/api";
-import { alertFired, useAlerts, type PriceAlert } from "../lib/alerts";
+import { evaluateAlert, readVolumeSeen, useAlerts, type PriceAlert } from "../lib/alerts";
 import { hydrateQuotes } from "../lib/snapshot-quotes";
+import { useWatchlist } from "../lib/watchlist";
 import { formatPercent, formatUsd } from "../lib/format";
 
 function ruleLabel(item: PriceAlert) {
@@ -13,11 +14,14 @@ function ruleLabel(item: PriceAlert) {
 
 export function AlertsStrip({ assets }: { assets: MarketAsset[] }) {
   const { items } = useAlerts();
+  const { ids: watchIds } = useWatchlist();
   const [extra, setExtra] = useState<MarketAsset[]>([]);
+  const [lastVolume, setLastVolume] = useState<Record<string, number>>({});
 
   useEffect(() => {
+    setLastVolume(readVolumeSeen());
     const known = new Set(assets.map((asset) => asset.id));
-    const missing = items.map((item) => item.coinId).filter((id) => !known.has(id));
+    const missing = items.map((item) => item.coinId).filter((id) => watchIds.has(id) && !known.has(id));
     if (!missing.length) {
       setExtra([]);
       return;
@@ -29,7 +33,7 @@ export function AlertsStrip({ assets }: { assets: MarketAsset[] }) {
     return () => {
       active = false;
     };
-  }, [items, assets]);
+  }, [items, assets, watchIds]);
 
   const byId = useMemo(() => {
     const map = new Map<string, MarketAsset>();
@@ -39,25 +43,29 @@ export function AlertsStrip({ assets }: { assets: MarketAsset[] }) {
 
   const fired = items.filter((item) => {
     const live = byId.get(item.coinId);
-    return alertFired(item, live?.current_price, live?.price_change_percentage_24h);
+    return evaluateAlert(
+      item,
+      { price: live?.current_price, change24h: live?.price_change_percentage_24h, volume: live?.total_volume },
+      { watched: watchIds.has(item.coinId), lastVolume: lastVolume[item.coinId] },
+    ).fired;
   });
 
   return (
     <section id="alerts-dock" className="card alerts-card alerts-dock">
       <div className="section-heading">
         <div>
-          <div className="eyebrow">PRICE ALERTS</div>
-          <h2>{fired.length ? `${fired.length} triggered in this snapshot` : "Watching local rules"}</h2>
+          <div className="eyebrow">WATCHLIST ALERTS</div>
+          <h2>{fired.length ? `${fired.length} triggered on your list` : "Watchlist-scoped only"}</h2>
         </div>
         <Link className="ghost tool-button" href="/alerts">{items.length} rules</Link>
       </div>
       <p className="muted alerts-note">
-        Evaluated here against the live table (and asset quotes if a rule is off-page). In-tab only — no push or email backend.
+        Evaluated only for starred coins. Rule-based price/volume prefilter runs before any AI note. In-tab only — no push.
       </p>
       {items.length === 0 ? (
-        <p className="muted alerts-note">No local rules yet. <Link href="/alerts">Create one</Link> — it stays in this browser.</p>
+        <p className="muted alerts-note">No local rules yet. <Link href="/alerts">Create one</Link> for a watchlist coin.</p>
       ) : fired.length === 0 ? (
-        <p className="muted alerts-note">No rules triggered against this snapshot. {items.length} still watching.</p>
+        <p className="muted alerts-note">No watchlist rules triggered in this snapshot. Off-list coins are never alerted.</p>
       ) : (
         <ul className="alerts-list">
           {fired.slice(0, 4).map((item) => {
@@ -68,6 +76,7 @@ export function AlertsStrip({ assets }: { assets: MarketAsset[] }) {
                   <strong><Link href={`/asset/${item.coinId}`}>{live?.name || item.name}</Link></strong>
                   <span className="muted">{ruleLabel(item)}</span>
                   <span className="muted">{live ? `${formatUsd(live.current_price)} · ${formatPercent(live.price_change_percentage_24h)}` : "Quote pending"}</span>
+                  {item.note ? <span className="alert-note">{item.note.generated ? "AI" : "Heuristic"}: {item.note.text}</span> : null}
                 </div>
                 <span className="pill">Triggered</span>
               </li>

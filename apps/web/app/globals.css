@@ -226,6 +226,15 @@ nav { min-height: 72px; display: flex; align-items: center; justify-content: spa
   grid-template-columns: minmax(0, 1fr) auto;
 }
 .convert-form, .alerts-form { grid-template-columns: repeat(4, minmax(0, 1fr)); align-items: end; }
+.smart-form { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.checkbox-label { flex-direction: row; align-items: center; gap: 8px; }
+.ask-chips, .preset-row { display: flex; flex-wrap: wrap; gap: 8px; padding: 0 20px 14px; }
+.alert-note { color: var(--text); font-size: 13px; line-height: 1.5; }
+.premium-toggle { display: flex; gap: 8px; align-items: flex-start; padding: 0 20px 12px; font-size: 13px; color: var(--muted); }
+.premium-toggle.compact { padding: 8px 0 0; }
+.premium-toggle input { margin-top: 3px; }
+.status-card .premium-toggle { padding: 10px 0 0; }
+.watch-button.is-blocked { opacity: 0.55; }
 .ask-form textarea, .convert-form input, .alerts-form input, .alerts-form select {
   width: 100%;
   border: 1px solid var(--line);

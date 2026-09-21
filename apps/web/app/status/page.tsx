@@ -1,4 +1,5 @@
 import { getStackStatus } from "../../lib/api";
+import { PremiumToggle } from "../../components/PremiumToggle";
 import { StatusBadge } from "../../components/StatusBadge";
 import { StatusRefresh } from "../../components/StatusRefresh";
 
@@ -73,6 +74,15 @@ export default async function StatusPage() {
                 ? `Custom hosts: ${status.news.hosts.join(", ")}.`
                 : "No feeds configured — the news page stays empty on purpose.")}
           </em>
+        </article>
+        <article className="card status-card">
+          <span>Watchlist alerts</span>
+          <strong>Watchlist-scoped</strong>
+          <em>
+            Free cap 3 coins. Local premium toggle is not billing and is not Telegram/Discord/push.
+            No on-chain whale feed. Alerts stay in this browser.
+          </em>
+          <PremiumToggle />
         </article>
         <article className="card status-card">
           <span>API</span>

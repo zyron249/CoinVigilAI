@@ -4,6 +4,7 @@ import Link from "next/link";
 import type { MarketAsset } from "../lib/api";
 import { changeClass, formatPercent, formatUsd } from "../lib/format";
 import { useWatchlist } from "../lib/watchlist";
+import { PremiumToggle } from "./PremiumToggle";
 import { WatchButton } from "./WatchButton";
 
 function companionId(id: string) {
@@ -11,7 +12,7 @@ function companionId(id: string) {
 }
 
 export function WatchlistStrip({ assets }: { assets: MarketAsset[] }) {
-  const { items } = useWatchlist();
+  const { items, cap, atCap, premium } = useWatchlist();
   const byId = new Map(assets.map((asset) => [asset.id, asset]));
   const compareHref = items.length >= 2
     ? `/compare?ids=${items.slice(0, 3).map((item) => item.id).join(",")}`
@@ -24,21 +25,34 @@ export function WatchlistStrip({ assets }: { assets: MarketAsset[] }) {
       <div className="section-heading">
         <div>
           <div className="eyebrow">WATCHLIST</div>
-          <h2>Saved in this browser</h2>
+          <h2>Surveillance list — not the whole market</h2>
         </div>
         <div className="table-tools">
+          <Link className="ghost tool-button" href="/alerts">Smart alerts</Link>
           <Link className="ghost tool-button" href={compareHref}>
             {items.length >= 2 ? "Compare watched" : "Open Compare"}
           </Link>
-          <span className="muted">{items.length} saved</span>
+          <span className="muted">{items.length} / {cap}</span>
         </div>
       </div>
+      <p className="muted alerts-note">
+        Alerts only evaluate coins you star here. Free tier is {premium ? "unlocked locally" : "3 coins"} — the 4th star
+        is blocked until the local premium toggle. Not billing. No Telegram/Discord/push yet.
+      </p>
+      <PremiumToggle />
+      {atCap ? (
+        <p className="alerts-fired-banner" role="status" id="watchlist-cap">
+          {premium
+            ? `Premium cap reached (${cap}). Remove a coin to star another.`
+            : "Free watchlist is full (3/3). The 4th coin is blocked. Flip the local premium toggle to research more — not a payment."}
+        </p>
+      ) : null}
       {items.length === 0 ? (
         <div className="empty empty-panel">
-          <strong>No local favorites yet</strong>
+          <strong>No surveillance coins yet</strong>
           <p>
-            Star a coin in the rankings or on an asset page, then Compare watched. The list stays in this browser only —
-            CoinVigil has no accounts and does not sync watchlists.
+            Star a coin in the rankings or on an asset page. Smart alerts never spam the whole market — only this list.
+            Local only, no account.
           </p>
         </div>
       ) : (
@@ -57,7 +71,7 @@ export function WatchlistStrip({ assets }: { assets: MarketAsset[] }) {
                   <span className={changeClass(live?.price_change_percentage_24h)}>
                     {live ? formatPercent(live.price_change_percentage_24h) : "Open asset"}
                   </span>
-                  <Link className="trade-link" href={`/asset/${item.id}#contracts`}>Contracts</Link>
+                  <Link className="trade-link" href={`/alerts?coin=${item.id}`}>Alert</Link>
                   <Link className="trade-link" href={`/compare?ids=${item.id},${companionId(item.id)}`}>
                     Compare
                   </Link>
@@ -68,9 +82,7 @@ export function WatchlistStrip({ assets }: { assets: MarketAsset[] }) {
         </div>
       )}
       <p className="watchlist-footnote muted">
-        {items.length === 1
-          ? "Star one more coin to compare two watched assets. Local only — not financial advice."
-          : "Local only — no account, no server copy. Compare uses the shareable ?ids= URL. Not financial advice."}
+        Local only — no account, no server copy. Alerts stay watchlist-scoped. Not financial advice.
       </p>
     </section>
   );

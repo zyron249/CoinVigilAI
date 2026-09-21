@@ -463,7 +463,7 @@ jobs:
               sleep 2
               continue
             fi
-            if ! grep -qi "no push" /tmp/alerts.html && ! grep -qi "local only" /tmp/alerts.html; then
+            if ! grep -qi "no push" /tmp/alerts.html && ! grep -qi "watchlist" /tmp/alerts.html; then
               sleep 2
               continue
             fi

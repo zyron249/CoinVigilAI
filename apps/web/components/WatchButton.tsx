@@ -13,9 +13,14 @@ export function WatchButton({
   name: string;
   compact?: boolean;
 }) {
-  const { ids, toggle } = useWatchlist();
+  const { ids, toggle, atCap, cap, premium } = useWatchlist();
   const watched = ids.has(id.toLowerCase());
-  const label = watched ? `Remove ${name} from watchlist` : `Save ${name} to this browser watchlist`;
+  const blocked = atCap && !watched;
+  const label = watched
+    ? `Remove ${name} from watchlist`
+    : blocked
+      ? `Free watchlist is full (${cap} coins). Local premium toggle raises the cap — not a payment.`
+      : `Save ${name} to this browser watchlist`;
 
   function activate(event: { preventDefault: () => void; stopPropagation: () => void }) {
     event.preventDefault();
@@ -26,10 +31,12 @@ export function WatchButton({
   return (
     <button
       type="button"
-      className={`watch-button ${compact ? "compact" : ""} ${watched ? "is-on" : ""}`}
+      className={`watch-button ${compact ? "compact" : ""} ${watched ? "is-on" : ""} ${blocked ? "is-blocked" : ""}`}
       aria-pressed={watched}
+      aria-disabled={blocked || undefined}
       aria-label={label}
-      title={watched ? "Saved in this browser. Enter or Space removes it." : "Save in this browser — no account. Enter or Space."}
+      title={label}
+      data-blocked={blocked ? "free-cap" : undefined}
       onClick={activate}
       onKeyDown={(event) => {
         if (event.key === "Enter" || event.key === " ") {
@@ -38,7 +45,7 @@ export function WatchButton({
       }}
     >
       <span aria-hidden="true">{watched ? "★" : "☆"}</span>
-      {compact ? null : <span>{watched ? "Watching" : "Watch"}</span>}
+      {compact ? null : <span>{watched ? "Watching" : blocked ? (premium ? "Cap reached" : "Free cap") : "Watch"}</span>}
     </button>
   );
 }

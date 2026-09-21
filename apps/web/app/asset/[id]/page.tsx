@@ -141,6 +141,7 @@ export default async function AssetPage({
         name={asset.name}
         price={asset.current_price}
         change24h={asset.price_change_percentage_24h}
+        volume={asset.total_volume}
       />
 
       <AssetWorkspace

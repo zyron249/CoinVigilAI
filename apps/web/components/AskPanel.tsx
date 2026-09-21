@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { AskAnswer } from "../lib/api";
 import { postAsk } from "../lib/api";
 import { formatPercent, formatUsd } from "../lib/format";
+import { useWatchlist } from "../lib/watchlist";
 import { StatusBadge } from "./StatusBadge";
 
 export function AskPanel({
@@ -17,6 +18,7 @@ export function AskPanel({
   compact?: boolean;
   heading?: string;
 }) {
+  const { items: watched } = useWatchlist();
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<AskAnswer | null>(initial ?? null);
@@ -65,6 +67,20 @@ export function AskPanel({
         />
         <button type="submit" disabled={busy || !draft.trim()}>{busy ? "Checking tools…" : "Ask"}</button>
       </form>
+      {!coinId && watched.length ? (
+        <div className="ask-chips" aria-label="Ask about watchlist coins">
+          {watched.slice(0, 5).map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              className="ghost tool-button"
+              onClick={() => void submit(`What moved for ${item.name}?`)}
+            >
+              Ask {item.symbol.toUpperCase()}
+            </button>
+          ))}
+        </div>
+      ) : null}
       {result ? (
         <div className="ask-result" aria-live="polite">
           {result.refused_advice ? (

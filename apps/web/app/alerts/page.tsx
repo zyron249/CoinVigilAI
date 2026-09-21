@@ -12,7 +12,7 @@ export default async function AlertsPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const query = await searchParams;
-  const coin = (firstParam(query.coin) || "bitcoin").trim().toLowerCase();
+  const coin = (firstParam(query.coin) || "").trim().toLowerCase();
   const kindRaw = (firstParam(query.kind) || "above").trim();
   const kind = (["above", "below", "change_24h"].includes(kindRaw) ? kindRaw : "above") as "above" | "below" | "change_24h";
 
@@ -20,17 +20,17 @@ export default async function AlertsPage({
     <main id="content">
       <section className="page-hero">
         <div className="eyebrow hero-tag">ALERTS</div>
-        <h1>Watch a level.<br /><span>Local only for now.</span></h1>
+        <h1>Watchlist only.<br /><span>Never the whole market.</span></h1>
         <p>
-          Price-above, price-below, and 24h-change rules live in this browser and evaluate on Markets and asset pages.
-          Push notifications are a later slice — this tab uses the current snapshot only. Informational research, not
-          financial advice.
+          Smart alerts prefilter price and volume on coins you star. Then a short tool-grounded note (heuristic or AI)
+          explains what moved. Free watchlist is 3 coins. No push/Telegram/Discord yet — in-app only. Informational
+          research, not financial advice.
         </p>
       </section>
       <AlertsBoard initialCoin={coin} initialKind={kind} />
       <p className="coverage-note muted">
-        Holdings live on the <Link href="/portfolio">local portfolio stub</Link> (no custody, no keys). Watch research
-        lists on the <Link href="/#watchlist">watchlist</Link>. CoinVigil has no accounts.
+        Star coins on the <Link href="/#watchlist">watchlist</Link>. Holdings remain a <Link href="/portfolio">light stub</Link>
+        {" "}(no custody). CoinVigil has no accounts and does not invent on-chain whale prints.
       </p>
     </main>
   );
