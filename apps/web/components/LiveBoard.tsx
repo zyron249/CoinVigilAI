@@ -105,7 +105,8 @@ export function LiveBoard({
       setCheckedAt(new Date().toISOString());
     }
 
-    const id = window.setInterval(() => { void tick(); }, POLL_MS);
+    const delay = market.partial ? MIN_TICK_MS : POLL_MS;
+    const id = window.setInterval(() => { void tick(); }, delay);
     const onVis = () => {
       if (document.visibilityState === "visible") void tick();
     };
@@ -118,7 +119,13 @@ export function LiveBoard({
       document.removeEventListener("visibilitychange", onVis);
       window.removeEventListener("online", onOnline);
     };
-  }, [loadMarket]);
+  }, [loadMarket, market.partial]);
+
+  useEffect(() => {
+    if (!market.partial) return;
+    const id = window.setTimeout(() => { void loadMarket({}, true); }, 3500);
+    return () => window.clearTimeout(id);
+  }, [loadMarket, market.partial, market.universe_size]);
 
   useEffect(() => {
     if (draft.trim() !== (queryRef.current.q || "").trim()) return;
@@ -225,7 +232,7 @@ export function LiveBoard({
         <p className="source-ribbon cache-ribbon" role="status">
           <strong>Partial CoinGecko snapshot.</strong>
           {" "}Showing {market.universe_size} of {market.coverage_target || 1000} assets because later market pages were rate-limited or empty.
-          CoinVigil does not invent coins to fill the table.
+          {" "}A follow-up pass is scheduled — CoinVigil does not invent coins to fill the table.
         </p>
       ) : null}
       <GlobalStrip overview={overview} checkedAt={checkedAt} />

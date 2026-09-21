@@ -85,7 +85,7 @@ nav { min-height: 72px; display: flex; align-items: center; justify-content: spa
 .nav-backdrop { display: none; }
 .chart-canvas { cursor: crosshair; }
 .chart-canvas.is-drawing { outline: 1px dashed rgba(255,213,154,.35); outline-offset: -6px; }
-#watchlist, #markets, #ai-brief, #movers, #radar, #ai-council, #community, #overview, #contracts, #chart-lab, #markets-tab { scroll-margin-top: var(--sticky-offset); }
+#watchlist, #markets, #ai-brief, #movers, #radar, #ai-council, #community, #overview, #contracts, #chart-lab, #markets-tab, .asset-workspace { scroll-margin-top: var(--sticky-offset); }
 .hero { min-height: 430px; display: grid; grid-template-columns: 1.35fr .65fr; align-items: center; border-bottom: 1px solid var(--line); }
 .hero h1 { font-size: clamp(44px, 6vw, 82px); line-height: .98; letter-spacing: -4px; margin: 16px 0 20px; max-width: 850px; }
 .hero h1 span, .studio-hero h1 span { color: var(--accent); }
@@ -130,6 +130,7 @@ nav { min-height: 72px; display: flex; align-items: center; justify-content: spa
   border-radius: 6px;
 }
 .asset-workspace { padding-top: 8px; }
+.asset-workspace-anchor { width: 1px; height: 1px; overflow: hidden; }
 .asset-jump { display: flex; flex-wrap: wrap; gap: 8px 12px; margin: 10px 0 0; }
 .asset-jump a { font-size: 12px; font-weight: 700; color: var(--accent); }
 .asset-subnav {
