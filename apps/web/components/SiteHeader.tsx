@@ -40,12 +40,12 @@ export function SiteHeader() {
             type="search"
             value={q}
             onChange={(event) => setQ(event.target.value)}
-            placeholder="Search name, symbol, or id"
+            placeholder="Search"
             autoComplete="off"
           />
           <button type="submit" className="ghost tool-button">Search</button>
         </form>
-        <Link className="ghost tool-button header-watch" href="/#watchlist">Watchlist</Link>
+        <Link className="ghost tool-button header-watch" href="/#watchlist" aria-label="Watchlist">Watchlist</Link>
       </nav>
       <p className="legal-strip">Informational research only — not financial advice.</p>
     </header>
