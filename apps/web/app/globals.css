@@ -232,6 +232,7 @@ nav { min-height: 72px; display: flex; align-items: center; justify-content: spa
   display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap;
   padding: 10px 0; border-top: 1px solid var(--line); align-items: center;
 }
+.alert-copy { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .ask-cites li { color: var(--muted); font-size: 13px; }
 .ask-cites a { color: var(--accent); font-weight: 700; }
 .alerts-list li.is-fired { border-color: rgba(255,213,154,.35); }

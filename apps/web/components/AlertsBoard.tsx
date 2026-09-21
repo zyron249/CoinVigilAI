@@ -119,7 +119,7 @@ export function AlertsBoard() {
             const fired = alertFired(item, live?.current_price, live?.price_change_percentage_24h);
             return (
               <li key={item.id} className={fired ? "is-fired" : undefined}>
-                <div>
+                <div className="alert-copy">
                   <strong>{item.name}</strong>
                   <span className="muted">
                     {item.kind === "change_24h" ? `|24h| ≥ ${item.threshold}%` : `${item.kind} ${formatUsd(item.threshold)}`}
