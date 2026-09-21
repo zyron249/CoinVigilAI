@@ -89,7 +89,6 @@ export default async function AssetPage({
               <p className="live-updated muted">Last updated: {formatTimestamp(asset.last_updated)}</p>
             ) : null}
             <nav className="asset-jump" aria-label="Related pages">
-              <Link href={`/compare?ids=${asset.id},${companion}`}>Compare</Link>
               <Link href={`/convert?from=${asset.id}&to=usd`}>Convert</Link>
               <Link href={`/ask`}>Ask</Link>
               <Link href={`/alerts?coin=${asset.id}`}>Alert</Link>

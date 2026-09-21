@@ -197,7 +197,7 @@ export function LiveBoard({
             type="search"
             value={draft}
             onChange={(event) => setDraft(event.target.value)}
-            placeholder="Search name, symbol, or id — then jump to the asset"
+            placeholder="Search name, symbol, or id"
             autoComplete="off"
             aria-busy={busy}
             aria-describedby="market-results-status"
