@@ -6,12 +6,11 @@ import type { GlobalOverview, MarketMovers, MarketPage } from "../lib/api";
 import { getGlobalOverview, getMarket, getMovers } from "../lib/api";
 import { sourceLabel } from "../lib/format";
 import { writeMarketQuery } from "../lib/pagination";
-import { DemoRibbon } from "./DemoRibbon";
-import { PortfolioStrip } from "./PortfolioStrip";
 import { GlobalStrip } from "./GlobalStrip";
 import { MarketTable } from "./MarketTable";
 import { Movers } from "./Movers";
 import { SurveillanceDesk } from "./SurveillanceDesk";
+import { TapeBar } from "./TapeBar";
 
 const POLL_MS = 30_000;
 const MIN_TICK_MS = 8_000;
@@ -25,8 +24,6 @@ export function LiveBoard({
   brief,
   radar,
   rail,
-  topCryptos,
-  radarStrip,
 }: {
   initialMarket: MarketPage;
   initialOverview: GlobalOverview;
@@ -160,22 +157,31 @@ export function LiveBoard({
     return rows;
   }, [market.assets, movers.gainers, movers.losers]);
 
+  const bitcoin = useMemo(
+    () => market.assets.find((asset) => asset.id === "bitcoin") || market.assets[0] || null,
+    [market.assets],
+  );
+
   return (
     <>
-      <DemoRibbon
+      <TapeBar
         source={market.source}
-        lastLiveAt={market.last_live_at}
         stale={market.stale}
         fallbackReason={market.fallback_reason}
+        lastLiveAt={market.last_live_at}
+        asOf={market.as_of}
+        bitcoin={bitcoin}
       />
       <SurveillanceDesk
         assets={watchAssets}
         movers={movers}
         source={market.source}
         stale={market.stale}
+        fallbackReason={market.fallback_reason}
+        asOf={market.as_of}
+        lastLiveAt={market.last_live_at}
       />
       {hero}
-      <GlobalStrip overview={overview} checkedAt={checkedAt} />
       <section className="card finder-dock is-compact" id="find-asset" aria-label="Find a CoinGecko-tracked asset">
         <div className="finder-copy">
           <div className="eyebrow">FIND AN ASSET</div>
@@ -260,21 +266,19 @@ export function LiveBoard({
           onQuery={(next) => { void loadMarket(next); }}
         />
       </section>
+      <GlobalStrip overview={overview} checkedAt={checkedAt} />
       <div className="dash-grid">
         <div className="dash-main">
-          {topCryptos}
           {brief}
-          {radarStrip}
         </div>
         {rail ? <aside className="dash-rail">{rail}</aside> : null}
       </div>
-      <PortfolioStrip assets={watchAssets} />
       <section className="slice-grid" id="movers">
         <Movers gainers={movers.gainers} losers={movers.losers} source={movers.source} stale={movers.stale} />
         <div id="radar-flags">{radar}</div>
       </section>
       <p className="movers-footnote muted">
-        24h gainers are up; 24h losers are down. Ranked from the CoinVigil universe ({sourceLabel(movers.source, { stale: movers.stale }).text}).
+        24h gainers are up; 24h losers are down. Ranked from the same CoinVigil universe as the table ({sourceLabel(movers.source, { stale: movers.stale, fallbackReason: movers.fallback_reason }).text}).
         Prices are never invented.
       </p>
     </>

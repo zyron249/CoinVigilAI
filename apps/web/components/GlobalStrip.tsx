@@ -64,11 +64,11 @@ export function GlobalStrip({
         ))}
         <div className="global-stat source-stat">
           <span>Data source</span>
-          <strong><StatusBadge source={overview.source} stale={overview.stale} /></strong>
+          <StatusBadge source={overview.source} stale={overview.stale} fallbackReason={overview.fallback_reason} />
           <em>{overview.coverage === "global" ? "CoinGecko global" : universeNote}</em>
         </div>
       </div>
-      <p className="live-updated muted">
+      <p className="live-updated muted sr-only">
         {overview.stale && lastLive
           ? `Last live CoinGecko data: ${lastLive}`
           : asOf

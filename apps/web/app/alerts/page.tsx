@@ -24,8 +24,8 @@ export default async function AlertsPage({
         <p>
           Create a watchlist rule, keep the active list here, and read fire history with timestamps.
           Quotes poll the CoinGecko snapshot — there is no WebSocket tick stream. Delivery is in-app in this browser;
-          optional HTTPS webhook via ALERT_WEBHOOK_URL. Telegram and Discord are not implemented.
-          Free watchlist is 3 coins. Informational research, not financial advice.
+          webhook only if ALERT_WEBHOOK_URL is set on the API. Telegram and Discord are not implemented.
+          Rules stay in this browser. Free watchlist is 3 coins. Informational research, not financial advice.
         </p>
       </section>
       <AlertsBoard initialCoin={coin} initialKind={kind} />

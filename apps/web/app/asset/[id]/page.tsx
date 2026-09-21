@@ -152,7 +152,7 @@ export default async function AssetPage({
       <section className="analysis-grid">
         <div className="card analysis-card">
           <div className="eyebrow">AI ANALYSIS</div>
-          <h2>{analysis.bias.toUpperCase()} · {analysis.confidence}% confidence</h2>
+          <h2>{analysis.council ? `${analysis.bias.toUpperCase()} · ${analysis.confidence}% confidence` : `Heuristic ${analysis.bias} · not a model vote`}</h2>
           <p>{analysis.summary}</p>
           {analysis.council ? (
             <ul className="council-meta">

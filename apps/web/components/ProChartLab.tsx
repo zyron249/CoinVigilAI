@@ -94,7 +94,9 @@ export function ProChartLab({ coinId, symbol, candles, source, tickerSource }: P
           callback(series, { forward: false, backward: false });
         },
       });
-      chart.createIndicator({ name: "MA", paneId: "candle_pane" }, true);
+      if (series.length >= 10) {
+        chart.createIndicator({ name: "MA", paneId: "candle_pane" }, true);
+      }
 
       chartRef.current = chart;
       disposeRef.current = lib.dispose;
@@ -197,8 +199,8 @@ export function ProChartLab({ coinId, symbol, candles, source, tickerSource }: P
     <section className="chart-lab card">
       <div className="chart-lab-head">
         <div>
-          <div className="eyebrow">PRO CHART LAB</div>
-          <h2>{symbol.toUpperCase()} technical workspace</h2>
+          <div className="eyebrow">{sourceLabel(seriesSource).demo ? "DEMO CANDLES" : "CHART"}</div>
+          <h2>{symbol.toUpperCase()} {sourceLabel(seriesSource).demo ? "labeled demo series" : "technical workspace"}</h2>
         </div>
         <span className="chart-status" role="status">{busy && empty ? "Loading OHLC…" : status}</span>
       </div>
@@ -236,9 +238,9 @@ export function ProChartLab({ coinId, symbol, candles, source, tickerSource }: P
         <button type="button" className="tool-button" disabled={empty} onClick={() => draw("brush", "Brush")}>Brush</button>
         <button type="button" className="tool-button" disabled={empty} onClick={() => draw("priceLine", "Price line")}>Price line</button>
         <span className="toolbar-divider" />
-        <button type="button" className="tool-button" disabled={empty} onClick={() => addIndicator("MA")}>MA</button>
-        <button type="button" className="tool-button" disabled={empty} onClick={() => addIndicator("EMA")}>EMA</button>
-        <button type="button" className="tool-button" disabled={empty} onClick={() => addIndicator("BOLL")}>BOLL</button>
+        {series.length >= 10 ? <button type="button" className="tool-button" disabled={empty} onClick={() => addIndicator("MA")}>MA</button> : null}
+        {series.length >= 10 ? <button type="button" className="tool-button" disabled={empty} onClick={() => addIndicator("EMA")}>EMA</button> : null}
+        {series.length >= 20 ? <button type="button" className="tool-button" disabled={empty} onClick={() => addIndicator("BOLL")}>BOLL</button> : null}
         <button type="button" className="tool-button" disabled={empty} onClick={() => addIndicator("RSI")}>RSI</button>
         <button type="button" className="tool-button" disabled={empty} onClick={() => addIndicator("MACD")}>MACD</button>
         <span className="toolbar-divider" />

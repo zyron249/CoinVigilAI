@@ -118,9 +118,26 @@ nav { min-height: 48px; display: flex; align-items: center; justify-content: spa
 .status-badge { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 800; letter-spacing: .2px; white-space: nowrap; }
 .status-badge::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
 .status-badge.tone-live { color: var(--accent); }
-.status-badge.tone-cache { color: var(--accent); }
+.status-badge.tone-cache { color: var(--warning); }
 .status-badge.tone-demo { color: var(--warning); }
 .status-badge.tone-down { color: var(--danger); }
+.tape-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px 14px;
+  margin: 6px 0 8px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  font-size: 12px;
+  line-height: 1.4;
+  background: rgba(8, 14, 30, .7);
+}
+.tape-bar.tone-cache, .tape-bar.tone-demo { border-color: rgba(255, 213, 154, .35); background: rgba(255, 213, 154, .08); }
+.tape-bar.tone-down { border-color: rgba(255, 93, 122, .35); background: rgba(255, 93, 122, .08); }
+.tape-bar strong { font-size: 13px; }
+.tape-quote { margin: 0; padding: 8px 16px 0; }
 .source-ribbon { margin: 6px 0 0; padding: 8px 12px; border-radius: 10px; border: 1px solid var(--line); font-size: 12px; line-height: 1.45; }
 .demo-ribbon { background: rgba(255, 213, 154, .08); border-color: rgba(255, 213, 154, .28); }
 .cache-ribbon { background: rgba(89, 242, 180, .06); border-color: rgba(255, 213, 154, .28); }
@@ -226,7 +243,7 @@ nav { min-height: 48px; display: flex; align-items: center; justify-content: spa
 }
 .watched-movers li a, .desk-fires li {
   display: grid;
-  grid-template-columns: 72px minmax(0, 1fr) auto;
+  grid-template-columns: 72px minmax(0, 1fr) auto auto;
   gap: 10px;
   align-items: baseline;
   padding: 8px 0;
@@ -443,7 +460,7 @@ nav { min-height: 48px; display: flex; align-items: center; justify-content: spa
 .asset-tab { padding: 8px 14px; border-radius: 999px; font-size: 13px; }
 .asset-tab.is-on { background: var(--accent); color: #062019; }
 .exchange-note { margin: 0; padding: 10px 20px 0; line-height: 1.5; }
-.finder-dock { padding: 18px 20px; margin: 8px 0 6px; display: grid; gap: 12px; }
+.finder-dock { padding: 18px 20px; margin: 8px 0 6px; display: none; gap: 12px; }
 .finder-copy h2 { margin: 4px 0 6px; font-size: 20px; }
 .finder-copy p { margin: 0; line-height: 1.5; }
 .coverage-count { color: var(--muted); font-size: 13px; }
@@ -909,7 +926,9 @@ footer > div:first-child { overflow-wrap: anywhere; max-width: 52rem; }
   .markets-board .markets-table th:nth-child(8),
   .markets-board .markets-table td:nth-child(8),
   .markets-board .markets-table th:nth-child(9),
-  .markets-board .markets-table td:nth-child(9) { display: none; }
+  .markets-board .markets-table td:nth-child(9),
+  .markets-board .markets-table th:nth-child(10),
+  .markets-board .markets-table td:nth-child(10) { display: none; }
   .markets-board .markets-table th:nth-child(1),
   .markets-board .markets-table td:nth-child(1) {
     min-width: 44px;
@@ -983,7 +1002,8 @@ footer > div:first-child { overflow-wrap: anywhere; max-width: 52rem; }
   .desk-cta-row { padding-left: 10px; padding-right: 10px; }
   .onboard-lead, .desk-meta, .onboard-foot, .desk-note { padding-left: 10px; padding-right: 10px; }
   .onboard-steps, .seed-row, .watched-movers, .desk-fires { margin-left: 10px; margin-right: 10px; }
-  .header-brand > span:last-child { display: none; }
+  .header-brand .brand-text { font-size: 13px; }
+  .header-brand .brand-text b { display: none; }
   .header-search { flex: 1 1 auto; max-width: none; min-width: 0; margin-left: 0; }
   .header-search .tool-button { display: none; }
   .header-watch { font-size: 12px; padding-left: 8px; padding-right: 8px; }
@@ -1016,15 +1036,18 @@ footer > div:first-child { overflow-wrap: anywhere; max-width: 52rem; }
   .markets-board .market-search { flex: 1; min-width: 0; }
   .markets-board .market-search input { width: auto; flex: 1; min-width: 0; }
   .header-search input { font-size: 13px; }
+  .markets-board .markets-table th:nth-child(10),
+  .markets-board .markets-table td:nth-child(10) { display: none; }
   .source-ribbon {
-    margin: 6px 0;
+    margin: 4px 0;
     font-size: 11px;
-    padding: 8px 10px;
+    padding: 6px 10px;
     display: -webkit-box;
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
   }
+  .tape-bar { margin: 4px 0 6px; padding: 6px 10px; }
   .jump-row { display: none; }
   .markets-board .markets-table { min-width: 390px; }
   .markets-board .markets-table .asset-link strong { display: none; }

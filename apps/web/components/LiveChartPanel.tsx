@@ -15,7 +15,17 @@ const RANGES: { id: string; label: string; days: number }[] = [
   { id: "1y", label: "1Y", days: 365 },
 ];
 
-export function LiveChartPanel({ assets }: { assets: MarketAsset[] }) {
+export function LiveChartPanel({
+  assets,
+  tapeSource,
+  tapeStale,
+  tapeFallback,
+}: {
+  assets: MarketAsset[];
+  tapeSource?: string;
+  tapeStale?: boolean;
+  tapeFallback?: string | null;
+}) {
   const picks = useMemo(
     () => {
       const preferred = assets.filter((asset) => ["bitcoin", "ethereum", "solana", "binancecoin", "ripple"].includes(asset.id));
@@ -68,14 +78,24 @@ export function LiveChartPanel({ assets }: { assets: MarketAsset[] }) {
     return { line, area, up, width, height };
   }, [candles]);
 
+  const lastClose = candles.at(-1)?.close;
+  const diverge = Boolean(
+    live?.current_price
+    && lastClose
+    && Number.isFinite(lastClose)
+    && Math.abs(lastClose - live.current_price) / Math.max(Math.abs(live.current_price), 1) > 0.015,
+  );
+  const candleDemo = sourceLabel(source).demo;
+  const chartLabel = candleDemo ? "OHLC · Demo candles" : "OHLC";
+
   return (
     <section className="card live-chart-panel">
       <div className="section-heading">
         <div>
-          <div className="eyebrow">LIVE MARKET CHART</div>
+          <div className="eyebrow">{chartLabel}</div>
           <h2>{live ? `${live.symbol.toUpperCase()} · ${formatUsd(live.current_price)}` : "Chart"}</h2>
         </div>
-        <StatusBadge source={source} />
+        <StatusBadge source={tapeSource || source} stale={tapeStale} fallbackReason={tapeFallback} />
       </div>
       <div className="chart-chip-row">
         <div className="chart-coins">
@@ -106,8 +126,9 @@ export function LiveChartPanel({ assets }: { assets: MarketAsset[] }) {
       <p className="muted chart-honest">
         CoinGecko OHLC for the selected range — not a TradingView widget, not a WebSocket tick stream.
         {range === "1h" ? " 1H uses the same 1-day OHLC snap as 1D (CoinGecko does not give true hourly ticks here)." : ""}
-        {live ? ` ${formatPercent(live.price_change_percentage_24h)} 24h in the rankings snapshot.` : ""}
-        {sourceLabel(source).demo ? " Demo candles are labeled, never live." : ""}
+        {live ? ` Tape 24h ${formatPercent(live.price_change_percentage_24h)} from the rankings snapshot.` : ""}
+        {candleDemo ? " Demo candles are labeled, never live." : ""}
+        {diverge ? ` Last OHLC close ${formatUsd(lastClose)} vs tape ${formatUsd(live?.current_price)} — candles are a different series.` : ""}
       </p>
       <div className={`live-chart-canvas ${busy ? "is-busy" : ""}`}>
         {chart ? (
@@ -129,7 +150,9 @@ export function LiveChartPanel({ assets }: { assets: MarketAsset[] }) {
         )}
       </div>
       {live ? (
-        <Link className="ghost tool-button chart-lab-link" href={`/asset/${live.id}#chart-lab`}>Open Chart Lab</Link>
+        <Link className="ghost tool-button chart-lab-link" href={`/asset/${live.id}#chart-lab`}>
+          {candleDemo ? "Open demo chart" : "Open chart"}
+        </Link>
       ) : null}
     </section>
   );

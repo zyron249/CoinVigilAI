@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { MarketAsset, WatchlistSentiment } from "../lib/api";
-import { getWatchlistSentiment } from "../lib/api";
+import { getStackStatus, getWatchlistSentiment } from "../lib/api";
 import {
   ALERTS_LIMIT,
   DEFAULT_COOLDOWN_MINUTES,
@@ -55,6 +55,17 @@ export function AlertsBoard({
   const [lastVolume, setLastVolume] = useState<Record<string, number>>({});
   const [now, setNow] = useState(() => Date.now());
   const [sentiment, setSentiment] = useState<WatchlistSentiment | null>(null);
+  const [webhookOn, setWebhookOn] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    getStackStatus().then((status) => {
+      if (!cancelled) setWebhookOn(Boolean(status.webhook?.configured));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     if (!coinId && watched[0]) setCoinId(watched[0].id);
@@ -184,8 +195,11 @@ export function AlertsBoard({
       <p className="muted alerts-note">
         Create a watchlist rule, then read active status and fire history below. Only starred coins are evaluated.
         Quotes poll the CoinGecko snapshot (no WebSocket tick stream). Price/volume rules run before any AI cost.
-        Delivery is in-app in this browser, plus an optional HTTPS webhook when ALERT_WEBHOOK_URL is set.
-        Telegram and Discord are not implemented. No on-chain whale feed.
+        Rules and history are saved in this browser — there is no account.
+        {webhookOn
+          ? " Optional HTTPS webhook is configured on this API (ALERT_WEBHOOK_URL) — fires POST when a rule matches."
+          : " Delivery is browser-only: ALERT_WEBHOOK_URL is not set on this API."}
+        {" "}Telegram and Discord bots are not implemented. No on-chain whale feed.
       </p>
       {watched.length ? (
         <p className="muted alerts-note" data-sentiment-peek>

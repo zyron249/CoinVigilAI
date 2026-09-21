@@ -86,12 +86,8 @@ export function SiteSidebar() {
         ))}
       </nav>
       <div className="sidebar-foot">
-        <Link className="sidebar-link" href="/token-studio" onClick={() => setOpen(false)}>
-          <Icon name="spark" />
-          <span>Token Studio</span>
-        </Link>
         <p>v0.4.0 · CoinGecko snapshot</p>
-        <p>Not financial advice. Alerts fire in this browser. Token Studio is not a Phase 1 CTA.</p>
+        <p>Not financial advice. Watchlist and alerts stay in this browser.</p>
       </div>
     </aside>
   );

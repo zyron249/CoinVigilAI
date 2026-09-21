@@ -1,16 +1,25 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { MarketBrief } from "../lib/api";
+import type { MarketAsset, MarketBrief } from "../lib/api";
 import { getMarketBrief } from "../lib/api";
+import { changeClass, formatPercent, formatUsd } from "../lib/format";
 import { StatusBadge } from "./StatusBadge";
 
 export function MarketBriefCard({
   initial = null,
   refresh = false,
+  tapeSource,
+  tapeStale,
+  tapeFallback,
+  bitcoin,
 }: {
   initial?: MarketBrief | null;
   refresh?: boolean;
+  tapeSource?: string;
+  tapeStale?: boolean;
+  tapeFallback?: string | null;
+  bitcoin?: MarketAsset | null;
 }) {
   const [brief, setBrief] = useState<MarketBrief | null>(initial);
   const [status, setStatus] = useState<"loading" | "ready" | "empty">(initial ? "ready" : "loading");
@@ -33,9 +42,10 @@ export function MarketBriefCard({
     };
   }, [refresh, initial]);
 
+  const tape = tapeSource || brief?.data_source;
   const engineLabel = brief?.generated
     ? `AI-generated · ${brief.engine}`
-    : "Heuristic fallback · no council vote yet";
+    : "Heuristic · no council vote";
 
   return (
     <section className="card market-brief" id="ai-brief" aria-live="polite">
@@ -46,15 +56,24 @@ export function MarketBriefCard({
         </div>
         <div className="brief-meta">
           {brief ? <span className={`tone-pill ${brief.tone}`}>{brief.tone}</span> : null}
-          <StatusBadge source={brief?.data_source} />
+          <StatusBadge source={tape} stale={tapeStale} fallbackReason={tapeFallback} />
         </div>
       </div>
+      {bitcoin ? (
+        <p className="tape-quote muted">
+          Tape BTC {formatUsd(bitcoin.current_price)}{" "}
+          <span className={changeClass(bitcoin.price_change_percentage_24h)}>
+            {formatPercent(bitcoin.price_change_percentage_24h)}
+          </span>
+          {" "}24h — same snapshot as the rankings table, not a second print.
+        </p>
+      ) : null}
       <div className="brief-body">
         {status === "loading" && !brief ? (
           <p className="muted">Loading the market brief. If no AI keys are set, this uses the labeled heuristic fallback — not a live model vote.</p>
         ) : null}
         {status === "empty" && !brief ? (
-          <p className="muted">Market brief unavailable. The rankings table below still uses its own labeled market source.</p>
+          <p className="muted">Market brief unavailable. The rankings table still uses its own labeled market source.</p>
         ) : null}
         {brief ? (
           <>
@@ -69,7 +88,7 @@ export function MarketBriefCard({
               {brief.providers_responded.length > 0 ? (
                 <span className="muted">Responded: {brief.providers_responded.join(", ")}.</span>
               ) : (
-                <span className="muted">No AI keys configured — this is the quantitative fallback, not a live model vote.</span>
+                <span className="muted">No AI keys configured — heuristic only, not a live model vote.</span>
               )}
             </div>
             <p className="brief-disclaimer">

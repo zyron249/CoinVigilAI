@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { MarketAsset, MarketMovers } from "../lib/api";
 import { DEFAULT_COOLDOWN_MINUTES, SENSITIVITY, useAlerts } from "../lib/alerts";
 import { useAlertHistory } from "../lib/alert-history";
+import { getStackStatus } from "../lib/api";
 import { changeClass, formatAge, formatPercent, formatTimestamp, formatUsd, sourceLabel } from "../lib/format";
 import { useWatchlist } from "../lib/watchlist";
 import { AlertsStrip } from "./AlertsStrip";
@@ -23,19 +24,27 @@ export function SurveillanceDesk({
   movers,
   source,
   stale,
+  fallbackReason,
+  asOf,
+  lastLiveAt,
 }: {
   assets: MarketAsset[];
   movers: MarketMovers;
   source: string;
   stale?: boolean;
+  fallbackReason?: string | null;
+  asOf?: string | null;
+  lastLiveAt?: string | null;
 }) {
   const { items: watched, ids, toggle } = useWatchlist();
   const { items: alerts, add } = useAlerts();
   const { items: history } = useAlertHistory();
   const [ready, setReady] = useState(false);
+  const [webhookOn, setWebhookOn] = useState<boolean | null>(null);
 
   useEffect(() => {
     setReady(true);
+    getStackStatus().then((status) => setWebhookOn(Boolean(status.webhook?.configured)));
   }, []);
 
   const seeds = useMemo(() => seedAssets(assets), [assets]);
@@ -83,13 +92,11 @@ export function SurveillanceDesk({
               <div className="eyebrow">WHY COINVIGIL</div>
               <h2>Watchlist → rules → smart alerts → Ask</h2>
             </div>
-            <StatusBadge source={source} stale={stale} />
+            <StatusBadge source={source} stale={stale} fallbackReason={fallbackReason} />
           </div>
           <p className="onboard-lead">
-            CoinMarketCap ranks every coin. CoinVigil watches <strong>yours</strong>: star 1–3 coins (free),
-            save a price or 24h rule, get a tool-backed note when it fires, then Ask about that list.
-            Quotes are CoinGecko Live/cached or a labeled Demo — never invented. Telegram and Discord are not implemented.
-            Informational research only — not financial advice.
+            One job: <strong>star coins → set a price rule</strong>. CoinMarketCap ranks the universe; CoinVigil watches yours.
+            Saved in this browser (no account). Telegram is not implemented.
           </p>
           <ol className="onboard-steps">
             <li className="is-on"><strong>1. Watchlist</strong> Star 1–3 coins in this snapshot.</li>
@@ -119,7 +126,8 @@ export function SurveillanceDesk({
             <p className="muted">Snapshot is empty — CoinVigil does not invent coins to star.</p>
           )}
           <p className="muted onboard-foot">
-            Local only, no account. Free cap is 3 coins; local premium toggle raises it — not billing.
+            Free cap is 3 coins. Then save a price or 24h rule — fires land in this browser
+            {webhookOn === false ? ", webhook off (ALERT_WEBHOOK_URL empty)" : webhookOn ? ", webhook env is set" : ""}.
           </p>
         </section>
   ) : (
@@ -129,12 +137,17 @@ export function SurveillanceDesk({
               <div className="eyebrow">YOUR DESK</div>
               <h2>Watchlist, rules, and Ask — not the whole market</h2>
             </div>
-            <StatusBadge source={source} stale={stale} />
+            <StatusBadge source={source} stale={stale} fallbackReason={fallbackReason} />
           </div>
           <p className="desk-meta">
-            {watched.length} watched · {alerts.length} rule{alerts.length === 1 ? "" : "s"} · {history.length} fire{history.length === 1 ? "" : "s"} in history
-            {lastFire ? ` · last fire ${formatTimestamp(lastFire.at) || "just now"} (${lastFire.delivered ? "webhook delivered" : "in-app / this browser"})` : " · no fires yet"}
-            {" · "}{sourceLabel(source, { stale }).text}
+            {watched.length} watched · {alerts.length} rule{alerts.length === 1 ? "" : "s"} · {history.length} fire{history.length === 1 ? "" : "s"}
+            {lastFire ? ` · last fire ${formatTimestamp(lastFire.at) || "just now"} (${lastFire.delivered ? "webhook POST succeeded" : "in-app / this browser"})` : " · no fires yet"}
+            {webhookOn === false ? " · browser-only delivery" : ""}
+            {" · "}{sourceLabel(source, { stale, fallbackReason }).text}
+          </p>
+          <p className="desk-meta">
+            Today&apos;s check · {sourceLabel(source, { stale, fallbackReason }).text} · {formatAge(asOf || lastLiveAt)}
+            {fallbackReason === "rate_limited" ? " · CoinGecko rate-limited" : ""}
           </p>
           {!hasRuleForFirst && first ? (
             <div className="desk-cta-row">
@@ -161,6 +174,7 @@ export function SurveillanceDesk({
                     <span className={changeClass(live?.price_change_percentage_24h)}>
                       {live ? formatPercent(live.price_change_percentage_24h) : "—"}
                     </span>
+                    <span className="muted">{live ? sourceLabel(source, { stale, fallbackReason }).text : "quote pending"}</span>
                   </Link>
                 </li>
               ))}

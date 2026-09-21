@@ -24,7 +24,7 @@ export function SiteHeader() {
         </button>
         <Link className="brand header-brand" href="/">
           <span className="brand-mark">V</span>
-          <span>CoinVigil <b>AI</b></span>
+          <span className="brand-text">CoinVigil <b>AI</b></span>
         </Link>
         <form
           className="market-search header-search"
@@ -45,10 +45,10 @@ export function SiteHeader() {
           />
           <button type="submit" className="ghost tool-button">Search</button>
         </form>
-        <Link className="ghost tool-button header-watch" href="/#watchlist" aria-label="Watchlist">Watchlist</Link>
+        <Link className="ghost tool-button header-watch" href="/#desk" aria-label="Watchlist">Watchlist</Link>
         <Link className="ghost tool-button header-alerts" href="/alerts">Alerts</Link>
       </nav>
-      <p className="legal-strip">Informational research only — not financial advice.</p>
+      <p className="legal-strip sr-only">Informational research only — not financial advice.</p>
     </header>
   );
 }
