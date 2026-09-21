@@ -2,7 +2,7 @@
 
 // Keep parseWatchlist + cap helpers aligned with apps/web/lib/watchlist-contract.test.mjs
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useSyncExternalStore } from "react";
 import { canAddWatch, PREMIUM_EVENT, PREMIUM_WATCH_LIMIT, readPremium, watchlistCap } from "./premium";
 
 export const WATCHLIST_KEY = "coinvigil.watchlist.v1";
@@ -47,9 +47,17 @@ export function serializeWatchlist(items: WatchItem[]): string {
   return JSON.stringify({ items: items.slice(0, WATCHLIST_LIMIT) });
 }
 
+const EMPTY_WATCHLIST: WatchItem[] = [];
+let watchlistRaw: string | null | undefined;
+let watchlistCache: WatchItem[] = EMPTY_WATCHLIST;
+
 export function readWatchlist(): WatchItem[] {
-  if (typeof window === "undefined") return [];
-  return parseWatchlist(window.localStorage.getItem(WATCHLIST_KEY));
+  if (typeof window === "undefined") return EMPTY_WATCHLIST;
+  const raw = window.localStorage.getItem(WATCHLIST_KEY);
+  if (raw === watchlistRaw) return watchlistCache;
+  watchlistRaw = raw;
+  watchlistCache = parseWatchlist(raw);
+  return watchlistCache;
 }
 
 function writeWatchlist(items: WatchItem[]): WatchItem[] {
@@ -76,30 +84,23 @@ export function toggleWatchItem(item: Omit<WatchItem, "addedAt">): { items: Watc
   };
 }
 
-export function useWatchlist() {
-  const [items, setItems] = useState<WatchItem[]>(() => readWatchlist());
-  const [premium, setPremiumState] = useState(() => readPremium());
+function subscribeWatchlist(onChange: () => void) {
+  window.addEventListener("storage", onChange);
+  window.addEventListener(WATCHLIST_EVENT, onChange);
+  window.addEventListener(PREMIUM_EVENT, onChange);
+  return () => {
+    window.removeEventListener("storage", onChange);
+    window.removeEventListener(WATCHLIST_EVENT, onChange);
+    window.removeEventListener(PREMIUM_EVENT, onChange);
+  };
+}
 
-  useEffect(() => {
-    const sync = () => {
-      setItems(readWatchlist());
-      setPremiumState(readPremium());
-    };
-    sync();
-    window.addEventListener("storage", sync);
-    window.addEventListener(WATCHLIST_EVENT, sync);
-    window.addEventListener(PREMIUM_EVENT, sync);
-    return () => {
-      window.removeEventListener("storage", sync);
-      window.removeEventListener(WATCHLIST_EVENT, sync);
-      window.removeEventListener(PREMIUM_EVENT, sync);
-    };
-  }, []);
+export function useWatchlist() {
+  const items = useSyncExternalStore(subscribeWatchlist, readWatchlist, () => EMPTY_WATCHLIST);
+  const premium = useSyncExternalStore(subscribeWatchlist, readPremium, () => false);
 
   function toggle(item: Omit<WatchItem, "addedAt">) {
-    const result = toggleWatchItem(item);
-    setItems(result.items);
-    return result;
+    return toggleWatchItem(item);
   }
 
   const cap = watchlistCap(premium);

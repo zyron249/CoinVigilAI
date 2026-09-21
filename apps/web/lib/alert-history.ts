@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
 import type { AlertNote, PriceAlert } from "./alerts";
 
 export const HISTORY_KEY = "coinvigil.alert-history.v1";
@@ -65,9 +65,17 @@ export function writeHistory(items: AlertHistoryItem[]): AlertHistoryItem[] {
   return next;
 }
 
+const EMPTY_HISTORY: AlertHistoryItem[] = [];
+let historyRaw: string | null | undefined;
+let historyCache: AlertHistoryItem[] = EMPTY_HISTORY;
+
 export function readHistory(): AlertHistoryItem[] {
-  if (typeof window === "undefined") return [];
-  return parseHistory(window.localStorage.getItem(HISTORY_KEY));
+  if (typeof window === "undefined") return EMPTY_HISTORY;
+  const raw = window.localStorage.getItem(HISTORY_KEY);
+  if (raw === historyRaw) return historyCache;
+  historyRaw = raw;
+  historyCache = parseHistory(raw);
+  return historyCache;
 }
 
 export function recordFire(
@@ -92,22 +100,20 @@ export function recordFire(
   return writeHistory([item, ...readHistory()].slice(0, HISTORY_LIMIT));
 }
 
-export function useAlertHistory() {
-  const [items, setItems] = useState<AlertHistoryItem[]>(() => readHistory());
+function subscribeHistory(onChange: () => void) {
+  window.addEventListener("storage", onChange);
+  window.addEventListener(HISTORY_EVENT, onChange);
+  return () => {
+    window.removeEventListener("storage", onChange);
+    window.removeEventListener(HISTORY_EVENT, onChange);
+  };
+}
 
-  useEffect(() => {
-    const sync = () => setItems(readHistory());
-    sync();
-    window.addEventListener("storage", sync);
-    window.addEventListener(HISTORY_EVENT, sync);
-    return () => {
-      window.removeEventListener("storage", sync);
-      window.removeEventListener(HISTORY_EVENT, sync);
-    };
-  }, []);
+export function useAlertHistory() {
+  const items = useSyncExternalStore(subscribeHistory, readHistory, () => EMPTY_HISTORY);
 
   function clear() {
-    setItems(writeHistory([]));
+    writeHistory([]);
   }
 
   return { items, clear, record: recordFire };

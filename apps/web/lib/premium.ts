@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
 
 export const PREMIUM_KEY = "coinvigil.premium.v1";
 export const PREMIUM_EVENT = "coinvigil:premium";
@@ -32,22 +32,20 @@ export function canAddWatch(count: number, premium: boolean): boolean {
   return count < watchlistCap(premium);
 }
 
-export function usePremium() {
-  const [premium, setPremium] = useState(() => readPremium());
+function subscribePremium(onChange: () => void) {
+  window.addEventListener("storage", onChange);
+  window.addEventListener(PREMIUM_EVENT, onChange);
+  return () => {
+    window.removeEventListener("storage", onChange);
+    window.removeEventListener(PREMIUM_EVENT, onChange);
+  };
+}
 
-  useEffect(() => {
-    const sync = () => setPremium(readPremium());
-    sync();
-    window.addEventListener("storage", sync);
-    window.addEventListener(PREMIUM_EVENT, sync);
-    return () => {
-      window.removeEventListener("storage", sync);
-      window.removeEventListener(PREMIUM_EVENT, sync);
-    };
-  }, []);
+export function usePremium() {
+  const premium = useSyncExternalStore(subscribePremium, readPremium, () => false);
 
   function toggle() {
-    setPremium(writePremium(!premium));
+    writePremium(!premium);
   }
 
   return {

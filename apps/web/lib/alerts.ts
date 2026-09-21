@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
 
 export const ALERTS_KEY = "coinvigil.alerts.v1";
 export const ALERTS_EVENT = "coinvigil:alerts";
@@ -102,9 +102,17 @@ export function serializeAlerts(items: PriceAlert[]): string {
   return JSON.stringify({ items: items.slice(0, ALERTS_LIMIT) });
 }
 
+const EMPTY_ALERTS: PriceAlert[] = [];
+let alertsRaw: string | null | undefined;
+let alertsCache: PriceAlert[] = EMPTY_ALERTS;
+
 export function readAlerts(): PriceAlert[] {
-  if (typeof window === "undefined") return [];
-  return parseAlerts(window.localStorage.getItem(ALERTS_KEY));
+  if (typeof window === "undefined") return EMPTY_ALERTS;
+  const raw = window.localStorage.getItem(ALERTS_KEY);
+  if (raw === alertsRaw) return alertsCache;
+  alertsRaw = raw;
+  alertsCache = parseAlerts(raw);
+  return alertsCache;
 }
 
 export function writeAlerts(items: PriceAlert[]): PriceAlert[] {
@@ -201,7 +209,7 @@ export function evaluateAlert(
 }
 
 export function cooldownRemainingMs(alert: PriceAlert, now = Date.now()): number {
-  if (!alert.lastNotifiedAt) return 0;
+  if (!alert?.lastNotifiedAt) return 0;
   const then = new Date(alert.lastNotifiedAt).getTime();
   if (Number.isNaN(then)) return 0;
   return Math.max(0, then + alert.cooldownMinutes * 60_000 - now);
@@ -224,19 +232,17 @@ export function rowStatusLabel(status: AlertEval["status"] | string, alert?: Pri
   return base;
 }
 
-export function useAlerts() {
-  const [items, setItems] = useState<PriceAlert[]>(() => readAlerts());
+function subscribeAlerts(onChange: () => void) {
+  window.addEventListener("storage", onChange);
+  window.addEventListener(ALERTS_EVENT, onChange);
+  return () => {
+    window.removeEventListener("storage", onChange);
+    window.removeEventListener(ALERTS_EVENT, onChange);
+  };
+}
 
-  useEffect(() => {
-    const sync = () => setItems(readAlerts());
-    sync();
-    window.addEventListener("storage", sync);
-    window.addEventListener(ALERTS_EVENT, sync);
-    return () => {
-      window.removeEventListener("storage", sync);
-      window.removeEventListener(ALERTS_EVENT, sync);
-    };
-  }, []);
+export function useAlerts() {
+  const items = useSyncExternalStore(subscribeAlerts, readAlerts, () => EMPTY_ALERTS);
 
   function add(item: Omit<PriceAlert, "id" | "createdAt" | "note" | "lastNotifiedAt"> & { id?: string; note?: AlertNote | null; lastNotifiedAt?: string | null }) {
     const next: PriceAlert = {
@@ -248,21 +254,15 @@ export function useAlerts() {
       id: item.id || `${item.coinId}-${item.kind}-${item.threshold}-${Date.now()}`,
       createdAt: new Date().toISOString(),
     };
-    const saved = writeAlerts([next, ...items]);
-    setItems(saved);
-    return saved;
+    return writeAlerts([next, ...items]);
   }
 
   function patch(id: string, partial: Partial<PriceAlert>) {
-    const saved = writeAlerts(items.map((row) => (row.id === id ? { ...row, ...partial } : row)));
-    setItems(saved);
-    return saved;
+    return writeAlerts(items.map((row) => (row.id === id ? { ...row, ...partial } : row)));
   }
 
   function remove(id: string) {
-    const saved = writeAlerts(items.filter((row) => row.id !== id));
-    setItems(saved);
-    return saved;
+    return writeAlerts(items.filter((row) => row.id !== id));
   }
 
   return { items, add, patch, remove };

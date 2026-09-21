@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
 
 export const PORTFOLIO_KEY = "coinvigil.portfolio.v1";
 export const PORTFOLIO_EVENT = "coinvigil:portfolio";
@@ -55,9 +55,17 @@ export function serializeHoldings(items: Holding[]): string {
   return JSON.stringify({ items: items.slice(0, PORTFOLIO_LIMIT) });
 }
 
+const EMPTY_HOLDINGS: Holding[] = [];
+let holdingsRaw: string | null | undefined;
+let holdingsCache: Holding[] = EMPTY_HOLDINGS;
+
 export function readHoldings(): Holding[] {
-  if (typeof window === "undefined") return [];
-  return parseHoldings(window.localStorage.getItem(PORTFOLIO_KEY));
+  if (typeof window === "undefined") return EMPTY_HOLDINGS;
+  const raw = window.localStorage.getItem(PORTFOLIO_KEY);
+  if (raw === holdingsRaw) return holdingsCache;
+  holdingsRaw = raw;
+  holdingsCache = parseHoldings(raw);
+  return holdingsCache;
 }
 
 export function writeHoldings(items: Holding[]): Holding[] {
@@ -120,19 +128,17 @@ export function aggregateHoldings(
   };
 }
 
-export function usePortfolio() {
-  const [items, setItems] = useState<Holding[]>(() => readHoldings());
+function subscribeHoldings(onChange: () => void) {
+  window.addEventListener("storage", onChange);
+  window.addEventListener(PORTFOLIO_EVENT, onChange);
+  return () => {
+    window.removeEventListener("storage", onChange);
+    window.removeEventListener(PORTFOLIO_EVENT, onChange);
+  };
+}
 
-  useEffect(() => {
-    const sync = () => setItems(readHoldings());
-    sync();
-    window.addEventListener("storage", sync);
-    window.addEventListener(PORTFOLIO_EVENT, sync);
-    return () => {
-      window.removeEventListener("storage", sync);
-      window.removeEventListener(PORTFOLIO_EVENT, sync);
-    };
-  }, []);
+export function usePortfolio() {
+  const items = useSyncExternalStore(subscribeHoldings, readHoldings, () => EMPTY_HOLDINGS);
 
   function add(item: Omit<Holding, "id" | "addedAt"> & { id?: string }) {
     const next: Holding = {
@@ -140,11 +146,11 @@ export function usePortfolio() {
       id: item.id || `${item.coinId}-${item.qty}-${Date.now()}`,
       addedAt: new Date().toISOString(),
     };
-    setItems(writeHoldings([next, ...items]));
+    writeHoldings([next, ...items]);
   }
 
   function remove(id: string) {
-    setItems(writeHoldings(items.filter((row) => row.id !== id)));
+    writeHoldings(items.filter((row) => row.id !== id));
   }
 
   return { items, add, remove };
