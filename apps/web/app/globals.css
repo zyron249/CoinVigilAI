@@ -59,6 +59,7 @@ button:disabled { opacity: .55; cursor: not-allowed; }
 .hero-visual { display: grid; gap: 14px; justify-items: center; }
 .dash-grid { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(300px, .9fr); gap: 14px; align-items: start; }
 .dash-main, .dash-rail { display: grid; gap: 14px; }
+.dash-rail { position: sticky; top: calc(var(--site-header-height) + 8px); }
 .live-chart-canvas { padding: 8px 16px 12px; min-height: 220px; }
 .live-chart-canvas svg { width: 100%; height: 220px; }
 .live-chart-canvas.is-busy { opacity: .72; }
@@ -627,12 +628,13 @@ footer > div:first-child { overflow-wrap: anywhere; max-width: 52rem; }
     transform: translateX(-105%);
     transition: transform .2s ease;
     box-shadow: 18px 0 40px rgba(0,0,0,.35);
+    z-index: 20;
   }
   .site-sidebar.open { transform: none; }
   .sidebar-close { display: inline-flex; }
-  .app-frame.is-sidebar-open .site-header { z-index: 18; }
-  .app-frame.is-sidebar-open .site-sidebar { z-index: 17; }
-  .menu-toggle { display: inline-flex; z-index: 18; }
+  .menu-toggle { display: inline-flex; }
+  .app-frame.is-sidebar-open .nav-cta { visibility: hidden; }
+  .dash-rail { position: static; }
   .top-nav { display: none; }
   .dash-hero, .dash-grid { grid-template-columns: 1fr; }
   .radar-chip-row { grid-template-columns: 1fr 1fr; }
@@ -647,7 +649,7 @@ footer > div:first-child { overflow-wrap: anywhere; max-width: 52rem; }
     padding: 0;
     margin: 0;
     background: rgba(0, 0, 0, .48);
-    z-index: 14;
+    z-index: 19;
     cursor: pointer;
   }
 }
@@ -680,7 +682,7 @@ footer > div:first-child { overflow-wrap: anywhere; max-width: 52rem; }
     padding: 0;
     margin: 0;
     background: rgba(0, 0, 0, .48);
-    z-index: 14;
+    z-index: 19;
     cursor: pointer;
   }
   .nav-links {
@@ -745,6 +747,11 @@ footer > div:first-child { overflow-wrap: anywhere; max-width: 52rem; }
   .contract-rows li { grid-template-columns: 1fr; }
   .contract-actions { justify-content: flex-start; }
   table.tickers-table { min-width: 460px; }
+}
+@media (max-width: 520px) {
+  header .nav-cta { display: none; }
+  .header-search input { min-width: 0; }
+  nav { gap: 8px; }
 }
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }

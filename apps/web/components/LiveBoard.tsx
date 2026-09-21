@@ -171,111 +171,111 @@ export function LiveBoard({
         fallbackReason={market.fallback_reason}
       />
       {hero}
-      <section className="card finder-dock" id="find-asset" aria-label="Find a CoinGecko-tracked asset">
-        <div className="finder-copy">
-          <div className="eyebrow">FIND AN ASSET</div>
-          <h2>Search this CoinGecko snapshot</h2>
-          <p className={`coverage-count ${market.partial ? "is-partial" : ""}`}>
-            {market.universe_size} of {market.coverage_target || 1000} CoinGecko-tracked assets in this snapshot
-            {market.partial ? " — partial (later /coins/markets pages were rate-limited)." : "."}
-            {" "}Not every coin on earth.
-          </p>
-        </div>
-        <form
-          className="market-search finder-search"
-          onSubmit={(event) => {
-            event.preventDefault();
-            void loadMarket({ q: draft, page: 1 });
-            document.getElementById("markets")?.scrollIntoView({ behavior: "smooth", block: "start" });
-          }}
-        >
-          <label className="sr-only" htmlFor="hero-market-search">Search name, symbol, or id</label>
-          <input
-            id="hero-market-search"
-            name="q"
-            type="search"
-            value={draft}
-            onChange={(event) => setDraft(event.target.value)}
-            placeholder="Search name, symbol, or id — then jump to the asset"
-            autoComplete="off"
-            aria-busy={busy}
-            aria-describedby="market-results-status"
-          />
-          <button type="submit">Search</button>
-        </form>
-        {market.query && market.assets.length > 0 ? (
-          <div className="jump-row">
-            <span className="muted">Open:</span>
-            {market.assets.slice(0, 5).map((asset) => (
-              <Link className="jump-chip" key={asset.id} href={`/asset/${asset.id}`}>
-                {asset.name} <span>{asset.symbol.toUpperCase()}</span>
-              </Link>
-            ))}
-            {market.assets.length >= 2 ? (
-              <Link
-                className="jump-chip"
-                href={`/compare?ids=${market.assets.slice(0, 3).map((asset) => asset.id).join(",")}`}
-              >
-                Compare these
-              </Link>
-            ) : null}
-          </div>
-        ) : market.assets.length >= 2 ? (
-          <div className="jump-row">
-            <span className="muted">Jump:</span>
-            {market.assets.slice(0, 3).map((asset) => (
-              <Link className="jump-chip" key={asset.id} href={`/asset/${asset.id}`}>
-                {asset.name} <span>{asset.symbol.toUpperCase()}</span>
-              </Link>
-            ))}
-            <Link
-              className="jump-chip"
-              href={`/compare?ids=${market.assets.slice(0, 2).map((asset) => asset.id).join(",")}`}
-            >
-              Compare {market.assets[0].symbol.toUpperCase()} vs {market.assets[1].symbol.toUpperCase()}
-            </Link>
-          </div>
-        ) : null}
-      </section>
-      {market.partial ? (
-        <p className="source-ribbon cache-ribbon" role="status">
-          <strong>Partial CoinGecko snapshot.</strong>
-          {" "}Showing {market.universe_size} of {market.coverage_target || 1000} assets because later market pages were rate-limited or empty.
-          {" "}A follow-up pass is scheduled — CoinVigil does not invent coins to fill the table.
-        </p>
-      ) : null}
-      <AskPanel compact heading="Ask CoinVigil" />
       <GlobalStrip overview={overview} checkedAt={checkedAt} />
       <div className="dash-grid">
         <div className="dash-main">
+          <section className="card finder-dock" id="find-asset" aria-label="Find a CoinGecko-tracked asset">
+            <div className="finder-copy">
+              <div className="eyebrow">FIND AN ASSET</div>
+              <h2>Search this CoinGecko snapshot</h2>
+              <p className={`coverage-count ${market.partial ? "is-partial" : ""}`}>
+                {market.universe_size} of {market.coverage_target || 1000} CoinGecko-tracked assets in this snapshot
+                {market.partial ? " — partial (later /coins/markets pages were rate-limited)." : "."}
+                {" "}Not every coin on earth.
+              </p>
+            </div>
+            <form
+              className="market-search finder-search"
+              onSubmit={(event) => {
+                event.preventDefault();
+                void loadMarket({ q: draft, page: 1 });
+                document.getElementById("markets")?.scrollIntoView({ behavior: "smooth", block: "start" });
+              }}
+            >
+              <label className="sr-only" htmlFor="hero-market-search">Search name, symbol, or id</label>
+              <input
+                id="hero-market-search"
+                name="q"
+                type="search"
+                value={draft}
+                onChange={(event) => setDraft(event.target.value)}
+                placeholder="Search name, symbol, or id — then jump to the asset"
+                autoComplete="off"
+                aria-busy={busy}
+                aria-describedby="market-results-status"
+              />
+              <button type="submit">Search</button>
+            </form>
+            {market.query && market.assets.length > 0 ? (
+              <div className="jump-row">
+                <span className="muted">Open:</span>
+                {market.assets.slice(0, 5).map((asset) => (
+                  <Link className="jump-chip" key={asset.id} href={`/asset/${asset.id}`}>
+                    {asset.name} <span>{asset.symbol.toUpperCase()}</span>
+                  </Link>
+                ))}
+                {market.assets.length >= 2 ? (
+                  <Link
+                    className="jump-chip"
+                    href={`/compare?ids=${market.assets.slice(0, 3).map((asset) => asset.id).join(",")}`}
+                  >
+                    Compare these
+                  </Link>
+                ) : null}
+              </div>
+            ) : market.assets.length >= 2 ? (
+              <div className="jump-row">
+                <span className="muted">Jump:</span>
+                {market.assets.slice(0, 3).map((asset) => (
+                  <Link className="jump-chip" key={asset.id} href={`/asset/${asset.id}`}>
+                    {asset.name} <span>{asset.symbol.toUpperCase()}</span>
+                  </Link>
+                ))}
+                <Link
+                  className="jump-chip"
+                  href={`/compare?ids=${market.assets.slice(0, 2).map((asset) => asset.id).join(",")}`}
+                >
+                  Compare {market.assets[0].symbol.toUpperCase()} vs {market.assets[1].symbol.toUpperCase()}
+                </Link>
+              </div>
+            ) : null}
+          </section>
+          {market.partial ? (
+            <p className="source-ribbon cache-ribbon" role="status">
+              <strong>Partial CoinGecko snapshot.</strong>
+              {" "}Showing {market.universe_size} of {market.coverage_target || 1000} assets because later market pages were rate-limited or empty.
+              {" "}A follow-up pass is scheduled — CoinVigil does not invent coins to fill the table.
+            </p>
+          ) : null}
+          <AskPanel compact heading="Ask CoinVigil" />
           {topCryptos}
           {brief}
-          <AlertsStrip assets={watchAssets} />
-          <WatchlistStrip assets={watchAssets} />
-          <PortfolioStrip assets={watchAssets} />
           {radarStrip}
-          <section className="slice-grid" id="movers">
-            <Movers gainers={movers.gainers} losers={movers.losers} source={movers.source} stale={movers.stale} />
-            <div id="radar-flags">{radar}</div>
-          </section>
-          <p className="movers-footnote muted">
-            24h gainers are up; 24h losers are down. Ranked from the CoinVigil universe ({sourceLabel(movers.source, { stale: movers.stale }).text}).
-            Prices are never invented.
-          </p>
-          <section id="markets" className="markets-board">
-            <MarketTable
-              pageData={market}
-              busy={busy}
-              refreshError={refreshError}
-              checkedAt={checkedAt}
-              draft={draft}
-              onDraft={setDraft}
-              onQuery={(next) => { void loadMarket(next); }}
-            />
-          </section>
         </div>
         {rail ? <aside className="dash-rail">{rail}</aside> : null}
       </div>
+      <AlertsStrip assets={watchAssets} />
+      <WatchlistStrip assets={watchAssets} />
+      <PortfolioStrip assets={watchAssets} />
+      <section className="slice-grid" id="movers">
+        <Movers gainers={movers.gainers} losers={movers.losers} source={movers.source} stale={movers.stale} />
+        <div id="radar-flags">{radar}</div>
+      </section>
+      <p className="movers-footnote muted">
+        24h gainers are up; 24h losers are down. Ranked from the CoinVigil universe ({sourceLabel(movers.source, { stale: movers.stale }).text}).
+        Prices are never invented.
+      </p>
+      <section id="markets" className="markets-board">
+        <MarketTable
+          pageData={market}
+          busy={busy}
+          refreshError={refreshError}
+          checkedAt={checkedAt}
+          draft={draft}
+          onDraft={setDraft}
+          onQuery={(next) => { void loadMarket(next); }}
+        />
+      </section>
     </>
   );
 }
