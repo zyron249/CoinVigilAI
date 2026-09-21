@@ -200,7 +200,7 @@ export function ProChartLab({ coinId, symbol, candles, source, tickerSource }: P
           <div className="eyebrow">PRO CHART LAB</div>
           <h2>{symbol.toUpperCase()} technical workspace</h2>
         </div>
-        <span className="chart-status" role="status">{busy ? "Loading OHLC…" : status}</span>
+        <span className="chart-status" role="status">{busy && empty ? "Loading OHLC…" : status}</span>
       </div>
       <div className="chart-ranges" role="tablist" aria-label="Chart range">
         {RANGES.map((row) => (
