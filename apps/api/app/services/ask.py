@@ -45,6 +45,7 @@ def _quote_row(asset: MarketAsset, source: str) -> dict[str, Any]:
         "volume_24h": asset.total_volume,
         "rank": asset.market_cap_rank,
         "source": source,
+        "last_updated": asset.last_updated,
     }
 
 

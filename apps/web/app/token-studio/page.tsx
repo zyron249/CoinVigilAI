@@ -4,12 +4,12 @@ export default function TokenStudioPage() {
   return (
     <main id="content">
       <section className="page-hero">
-        <div className="eyebrow hero-tag">NON-CUSTODIAL TOKEN LAUNCHPAD</div>
-        <h1>Create on-chain.<br /><span>Keep control.</span></h1>
+        <div className="eyebrow hero-tag">TOKEN STUDIO</div>
+        <h1>Token Studio is opt-in.<br /><span>Not the Phase 1 job.</span></h1>
         <p>
           Configure a standard token, connect your own wallet, review the permissions and sign the deployment yourself.
           CoinVigil never receives a seed phrase or private key. Factory contracts are unaudited — research only, not financial advice.
-          Phase 1 of this product is watchlist surveillance (alerts + Ask), not token creation — this studio is an opt-in tool, not the homepage CTA.
+          Phase 1 of this product is watchlist surveillance (alerts + Ask), not token creation — this studio is not a homepage CTA.
         </p>
       </section>
 

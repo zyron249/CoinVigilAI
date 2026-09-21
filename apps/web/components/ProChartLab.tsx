@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { getCandles, type Candle } from "../lib/api";
-import { sourceLabel } from "../lib/format";
+import { formatUsd, sourceLabel } from "../lib/format";
 
 type ProChartLabProps = {
   coinId: string;
@@ -10,6 +10,7 @@ type ProChartLabProps = {
   candles: Candle[];
   source: string;
   tickerSource?: string;
+  tapePrice?: number | null;
 };
 
 const RANGES: { id: string; label: string; days: number }[] = [
@@ -28,7 +29,7 @@ function pricePrecision(candles: Candle[]) {
   return 8;
 }
 
-export function ProChartLab({ coinId, symbol, candles, source, tickerSource }: ProChartLabProps) {
+export function ProChartLab({ coinId, symbol, candles, source, tickerSource, tapePrice }: ProChartLabProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const chartRef = useRef<any>(null);
   const disposeRef = useRef<((container: HTMLElement) => void) | null>(null);
@@ -192,6 +193,13 @@ export function ProChartLab({ coinId, symbol, candles, source, tickerSource }: P
   }
 
   const empty = series.length === 0;
+  const lastClose = series.at(-1)?.close;
+  const diverge = Boolean(
+    tapePrice
+    && lastClose
+    && Number.isFinite(lastClose)
+    && Math.abs(lastClose - tapePrice) / Math.max(Math.abs(tapePrice), 1) > 0.015,
+  );
   const mixed = (seriesSource === "demo" || seriesSource === "unavailable")
     && (tickerSource === "coingecko" || tickerSource === "cache");
 
@@ -220,6 +228,7 @@ export function ProChartLab({ coinId, symbol, candles, source, tickerSource }: P
         CoinGecko OHLC for the selected range — not a TradingView widget, not a WebSocket tick stream.
         {range === "1h" ? " 1H uses the same 1-day OHLC snap as 24H (CoinGecko does not give true hourly ticks here)." : ""}
         {sourceLabel(seriesSource).demo ? " Demo candles are labeled, never live." : ""}
+        {diverge ? ` Last OHLC close ${formatUsd(lastClose)} vs tape ${formatUsd(tapePrice)} — candles are a different series.` : ""}
       </p>
       {mixed ? (
         <div className="source-ribbon demo-ribbon mixed-ribbon" role="status">

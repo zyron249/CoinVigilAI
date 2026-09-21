@@ -14,8 +14,6 @@ const PRIMARY = [
 ];
 
 const SECONDARY = [
-  { href: "/#radar", label: "Token Radar", icon: "radar" },
-  { href: "/portfolio", label: "Portfolio", icon: "bag" },
   { href: "/compare", label: "Compare", icon: "list" },
   { href: "/convert", label: "Convert", icon: "radar" },
   { href: "/status", label: "Status", icon: "gear" },

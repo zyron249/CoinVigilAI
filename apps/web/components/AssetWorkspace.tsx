@@ -19,12 +19,14 @@ export function AssetWorkspace({
   tickers,
   candles,
   candleSource,
+  tapePrice,
 }: {
   coinId: string;
   symbol: string;
   tickers: AssetTickers;
   candles: Candle[];
   candleSource: string;
+  tapePrice?: number | null;
 }) {
   const [tab, setTab] = useState<"markets" | "chart">("chart");
 
@@ -82,6 +84,7 @@ export function AssetWorkspace({
           candles={candles}
           source={candleSource}
           tickerSource={tickers.source}
+          tapePrice={tapePrice}
         />
       </div>
       <div

@@ -30,8 +30,7 @@ export default async function AlertsPage({
       </section>
       <AlertsBoard initialCoin={coin} initialKind={kind} />
       <p className="coverage-note muted">
-        Star coins on the <Link href="/#desk">desk</Link>. Holdings remain a <Link href="/portfolio">light stub</Link>
-        {" "}(no custody). CoinVigil has no accounts and does not invent on-chain whale prints.
+        Star coins on the <Link href="/#desk">desk</Link>. CoinVigil has no accounts and does not invent on-chain whale prints.
       </p>
     </main>
   );

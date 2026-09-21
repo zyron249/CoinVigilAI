@@ -68,6 +68,7 @@ button:disabled { opacity: .55; cursor: not-allowed; }
 .sidebar-link:hover, .sidebar-link[aria-current="page"] { color: var(--text); background: rgba(34,240,160,.08); }
 .sidebar-foot { margin-top: auto; padding: 12px 8px 4px; color: var(--muted); font-size: 11px; line-height: 1.5; }
 .header-brand { font-size: 16px; margin-right: 8px; flex-shrink: 0; }
+.header-brand .brand-text { white-space: nowrap; }
 .header-search { margin-left: auto; flex: 1 1 280px; max-width: 640px; min-width: 160px; }
 .header-search input { width: 100%; min-width: 0; border: 1px solid var(--line); background: rgba(8,14,28,.8); color: var(--text); border-radius: 999px; padding: 8px 14px; font: inherit; }
 .header-watch { background: transparent !important; color: var(--text) !important; flex-shrink: 0; }

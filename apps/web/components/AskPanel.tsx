@@ -3,7 +3,7 @@
 import { useState } from "react";
 import type { AskAnswer } from "../lib/api";
 import { postAsk } from "../lib/api";
-import { formatPercent, formatUsd } from "../lib/format";
+import { formatAge, formatPercent, formatUsd, sourceLabel } from "../lib/format";
 import { useWatchlist } from "../lib/watchlist";
 import { StatusBadge } from "./StatusBadge";
 
@@ -123,6 +123,11 @@ export function AskPanel({
                   <strong>{row.name || row.id}</strong>
                   <span>{formatUsd(row.price_usd ?? null)}</span>
                   <span>{formatPercent(row.change_24h ?? null)} 24h</span>
+                  <span className="muted">
+                    {sourceLabel(row.source || result.data_source).text}
+                    {" · "}
+                    {row.last_updated ? formatAge(row.last_updated) : "age unknown"}
+                  </span>
                 </li>
               ))}
             </ul>

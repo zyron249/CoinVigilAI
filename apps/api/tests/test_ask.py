@@ -90,6 +90,8 @@ async def test_ask_uses_tools_without_inventing_when_no_keys(monkeypatch):
     assert "bitcoin" in dumped
     assert result.quotes and result.quotes[0]["id"] == "bitcoin"
     assert result.quotes[0]["price_usd"] == DEMO_MARKETS[0].current_price
+    assert result.quotes[0]["source"]
+    assert "last_updated" in result.quotes[0]
 
 
 @pytest.mark.asyncio
