@@ -651,3 +651,145 @@ footer > div:first-child { overflow-wrap: anywhere; max-width: 52rem; }
   html { scroll-behavior: auto; }
   .market-row, .feature-card { transition: none; }
 }
+
+
+/* CoinVigilAI dashboard refresh */
+.home-dashboard {
+  position: relative;
+}
+.hero-dashboard {
+  min-height: 470px;
+  margin: 20px 0 18px;
+  padding: 34px;
+  border: 1px solid rgba(83, 239, 195, .12);
+  border-radius: 24px;
+  background:
+    linear-gradient(135deg, rgba(10, 24, 32, .96), rgba(5, 15, 20, .92)),
+    radial-gradient(circle at 78% 50%, rgba(37, 214, 212, .12), transparent 32%);
+  overflow: hidden;
+  position: relative;
+}
+.hero-dashboard::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(255,255,255,.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,.025) 1px, transparent 1px);
+  background-size: 38px 38px;
+  mask-image: linear-gradient(to bottom, black, transparent 92%);
+  pointer-events: none;
+}
+.hero-copy { position: relative; z-index: 2; }
+.hero-dashboard h1 {
+  max-width: 760px;
+  font-size: clamp(46px, 6vw, 78px);
+  line-height: .98;
+  letter-spacing: -3.7px;
+  margin: 18px 0 18px;
+}
+.hero-dashboard p {
+  max-width: 700px;
+  font-size: 17px;
+  line-height: 1.7;
+}
+.hero-proof {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 22px;
+}
+.hero-proof span {
+  padding: 8px 11px;
+  border-radius: 999px;
+  border: 1px solid rgba(89, 242, 180, .14);
+  background: rgba(89, 242, 180, .06);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+.hero-dashboard .orb {
+  width: 280px;
+  height: 280px;
+  background:
+    radial-gradient(circle at 38% 38%, rgba(89,242,180,.22), transparent 26%),
+    radial-gradient(circle at 60% 58%, rgba(45,184,255,.18), transparent 38%),
+    rgba(7,20,24,.8);
+}
+.hero-dashboard .orb-core {
+  width: 92px;
+  height: 92px;
+  font-size: 25px;
+  background: linear-gradient(135deg, #59f2b4, #6bdcff);
+  box-shadow: 0 0 52px rgba(89,242,180,.35);
+}
+.orb-ring {
+  position: absolute;
+  border: 1px solid rgba(89,242,180,.18);
+  border-radius: 50%;
+}
+.orb-ring-one { inset: 28px; }
+.orb-ring-two { inset: 64px; border-style: dashed; }
+.orb-label {
+  position: absolute;
+  padding: 7px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(89,242,180,.18);
+  background: rgba(5,14,18,.85);
+  color: var(--text);
+  font-size: 11px;
+  font-weight: 800;
+  box-shadow: 0 10px 30px rgba(0,0,0,.18);
+}
+.orb-label-one { top: 18px; right: -10px; }
+.orb-label-two { top: 112px; right: -44px; }
+.orb-label-three { bottom: 28px; left: -30px; }
+
+.finder-dock,
+.ask-card,
+.watchlist-card,
+.portfolio-card,
+.alerts-card,
+.table-card,
+.radar-card,
+.feature-card,
+.metric-card {
+  backdrop-filter: blur(18px);
+}
+.feature-strip {
+  margin-top: 18px;
+}
+.feature-card {
+  transition: transform .18s ease, border-color .18s ease, background .18s ease;
+}
+.feature-card:hover {
+  transform: translateY(-3px);
+  border-color: rgba(89,242,180,.28);
+  background: linear-gradient(180deg, rgba(18,36,33,.96), rgba(10,22,20,.96));
+}
+
+@media (max-width: 900px) {
+  .hero-dashboard {
+    grid-template-columns: 1fr;
+    padding: 28px;
+  }
+  .hero-dashboard .orb-wrap {
+    padding: 28px 0 10px;
+  }
+}
+@media (max-width: 640px) {
+  .hero-dashboard {
+    padding: 22px;
+    border-radius: 18px;
+  }
+  .hero-dashboard h1 {
+    font-size: 45px;
+    letter-spacing: -2.5px;
+  }
+  .hero-dashboard .orb {
+    width: 230px;
+    height: 230px;
+  }
+  .orb-label-two { right: -16px; }
+  .orb-label-three { left: -10px; }
+}
