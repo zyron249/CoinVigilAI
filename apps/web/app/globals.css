@@ -910,9 +910,44 @@ footer > div:first-child { overflow-wrap: anywhere; max-width: 52rem; }
   .header-search { flex: 1 1 auto; max-width: none; min-width: 0; margin-left: 0; }
   .header-search .tool-button { display: none; }
   .header-watch { font-size: 12px; padding-left: 8px; padding-right: 8px; }
+  @media (max-width: 360px) {
+    .header-watch {
+      font-size: 0;
+      width: 44px;
+      padding: 0;
+    }
+    .header-watch::before {
+      content: "★";
+      font-size: 18px;
+      line-height: 44px;
+    }
+  }
   nav { min-height: 52px; gap: 6px; }
   .brand-mark { width: 28px; height: 28px; }
-  .dash-hero.is-compact h1 { font-size: 20px; margin: 2px 0; }
+  .dash-hero.is-compact h1 { font-size: 18px; margin: 2px 0; }
+  .finder-dock { display: none; }
+  .dash-hero.is-compact p { display: none; }
+  .markets-board .section-heading {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 8px 10px 6px;
+    gap: 6px;
+  }
+  .markets-board .section-heading h2 { font-size: 16px; }
+  .markets-board .table-tools { flex-wrap: nowrap; width: 100%; }
+  .markets-board .market-search { flex: 1; min-width: 0; }
+  .markets-board .market-search input { width: auto; flex: 1; min-width: 0; }
+  .header-search input { font-size: 13px; }
+  .source-ribbon {
+    margin: 6px 0;
+    font-size: 11px;
+    padding: 8px 10px;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .jump-row { display: none; }
   .markets-board .markets-table { min-width: 390px; }
   .markets-board .markets-table .asset-link strong { display: none; }
   .markets-board .markets-table .asset-link span { color: var(--text); font-size: 13px; font-weight: 800; }
@@ -923,7 +958,6 @@ footer > div:first-child { overflow-wrap: anywhere; max-width: 52rem; }
   .chart-status { font-size: 10px; }
   .global-strip { gap: 4px 10px; }
   .global-stat em, .global-stat .fg-meter { display: none; }
-  .source-ribbon { font-size: 11px; padding: 8px 10px; }
 }
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
