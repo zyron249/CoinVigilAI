@@ -45,7 +45,7 @@ export function SiteHeader() {
           />
           <button type="submit" className="ghost tool-button">Search</button>
         </form>
-        <Link className="ghost tool-button header-watch" href="/#watchlist">Watchlist</Link>
+        <Link className="ghost tool-button header-watch" href="/#watchlist" aria-label="Watchlist">Watchlist</Link>
       </nav>
       <p className="legal-strip">Informational research only — not financial advice.</p>
     </header>
