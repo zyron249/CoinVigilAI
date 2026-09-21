@@ -1,3 +1,4 @@
+import { AssetAlerts } from "../../../components/AssetAlerts";
 import { AssetInsight } from "../../../components/AssetInsight";
 import { AssetSubnav } from "../../../components/AssetSubnav";
 import { AssetWorkspace } from "../../../components/AssetWorkspace";
@@ -91,7 +92,9 @@ export default async function AssetPage({
             <nav className="asset-jump" aria-label="Related pages">
               <Link href={`/compare?ids=${asset.id},${companion}`}>Compare</Link>
               <Link href={`/convert?from=${asset.id}&to=usd`}>Convert</Link>
-              <Link href="/ask">Ask</Link>
+              <Link href={`/ask`}>Ask</Link>
+              <Link href={`/alerts?coin=${asset.id}`}>Alert</Link>
+              <Link href={`/portfolio?coin=${asset.id}`}>Holdings</Link>
               <Link href="/news">News</Link>
               <Link href="/status">Status</Link>
             </nav>
@@ -132,6 +135,14 @@ export default async function AssetPage({
       <ProjectLinks profile={profile} />
 
       <AssetInsight coinId={asset.id} />
+      <AssetAlerts
+        coinId={asset.id}
+        symbol={asset.symbol}
+        name={asset.name}
+        price={asset.current_price}
+        change24h={asset.price_change_percentage_24h}
+        volume={asset.total_volume}
+      />
 
       <AssetWorkspace
         coinId={asset.id}

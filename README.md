@@ -7,7 +7,8 @@ It is an informational research tool, not a production trading desk and not fina
 ## What works today
 
 - FastAPI market rankings, global overview, movers, AI brief, radar, analysis, candle, news, and health endpoints
-- Next.js Markets homepage: sortable/paginated/searchable rankings of a CoinGecko-tracked snapshot (paginated `/coins/markets`, up to 1,000 by market cap — not every coin worldwide), jump-to-asset search, local browser watchlist, global strip, gainers/losers, AI Market Brief
+- Next.js Markets homepage: sortable/paginated/searchable rankings of a CoinGecko-tracked snapshot (paginated `/coins/markets`, up to 1,000 by market cap — not every coin worldwide), jump-to-asset search, local browser watchlist (free cap 3 coins; local premium toggle to 25 — not billing), global strip, gainers/losers, AI Market Brief, Ask CoinVigil, and a USD converter
+- **Watchlist-scoped smart alerts** (in this browser only): price above/below, |24h|% change, optional volume-spike prefilter, sensitivity presets. Rules never evaluate off-list coins. When a rule fires, a short tool-grounded note (heuristic or AI, labeled) is attached. Not financial advice.
 - Asset pages with an About/overview (English CoinGecko description, genesis date when listed, categories), CoinGecko-listed contract addresses by chain when present, official website/community links grouped website → explorers → socials → repos, denser stats (ATH/ATL + dates, vol/mcap, circulating vs max, 24h range), a Markets tab of CoinGecko exchange tickers (venue/volume filters), Chart Lab with an unmistakable mixed Live/Demo banner when OHLC falls back, and AI analysis
 - Heuristic analysis and market brief when no AI keys are configured
 - Parallel AI Council adapters (including optional xAI Grok) when you add provider keys
@@ -17,8 +18,9 @@ It is an informational research tool, not a production trading desk and not fina
 
 ## What is not done yet
 
-- PostgreSQL is **not provisioned**. `/health` reports `postgres: not_provisioned`. Watchlists are **localStorage in this browser only** — there are no accounts.
-- There are no user accounts, alerts, WebSocket feed, or production deploy config.
+- PostgreSQL is **not provisioned**. `/health` reports `postgres: not_provisioned`. Watchlists, alerts, and the premium flag are **localStorage in this browser only** — there are no accounts and no billing backend.
+- There is no push, Telegram bot, Discord bot, or WebSocket tick stream. Alerts evaluate in the open tab against the CoinGecko snapshot. See “Later delivery” below — CoinVigil does not fake those channels.
+- There is no on-chain whale feed. Sentiment analysis is stubbed until an NLP model is wired. Social network features (comments, follow, cashtags) are not built.
 - Token factory contracts are **unaudited**. Token Studio stays disabled until you deploy a factory and set `NEXT_PUBLIC_FACTORY_*`.
 - Public CoinGecko is rate-limited. Without a key the API may show a labeled **demo snapshot** of a small BTC/ETH/SOL-led universe.
 
@@ -204,12 +206,23 @@ Pushes and pull requests against `main` run API unit tests (including mocked xAI
 - CoinGecko's keyless pool is roughly 10–30 calls/minute. Prefer `COINGECKO_API_KEY` (see “Raising CoinGecko rate limits” above) and keep Redis up so the dashboard does not stampede the public API. Client refresh reuses the 20s in-process universe cache. `/status` reports `key_configured` without revealing the secret.
 - CORS defaults to localhost. Set `CORS_ALLOW_ORIGINS` before exposing the API.
 
+## Later delivery (not faked)
+
+Smart alerts stay **in-app** until a real channel exists. The intended path:
+
+1. Keep the current rule engine (watchlist-only, price/volume prefilter before any LLM cost).
+2. Add a documented webhook or bot token in `.env` (`TELEGRAM_BOT_TOKEN` / Discord webhook) — never commit secrets.
+3. Fan out the same fired payload (coin, rule, grounded note, NFA) to that channel. If the token is missing, the UI keeps saying in-tab only.
+4. Browser push would need a service worker + VAPID keys and an explicit user gesture. Do not show a “sent” state without a delivery receipt.
+
+Until those env vars and workers exist, Status and Alerts must not claim Telegram, Discord, or push delivery.
+
 ## Product direction
 
-1. Exchange WebSocket ingestion
+1. Real Telegram/Discord/push on top of the watchlist rule engine (see above)
 2. Optional persistence / snapshot history if a database is actually wired
-3. On-chain and whale intelligence
-4. User accounts, synced watchlists, and alerts
+3. On-chain intelligence only when a real feed exists — never invented whale prints
+4. Phase 2: coin-page comments under AI data. Phase 3: profiles, follow, cashtags, proof-of-trade
 5. Model evaluation and provider routing
 6. Production observability and a real deploy path
 

@@ -60,7 +60,7 @@ export function MarketBriefCard({
           <>
             <p>{brief.summary}</p>
             <ul>
-              {brief.bullets.map((bullet, index) => <li key={`${index}:${bullet.slice(0, 48)}`}>{bullet}</li>)}
+              {brief.bullets.map((bullet, index) => <li key={`brief-${index}-${bullet}`}>{bullet}</li>)}
             </ul>
             <div className="brief-labels">
               <span className="pill">{brief.generated ? "AI-generated" : "Heuristic"}</span>

@@ -19,6 +19,17 @@ ADVICE_RE = re.compile(
     re.I,
 )
 TOKEN_RE = re.compile(r"[a-z0-9][a-z0-9-]{1,40}")
+SKIP_TOKENS = {
+    "what", "whats", "price", "market", "cap", "volume", "why", "moved", "the", "for",
+    "how", "much", "is", "are", "and", "with", "over", "this", "that", "today", "doing",
+    "change", "news", "brief", "tell", "me", "about", "please", "show", "current",
+    "snapshot", "rank", "vs", "versus", "from", "into", "usd", "dollar", "dollars",
+    "now", "latest", "update", "updates", "moving", "look", "looking", "24h", "1h", "7d",
+}
+
+
+def question_tokens(question: str) -> list[str]:
+    return [token for token in TOKEN_RE.findall(question.lower()) if token not in SKIP_TOKENS and len(token) >= 2]
 
 
 def _quote_row(asset: MarketAsset, source: str) -> dict[str, Any]:
@@ -112,11 +123,7 @@ def resolve_coin_id(question: str, assets: list[dict[str, Any]], coin_id: str | 
             return ident or name
         if symbol and re.search(rf"\b{re.escape(symbol)}\b", text):
             return ident or symbol
-    tokens = TOKEN_RE.findall(question.lower())
-    skip = {"what", "whats", "price", "market", "cap", "volume", "why", "moved", "the", "for", "how", "much", "is"}
-    for token in tokens:
-        if token in skip:
-            continue
+    for token in question_tokens(question):
         for row in assets:
             if token in {str(row.get("id") or ""), str(row.get("symbol") or "").lower()}:
                 return str(row.get("id"))
@@ -245,10 +252,8 @@ async def answer_ask(question: str, coin_id: str | None = None, *, insight: bool
         )
 
     refused = bool(ADVICE_RE.search(text))
-    screen_query = None if insight else (coin_id or None)
-    if not screen_query and not insight:
-        tokens = [token for token in TOKEN_RE.findall(text.lower()) if token not in {"what", "price", "market", "cap", "the", "for", "is", "how", "much", "why"}]
-        screen_query = tokens[0] if len(tokens) == 1 else None
+    tokens = question_tokens(text)
+    screen_query = None if insight else coin_id
 
     screen = await tool_screen_markets(screen_query, limit=8)
     tools = ["screen_markets"]
@@ -259,6 +264,14 @@ async def answer_ask(question: str, coin_id: str | None = None, *, insight: bool
         if quote:
             facts["quote"] = quote
             tools.append("get_asset_quote")
+    if "quote" not in facts:
+        for token in tokens[:3]:
+            quote = await tool_get_asset_quote(token)
+            if quote:
+                facts["quote"] = quote
+                tools.append("get_asset_quote")
+                resolved = str(quote.get("id") or token)
+                break
     news_query = (facts.get("quote") or {}).get("name") or resolved or (None if insight else screen_query)
     facts["news"] = await tool_get_news(5, news_query if insight or resolved else None)
     tools.append("get_news")
@@ -267,6 +280,8 @@ async def answer_ask(question: str, coin_id: str | None = None, *, insight: bool
     model_text, requested, responded = await _maybe_model_answer(text, facts)
     generated = bool(model_text)
     answer = model_text if generated else heuristic
+    if refused and generated:
+        answer = "CoinVigil does not give buy/sell advice or price predictions. " + answer
     source = (facts.get("quote") or {}).get("source") or screen.get("source") or "unknown"
     quotes = []
     if facts.get("quote"):

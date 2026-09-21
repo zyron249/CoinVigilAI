@@ -41,7 +41,7 @@ jobs:
         run: python -m pytest -q
 
       - name: Check local watchlist contract
-        run: node --test apps/web/lib/watchlist-contract.test.mjs apps/web/lib/project-links-contract.test.mjs apps/web/lib/pagination-contract.test.mjs apps/web/lib/alerts-contract.test.mjs
+        run: node --test apps/web/lib/watchlist-contract.test.mjs apps/web/lib/project-links-contract.test.mjs apps/web/lib/pagination-contract.test.mjs apps/web/lib/alerts-contract.test.mjs apps/web/lib/portfolio-contract.test.mjs
 
       - name: Validate Python syntax
         run: python -m compileall -q apps/api/app apps/api/tests
@@ -463,13 +463,26 @@ jobs:
               sleep 2
               continue
             fi
-            if ! grep -qi "no push" /tmp/alerts.html && ! grep -qi "local only" /tmp/alerts.html; then
+            if ! grep -qi "no push" /tmp/alerts.html && ! grep -qi "watchlist" /tmp/alerts.html; then
               sleep 2
               continue
             fi
-            echo "Web, Chart Lab, Ask, Convert, Alerts, News, Status and Compare smoke tests passed"
+            if ! curl -fsS http://127.0.0.1:3000/portfolio > /tmp/portfolio.html; then
+              sleep 2
+              continue
+            fi
+            if ! grep -q "PORTFOLIO" /tmp/portfolio.html; then
+              sleep 2
+              continue
+            fi
+            if ! grep -qi "no wallet" /tmp/portfolio.html && ! grep -qi "private keys" /tmp/portfolio.html; then
+              sleep 2
+              continue
+            fi
+            echo "Web, Chart Lab, Ask, Convert, Alerts, Portfolio, News, Status and Compare smoke tests passed"
             exit 0
           done
+          echo "Web smoke still missing a homepage/asset/status/ask/alerts string after 60 tries" >&2
           exit 1
 
       - name: Verify running services

@@ -1,11 +1,13 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { getConvert, type ConvertQuote } from "../lib/api";
 import { formatUsd } from "../lib/format";
 import { StatusBadge } from "./StatusBadge";
 
 export function ConverterBoard({ initial }: { initial: ConvertQuote }) {
+  const router = useRouter();
   const [amount, setAmount] = useState(String(initial.amount || 1));
   const [fromId, setFromId] = useState(initial.from_id || "bitcoin");
   const [toId, setToId] = useState(initial.to_id || "usd");
@@ -14,11 +16,17 @@ export function ConverterBoard({ initial }: { initial: ConvertQuote }) {
 
   async function run() {
     const nextAmount = Math.max(0, Number(amount) || 0);
-    if (!nextAmount || !fromId.trim() || !toId.trim()) return;
+    const from = fromId.trim().toLowerCase();
+    const to = toId.trim().toLowerCase();
+    if (!nextAmount || !from || !to) return;
     setBusy(true);
-    const next = await getConvert(nextAmount, fromId.trim().toLowerCase(), toId.trim().toLowerCase());
-    setQuote(next);
-    setBusy(false);
+    try {
+      const next = await getConvert(nextAmount, from, to);
+      setQuote(next);
+      router.replace(`/convert?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}&amount=${encodeURIComponent(String(nextAmount))}`);
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (

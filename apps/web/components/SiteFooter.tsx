@@ -13,6 +13,8 @@ export function SiteFooter() {
         {" · "}
         <Link href="/alerts">Alerts</Link>
         {" · "}
+        <Link href="/portfolio">Portfolio</Link>
+        {" · "}
         <Link href="/status">Stack status</Link>
       </div>
       <div>v0.4.0</div>
