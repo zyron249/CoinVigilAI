@@ -482,6 +482,7 @@ jobs:
             echo "Web, Chart Lab, Ask, Convert, Alerts, Portfolio, News, Status and Compare smoke tests passed"
             exit 0
           done
+          echo "Web smoke still missing a homepage/asset/status/ask/alerts string after 60 tries" >&2
           exit 1
 
       - name: Verify running services

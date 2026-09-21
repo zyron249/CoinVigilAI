@@ -82,7 +82,7 @@ export function WatchlistStrip({ assets }: { assets: MarketAsset[] }) {
         </div>
       )}
       <p className="watchlist-footnote muted">
-        Local only — no account, no server copy. Alerts stay watchlist-scoped. Not financial advice.
+        Saved in this browser — no account, no server copy. Alerts stay watchlist-scoped. Not financial advice.
       </p>
     </section>
   );
