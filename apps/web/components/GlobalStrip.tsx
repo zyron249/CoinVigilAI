@@ -35,7 +35,7 @@ export function GlobalStrip({
       value: overview.fear_greed_value != null
         ? `${overview.fear_greed_value} · ${overview.fear_greed_classification}`
         : "Unavailable",
-      note: overview.fear_greed_source ? `via ${overview.fear_greed_source}` : "Hidden when the source is down — never invented",
+      note: overview.fear_greed_source ? `via ${overview.fear_greed_source}` : "Omitted — never invented",
     },
   ];
 

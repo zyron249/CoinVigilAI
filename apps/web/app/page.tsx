@@ -9,7 +9,6 @@ import { Radar } from "../components/Radar";
 import { TokenRadarStrip } from "../components/TokenRadarStrip";
 import { TopCryptos } from "../components/TopCryptos";
 import { getCouncilStatus, getGlobalOverview, getMarket, getMarketBrief, getMovers, getNews, getRadar } from "../lib/api";
-import { sourceLabel } from "../lib/format";
 import { parseMarketQuery } from "../lib/pagination";
 
 function firstParam(value: string | string[] | undefined) {
@@ -40,7 +39,6 @@ export default async function Home({
   ]);
   const brief = council.configured === 0 ? await getMarketBrief() : null;
   const leadAsset = market.assets[0];
-  const marketSource = sourceLabel(market.source, { stale: market.stale });
 
   return (
     <main id="content">
@@ -49,32 +47,16 @@ export default async function Home({
         initialOverview={overview}
         initialMovers={movers}
         hero={(
-          <section className="dash-hero">
+          <section className="dash-hero is-compact">
             <div>
               <div className="eyebrow hero-tag">CRYPTOCURRENCY RANKINGS</div>
               <h1>Smarter Crypto Decisions <span>with AI</span>.</h1>
               <p>
-                Live CoinGecko snapshot, multi-model analysis when keys are set, and watchlist alerts — all in one desk.
+                Live CoinGecko snapshot, multi-model analysis when keys are set, and watchlist alerts.
                 Ranked CoinGecko-tracked assets (paginated `/coins/markets`, {market.universe_size} of {market.coverage_target || 1000} in this snapshot).
                 Not CoinMarketCap. Informational research only — not financial advice.
               </p>
-              <div className="hero-actions">
-                <Link className="nav-cta" href="/#markets">Explore Markets</Link>
-                <Link className="ghost tool-button" href="/ask">See AI Analysis</Link>
-              </div>
             </div>
-            <aside className="hero-visual">
-              <div className="orb-wrap" aria-hidden="true">
-                <div className="orb"><span className="orb-core">AI</span></div>
-              </div>
-              <div className="disclaimer-banner">
-                <strong>Data tool, not investment advice.</strong>
-                <span>
-                  Source is {marketSource.text}. Live and cached rows come from CoinGecko.
-                  Demo prices are synthetic stand-ins used only when CoinGecko is unreachable.
-                </span>
-              </div>
-            </aside>
           </section>
         )}
         brief={<MarketBriefCard initial={brief} refresh={council.configured > 0} />}

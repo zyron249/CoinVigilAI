@@ -5,7 +5,6 @@ import { AssetWorkspace } from "../../../components/AssetWorkspace";
 import { CouncilRoster } from "../../../components/CouncilRoster";
 import { DemoRibbon } from "../../../components/DemoRibbon";
 import { ProjectLinks } from "../../../components/ProjectLinks";
-import { Sparkline } from "../../../components/Sparkline";
 import { RangeBar, SupplyBar } from "../../../components/StatBars";
 import { StatusBadge } from "../../../components/StatusBadge";
 import { WatchButton } from "../../../components/WatchButton";
@@ -36,7 +35,7 @@ export default async function AssetPage({
   const companion = id.toLowerCase() === "ethereum" ? "bitcoin" : "ethereum";
   const [analysis, candleResponse, councilStatus, tickers, profile] = await Promise.all([
     getAssetAnalysis(id),
-    getCandles(id, 90),
+    getCandles(id, 1),
     getCouncilStatus(),
     getAssetTickers(id, page, 25, { q, minVolume, sort, order: order || undefined }),
     getAssetProfile(id),
@@ -73,15 +72,15 @@ export default async function AssetPage({
     <main id="content">
       <DemoRibbon source={analysis.data_source} lastLiveAt={asset.last_updated} />
 
-      <section className="asset-hero">
+      <section className="asset-hero is-compact" id="overview">
         <div className="asset-title-row">
-          {asset.image ? <img src={asset.image} alt="" width={52} height={52} /> : null}
+          {asset.image ? <img src={asset.image} alt="" width={32} height={32} /> : null}
           <div>
             <div className="eyebrow">ASSET INTELLIGENCE</div>
             <h1>{asset.name} <span>{asset.symbol.toUpperCase()}</span></h1>
             <div className="asset-meta-row">
               <StatusBadge source={analysis.data_source} />
-              <WatchButton id={asset.id} symbol={asset.symbol} name={asset.name} />
+              <WatchButton id={asset.id} symbol={asset.symbol} name={asset.name} compact />
               <Link className="ghost tool-button compare-link" href={`/compare?ids=${asset.id},${companion}`}>
                 Compare
               </Link>
@@ -90,7 +89,6 @@ export default async function AssetPage({
               <p className="live-updated muted">Last updated: {formatTimestamp(asset.last_updated)}</p>
             ) : null}
             <nav className="asset-jump" aria-label="Related pages">
-              <Link href={`/compare?ids=${asset.id},${companion}`}>Compare</Link>
               <Link href={`/convert?from=${asset.id}&to=usd`}>Convert</Link>
               <Link href={`/ask`}>Ask</Link>
               <Link href={`/alerts?coin=${asset.id}`}>Alert</Link>
@@ -103,11 +101,18 @@ export default async function AssetPage({
         <div className="asset-price-block">
           <strong>{formatUsd(asset.current_price)}</strong>
           <span className={changeClass(change)}>{formatPercent(change)} 24h</span>
-          <Sparkline values={asset.sparkline_7d} />
         </div>
       </section>
 
       <AssetSubnav compareHref={`/compare?ids=${asset.id},${companion}`} />
+
+      <AssetWorkspace
+        coinId={asset.id}
+        symbol={asset.symbol}
+        tickers={tickers}
+        candles={candleResponse.data}
+        candleSource={candleResponse.source}
+      />
 
       <section className="asset-metrics asset-metrics-wide">
         {stats.map((stat) => (
@@ -142,14 +147,6 @@ export default async function AssetPage({
         price={asset.current_price}
         change24h={asset.price_change_percentage_24h}
         volume={asset.total_volume}
-      />
-
-      <AssetWorkspace
-        coinId={asset.id}
-        symbol={asset.symbol}
-        tickers={tickers}
-        candles={candleResponse.data}
-        candleSource={candleResponse.source}
       />
 
       <section className="analysis-grid">

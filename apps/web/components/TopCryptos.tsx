@@ -40,24 +40,26 @@ export function TopCryptos({ assets }: { assets: MarketAsset[] }) {
                   <td>
                     <div className="asset-cell">
                       <WatchButton id={asset.id} symbol={asset.symbol} name={asset.name} compact />
-                      {asset.image ? <img src={asset.image} alt="" width={28} height={28} /> : <div className="coin-placeholder" aria-hidden="true" />}
-                      <div>
-                        <Link className="asset-link" href={`/asset/${asset.id}`}>
-                          <strong>{asset.name}</strong>
-                          <span>{asset.symbol.toUpperCase()}</span>
-                        </Link>
-                        <nav className="asset-row-jumps" aria-label={`${asset.name} sections`}>
-                          <Link href={`/asset/${asset.id}#overview`}>Overview</Link>
-                          <Link href={`/asset/${asset.id}#contracts`}>Contracts</Link>
-                          <Link href={`/asset/${asset.id}#chart-lab`}>Chart</Link>
-                        </nav>
-                      </div>
+                      {asset.image ? <img src={asset.image} alt="" width={20} height={20} /> : <div className="coin-placeholder" aria-hidden="true" />}
+                      <Link className="asset-link" href={`/asset/${asset.id}`}>
+                        <strong>{asset.name}</strong>
+                        <span>{asset.symbol.toUpperCase()}</span>
+                      </Link>
+                      <nav className="asset-row-jumps" aria-label={`${asset.name} sections`}>
+                        <Link href={`/asset/${asset.id}#overview`}>Overview</Link>
+                        <Link href={`/asset/${asset.id}#contracts`}>Contracts</Link>
+                        <Link href={`/asset/${asset.id}#chart-lab`}>Chart</Link>
+                      </nav>
                     </div>
                   </td>
                   <td>{formatUsd(asset.current_price)}</td>
                   <td className={changeClass(asset.price_change_percentage_24h)}>{formatPercent(asset.price_change_percentage_24h)}</td>
                   <td>{formatCompactUsd(asset.market_cap)}</td>
-                  <td><Sparkline values={asset.sparkline_7d} /></td>
+                  <td className="spark-cell">
+                    {asset.sparkline_7d && asset.sparkline_7d.length >= 2
+                      ? <Sparkline values={asset.sparkline_7d} width={96} height={24} />
+                      : <span className="muted">—</span>}
+                  </td>
                 </tr>
               ))}
             </tbody>
