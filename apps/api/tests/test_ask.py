@@ -172,3 +172,38 @@ async def test_ask_refuses_trade_advice_still_returns_tool_quote(monkeypatch):
     assert result.refused_advice is True
     assert "buy/sell" in result.answer.lower()
     assert result.generated is False
+
+
+@pytest.mark.asyncio
+async def test_ask_generic_prompt_keeps_unfiltered_market_screen(monkeypatch):
+    from app.models import RankedMarkets
+
+    seen = []
+
+    async def fake_ranked(**kwargs):
+        seen.append(kwargs.get("query"))
+        return RankedMarkets(
+            data=list(DEMO_MARKETS[:3]),
+            count=3,
+            page=1,
+            limit=8,
+            total=3,
+            sort="market_cap",
+            order="desc",
+            source="demo",
+            universe_size=3,
+        )
+
+    async def fake_asset(coin_id: str):
+        return None, "unavailable"
+
+    async def fake_news(limit=5):
+        return []
+
+    monkeypatch.setattr("app.services.ask.get_ranked_markets", fake_ranked)
+    monkeypatch.setattr("app.services.ask.get_asset_with_source", fake_asset)
+    monkeypatch.setattr("app.services.ask.get_news", fake_news)
+    result = await answer_ask("Show market leaders")
+    assert seen and seen[0] in {None, ""}
+    assert "bitcoin" in result.answer.lower()
+    assert result.generated is False

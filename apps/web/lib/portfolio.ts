@@ -84,6 +84,42 @@ export function lotPnl(
   return { value, cost, pnl, pnlPct: cost !== 0 ? (pnl / cost) * 100 : null };
 }
 
+export function aggregateHoldings(
+  rows: Array<{ qty: number; coinId: string; costUsd: number | null }>,
+  quotes: Map<string, { current_price?: number | null }>,
+): {
+  value: number | null;
+  costUsd: number | null;
+  pnl: number | null;
+  valued: number;
+  comparable: number;
+} {
+  let quotedValue = 0;
+  let valued = 0;
+  let comparableValue = 0;
+  let comparableCost = 0;
+  let comparable = 0;
+  for (const row of rows) {
+    const stats = lotPnl(row.qty, quotes.get(row.coinId)?.current_price, row.costUsd);
+    if (stats.value != null) {
+      quotedValue += stats.value;
+      valued += 1;
+    }
+    if (stats.value != null && stats.cost != null) {
+      comparableValue += stats.value;
+      comparableCost += stats.cost;
+      comparable += 1;
+    }
+  }
+  return {
+    value: valued ? quotedValue : null,
+    costUsd: comparable ? comparableCost : null,
+    pnl: comparable ? comparableValue - comparableCost : null,
+    valued,
+    comparable,
+  };
+}
+
 export function usePortfolio() {
   const [items, setItems] = useState<Holding[]>([]);
 

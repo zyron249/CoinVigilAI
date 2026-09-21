@@ -69,3 +69,48 @@ test("P&L uses snapshot quotes only — never invents a price", () => {
   assert.deepEqual(lotPnl(1, null, 10), { value: null, pnl: null });
   assert.deepEqual(lotPnl(1, 90, null), { value: 90, pnl: null });
 });
+
+test("aggregate P&L only uses lots that have both a quote and a cost", () => {
+  function aggregate(rows, quotes) {
+    let quotedValue = 0;
+    let valued = 0;
+    let comparableValue = 0;
+    let comparableCost = 0;
+    let comparable = 0;
+    for (const row of rows) {
+      const stats = lotPnl(row.qty, quotes.get(row.coinId), row.costUsd);
+      if (stats.value != null) {
+        quotedValue += stats.value;
+        valued += 1;
+      }
+      if (stats.value != null && row.costUsd != null) {
+        comparableValue += stats.value;
+        comparableCost += row.costUsd;
+        comparable += 1;
+      }
+    }
+    return {
+      value: valued ? quotedValue : null,
+      costUsd: comparable ? comparableCost : null,
+      pnl: comparable ? comparableValue - comparableCost : null,
+      comparable,
+    };
+  }
+  const quotes = new Map([["bitcoin", 100], ["ethereum", 20]]);
+  const mixed = aggregate(
+    [
+      { coinId: "bitcoin", qty: 1, costUsd: 80 },
+      { coinId: "ethereum", qty: 1, costUsd: null },
+    ],
+    quotes,
+  );
+  assert.equal(mixed.value, 120);
+  assert.equal(mixed.pnl, 20);
+  assert.equal(mixed.comparable, 1);
+  const missingQuote = aggregate(
+    [{ coinId: "solana", qty: 2, costUsd: 50 }],
+    quotes,
+  );
+  assert.equal(missingQuote.value, null);
+  assert.equal(missingQuote.pnl, null);
+});

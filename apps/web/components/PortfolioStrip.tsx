@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import type { MarketAsset } from "../lib/api";
-import { lotPnl, usePortfolio } from "../lib/portfolio";
+import { aggregateHoldings, usePortfolio } from "../lib/portfolio";
 import { hydrateQuotes } from "../lib/snapshot-quotes";
 import { changeClass, formatPercent, formatUsd } from "../lib/format";
 
@@ -33,22 +33,7 @@ export function PortfolioStrip({ assets }: { assets: MarketAsset[] }) {
     return map;
   }, [assets, extra]);
 
-  let value = 0;
-  let valued = 0;
-  let costUsd = 0;
-  let costed = 0;
-  for (const row of items) {
-    const stats = lotPnl(row.qty, byId.get(row.coinId)?.current_price, row.costUsd);
-    if (stats.value != null) {
-      value += stats.value;
-      valued += 1;
-    }
-    if (stats.cost != null) {
-      costUsd += stats.cost;
-      costed += 1;
-    }
-  }
-  const pnl = costed && valued ? value - costUsd : null;
+  const { value, pnl, costUsd, valued, comparable } = aggregateHoldings(items, byId);
 
   return (
     <section id="portfolio-dock" className="card portfolio-card">
@@ -73,6 +58,7 @@ export function PortfolioStrip({ assets }: { assets: MarketAsset[] }) {
             <span className="muted">P&amp;L</span>
             <strong className={changeClass(pnl)}>
               {pnl != null ? `${formatUsd(pnl)}${costUsd ? ` · ${formatPercent((pnl / costUsd) * 100)}` : ""}` : "Add a cost basis"}
+              {comparable && comparable < items.length ? " · quoted+cost lots only" : ""}
             </strong>
           </div>
           <div>

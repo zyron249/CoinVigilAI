@@ -281,7 +281,7 @@ async function readJson<T>(path: string, fallback: T): Promise<T> {
 }
 
 export async function getMarket(query: MarketQuery = {}): Promise<MarketPage> {
-  const limit = query.limit ?? 50;
+  const limit = Math.min(100, Math.max(1, query.limit ?? 50));
   const page = query.page ?? 1;
   const sort = query.sort ?? "market_cap";
   const order = query.order ?? "desc";

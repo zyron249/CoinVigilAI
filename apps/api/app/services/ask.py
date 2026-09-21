@@ -253,7 +253,7 @@ async def answer_ask(question: str, coin_id: str | None = None, *, insight: bool
 
     refused = bool(ADVICE_RE.search(text))
     tokens = question_tokens(text)
-    screen_query = None if insight else (coin_id or (tokens[0] if tokens else None))
+    screen_query = None if insight else coin_id
 
     screen = await tool_screen_markets(screen_query, limit=8)
     tools = ["screen_markets"]
