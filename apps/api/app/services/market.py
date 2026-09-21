@@ -24,7 +24,7 @@ MARKET_UNIVERSE_PAGES = 4
 TICKER_SOURCE_PAGES = 3
 TICKER_PAGE_SIZE = 100
 VALID_SOURCES = {"coingecko", "cache", "demo"}
-UNIVERSE_CACHE_KEY = f"markets:v6:universe:{MARKET_UNIVERSE_LIMIT}x{MARKET_UNIVERSE_PAGES}"
+UNIVERSE_CACHE_KEY = f"markets:v7:universe:{MARKET_UNIVERSE_LIMIT}x{MARKET_UNIVERSE_PAGES}"
 COVERAGE_CAP = MARKET_UNIVERSE_LIMIT * MARKET_UNIVERSE_PAGES
 RETRY_ATTEMPTS = 3
 RETRY_BASE_DELAY_SECONDS = 0.35
@@ -178,20 +178,23 @@ def _copy_snapshot(snapshot: UniverseSnapshot, **overrides: Any) -> UniverseSnap
 def _missing_pages_from_payload(payload: dict[str, Any], asset_count: int) -> tuple[int, ...]:
     raw = payload.get("missing_pages")
     pages: list[int] = []
-    if isinstance(raw, list):
-        for item in raw:
-            try:
-                page = int(item)
-            except (TypeError, ValueError):
-                continue
-            if 1 <= page <= MARKET_UNIVERSE_PAGES:
-                pages.append(page)
-        if pages:
-            return tuple(dict.fromkeys(pages))
-    if payload.get("partial") and asset_count < _coverage_target():
-        filled = max(1, math.ceil(asset_count / MARKET_UNIVERSE_LIMIT))
-        return tuple(range(filled + 1, MARKET_UNIVERSE_PAGES + 1))
-    return ()
+    if not isinstance(raw, list):
+        return ()
+    for item in raw:
+        try:
+            page = int(item)
+        except (TypeError, ValueError):
+            continue
+        if 1 <= page <= MARKET_UNIVERSE_PAGES:
+            pages.append(page)
+    return tuple(dict.fromkeys(pages))
+
+
+def _fresh_cache_payload(payload: dict[str, Any]) -> bool:
+    """Reject legacy partial envelopes that never recorded which pages failed."""
+    if payload.get("partial") and "missing_pages" not in payload:
+        return False
+    return True
 
 
 def _universe_envelope(snapshot: UniverseSnapshot) -> dict[str, Any]:
@@ -240,6 +243,15 @@ def _schedule_background_fill(pages: tuple[int, ...], seed: list[MarketAsset]) -
     _fill_task = loop.create_task(_background_fill_pages(pages, seed), name="coingecko-universe-fill")
 
 
+def _background_fill_is_obsolete(collected: list[MarketAsset]) -> bool:
+    current = _memory_get("universe")
+    if not isinstance(current, UniverseSnapshot) or not current.assets:
+        return False
+    if not current.partial:
+        return True
+    return len(current.assets) > len(collected)
+
+
 async def _background_fill_pages(pages: tuple[int, ...], seed: list[MarketAsset]) -> None:
     await _sleep(PAGE_BACKGROUND_FILL_SECONDS)
     mem = _memory_get("universe")
@@ -251,7 +263,16 @@ async def _background_fill_pages(pages: tuple[int, ...], seed: list[MarketAsset]
         collected = list(mem.assets)
         seen = {asset.id for asset in collected}
         pages = mem.missing_pages or pages
+    if not pages:
+        return
+    before = len(collected)
     still = await _pull_market_pages(list(pages), collected, seen)
+    if len(collected) <= before:
+        logger.warning("CoinGecko background fill recovered no new rows; leaving snapshot timestamp unchanged")
+        return
+    if _background_fill_is_obsolete(collected):
+        logger.info("CoinGecko background fill discarded; a newer snapshot already won")
+        return
     target = _coverage_target()
     partial = bool(still) or len(collected) < target
     snapshot = UniverseSnapshot(
@@ -692,7 +713,7 @@ async def get_universe_snapshot() -> UniverseSnapshot:
         return UniverseSnapshot(list(mem[0]), mem[1])
 
     cached = await cache_get(UNIVERSE_CACHE_KEY)
-    if isinstance(cached, dict):
+    if isinstance(cached, dict) and _fresh_cache_payload(cached):
         snapshot = _snapshot_from_payload(cached, stale=False)
         if snapshot:
             _memory_set(
