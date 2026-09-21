@@ -71,6 +71,18 @@ export function formatTimestamp(value?: string | null): string | null {
   }).format(date);
 }
 
+export function formatAge(value?: string | null, now = Date.now()): string {
+  if (!value) return "age unknown";
+  const then = new Date(value).getTime();
+  if (Number.isNaN(then)) return "age unknown";
+  const sec = Math.max(0, Math.round((now - then) / 1000));
+  if (sec < 8) return "just now";
+  if (sec < 60) return `${sec}s ago`;
+  const min = Math.round(sec / 60);
+  if (min < 60) return `${min}m ago`;
+  return `${Math.round(min / 60)}h ago`;
+}
+
 export function sourceLabel(
   source: string | undefined,
   opts?: { stale?: boolean },

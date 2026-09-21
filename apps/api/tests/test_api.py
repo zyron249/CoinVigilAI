@@ -36,6 +36,10 @@ def test_public_status_has_no_secrets_and_no_postgres():
     assert body["ai"]["configured_count"] == 0
     assert isinstance(body["news"]["hosts"], list)
     assert body["market"]["key_configured"] is False
+    assert body["webhook"]["configured"] is False
+    assert body["webhook"]["telegram"] is False
+    assert "discord.com/api/webhooks" not in dumped
+    assert "hooks.slack.com" not in dumped
 
 
 def test_public_status_reports_observed_demo_without_calling_markets(monkeypatch):
@@ -330,4 +334,56 @@ def test_convert_endpoint_uses_query_aliases(monkeypatch):
     assert body["from_id"] == "bitcoin"
     assert "invent" in body["note"].lower()
     assert "not financial advice" in body["disclaimer"].lower()
+
+
+def test_notify_without_webhook_does_not_fake_delivery():
+    response = client.post("/api/alerts/notify", json={
+        "coin_id": "bitcoin",
+        "name": "Bitcoin",
+        "symbol": "btc",
+        "kind": "above",
+        "threshold": 1,
+        "note": "fixture",
+    })
+    assert response.status_code == 200
+    body = response.json()
+    assert body["delivered"] is False
+    assert body["configured"] is False
+    assert "not set" in body["reason"].lower()
+
+
+def test_notify_posts_when_webhook_configured(monkeypatch):
+    class FakeResponse:
+        status_code = 204
+
+    class FakeClient:
+        def __init__(self, *args, **kwargs):
+            pass
+        async def __aenter__(self):
+            return self
+        async def __aexit__(self, *args):
+            return False
+        async def post(self, url, json):
+            assert url.startswith("https://")
+            assert json["event"] == "watchlist_alert"
+            assert json["coin_id"] == "bitcoin"
+            return FakeResponse()
+
+    monkeypatch.setenv("ALERT_WEBHOOK_URL", "https://example.com/webhook")
+    from app.config import get_settings
+    get_settings.cache_clear()
+    monkeypatch.setattr("app.services.notify.httpx.AsyncClient", FakeClient)
+    response = client.post("/api/alerts/notify", json={
+        "coin_id": "bitcoin",
+        "name": "Bitcoin",
+        "symbol": "btc",
+        "kind": "above",
+        "threshold": 1,
+    })
+    assert response.status_code == 200
+    body = response.json()
+    assert body["delivered"] is True
+    assert body["configured"] is True
+    monkeypatch.delenv("ALERT_WEBHOOK_URL", raising=False)
+    get_settings.cache_clear()
 

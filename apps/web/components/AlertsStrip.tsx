@@ -41,13 +41,13 @@ export function AlertsStrip({ assets }: { assets: MarketAsset[] }) {
     return map;
   }, [assets, extra]);
 
-  const fired = items.filter((item) => {
+  const matching = items.filter((item) => {
     const live = byId.get(item.coinId);
     return evaluateAlert(
       item,
       { price: live?.current_price, change24h: live?.price_change_percentage_24h, volume: live?.total_volume },
       { watched: watchIds.has(item.coinId), lastVolume: lastVolume[item.coinId] },
-    ).fired;
+    ).matching;
   });
 
   return (
@@ -55,20 +55,23 @@ export function AlertsStrip({ assets }: { assets: MarketAsset[] }) {
       <div className="section-heading">
         <div>
           <div className="eyebrow">WATCHLIST ALERTS</div>
-          <h2>{fired.length ? `${fired.length} triggered on your list` : "Watchlist-scoped only"}</h2>
+          <h2>{matching.length ? `${matching.length} matching on your list` : "Watchlist-scoped only"}</h2>
         </div>
-        <Link className="ghost tool-button" href="/alerts">{items.length} rules</Link>
+        <div className="table-tools">
+          <Link className="ghost tool-button" href="/alerts#alert-history">History</Link>
+          <Link className="ghost tool-button" href="/alerts">{items.length} rules</Link>
+        </div>
       </div>
       <p className="muted alerts-note">
-        Evaluated only for starred coins. Rule-based price/volume prefilter runs before any AI note. In-tab only — no push.
+        Evaluated only for starred coins. Snapshot poll — no WebSocket. In-tab + local history — no push.
       </p>
       {items.length === 0 ? (
         <p className="muted alerts-note">No local rules yet. <Link href="/alerts">Create one</Link> for a watchlist coin.</p>
-      ) : fired.length === 0 ? (
-        <p className="muted alerts-note">No watchlist rules triggered in this snapshot. Off-list coins are never alerted.</p>
+      ) : matching.length === 0 ? (
+        <p className="muted alerts-note">No watchlist rules matching this snapshot. Off-list coins are never alerted.</p>
       ) : (
         <ul className="alerts-list">
-          {fired.slice(0, 4).map((item) => {
+          {matching.slice(0, 4).map((item) => {
             const live = byId.get(item.coinId);
             return (
               <li key={item.id} className="is-fired">

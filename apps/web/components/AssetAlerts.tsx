@@ -45,10 +45,15 @@ export function AssetAlerts({
       });
     }
     void refresh();
-    const timer = window.setInterval(refresh, 30_000);
+    const timer = window.setInterval(refresh, 10_000);
+    const onVis = () => {
+      if (document.visibilityState === "visible") void refresh();
+    };
+    document.addEventListener("visibilitychange", onVis);
     return () => {
       active = false;
       window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVis);
     };
   }, [coinId]);
 
@@ -75,7 +80,7 @@ export function AssetAlerts({
       <p className="muted alerts-note">
         {name} is {formatUsd(quote.price)} ({formatPercent(quote.change24h)} 24h) in this snapshot.
         {watched
-          ? " Rules for this starred coin evaluate in this tab only — no push."
+          ? " Rules for this starred coin poll the CoinGecko snapshot in this tab — no WebSocket, no push."
           : " Alerts never spam the whole market. Star it first (free cap 3)."}
         {" "}CoinVigil does not invent trip prices or on-chain whale prints.
       </p>

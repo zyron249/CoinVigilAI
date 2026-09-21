@@ -49,12 +49,15 @@ function volumePrefilterPass(multiplier, volume, lastVolume) {
 }
 
 function evaluateAlert(alert, quote, opts) {
-  if (!opts.watched) return { fired: false, status: "off-watchlist" };
+  if (!opts.watched) return { matching: false, fired: false, status: "off-watchlist" };
+  if (alert.muted) return { matching: false, fired: false, status: "muted" };
   if (!volumePrefilterPass(alert.volumeMultiplier, quote.volume, opts.lastVolume)) {
-    return { fired: false, status: "volume-prefilter" };
+    return { matching: false, fired: false, status: "volume-prefilter" };
   }
-  const fired = alertFired(alert, quote.price, quote.change24h);
-  return { fired, status: fired ? "fired" : "watching" };
+  const matching = alertFired(alert, quote.price, quote.change24h);
+  if (!matching) return { matching: false, fired: false, status: "watching" };
+  if (opts.cooldown) return { matching: true, fired: false, status: "cooldown" };
+  return { matching: true, fired: true, status: "fired" };
 }
 
 test("junk alert payloads stay empty", () => {
@@ -105,4 +108,19 @@ test("watchlist coin can fire; volume prefilter blocks a quiet print", () => {
   const loud = evaluateAlert(alert, { price: 85000, change24h: 5, volume: 3e9 }, { watched: true, lastVolume: 1e9 });
   assert.equal(loud.fired, true);
   assert.equal(loud.status, "fired");
+});
+
+test("muted and cooldown rules do not re-notify", () => {
+  const alert = { kind: "above", threshold: 1, volumeMultiplier: null, muted: true };
+  const muted = evaluateAlert(alert, { price: 85000, change24h: 5, volume: 1e9 }, { watched: true, lastVolume: 1e9 });
+  assert.equal(muted.status, "muted");
+  assert.equal(muted.fired, false);
+  const cool = evaluateAlert(
+    { kind: "above", threshold: 1, volumeMultiplier: null },
+    { price: 85000, change24h: 5, volume: 1e9 },
+    { watched: true, lastVolume: 1e9, cooldown: true },
+  );
+  assert.equal(cool.status, "cooldown");
+  assert.equal(cool.matching, true);
+  assert.equal(cool.fired, false);
 });

@@ -6,6 +6,7 @@ export const ALERTS_KEY = "coinvigil.alerts.v1";
 export const ALERTS_EVENT = "coinvigil:alerts";
 export const VOLUME_SEEN_KEY = "coinvigil.volume-seen.v1";
 export const ALERTS_LIMIT = 20;
+export const DEFAULT_COOLDOWN_MINUTES = 15;
 
 export type AlertKind = "above" | "below" | "change_24h";
 export type AlertSensitivity = "micro" | "normal" | "major";
@@ -28,6 +29,9 @@ export type PriceAlert = {
   sensitivity: AlertSensitivity;
   analysis: AlertAnalysis;
   volumeMultiplier: number | null;
+  muted: boolean;
+  cooldownMinutes: number;
+  lastNotifiedAt: string | null;
   note: AlertNote | null;
   createdAt: string;
 };
@@ -61,6 +65,7 @@ export function parseAlerts(raw: string | null): PriceAlert[] {
       const analysis = (["technical", "sentiment", "all"].includes(analysisRaw) ? analysisRaw : "technical") as AlertAnalysis;
       const volumeRaw = (row as PriceAlert).volumeMultiplier;
       const volumeMultiplier = volumeRaw == null ? null : Number(volumeRaw);
+      const cooldownRaw = Number((row as PriceAlert).cooldownMinutes);
       const noteRaw = (row as PriceAlert).note;
       items.push({
         id,
@@ -72,6 +77,9 @@ export function parseAlerts(raw: string | null): PriceAlert[] {
         sensitivity,
         analysis,
         volumeMultiplier: volumeMultiplier != null && Number.isFinite(volumeMultiplier) && volumeMultiplier > 0 ? volumeMultiplier : null,
+        muted: Boolean((row as PriceAlert).muted),
+        cooldownMinutes: Number.isFinite(cooldownRaw) && cooldownRaw > 0 ? Math.min(1440, Math.max(1, cooldownRaw)) : DEFAULT_COOLDOWN_MINUTES,
+        lastNotifiedAt: String((row as PriceAlert).lastNotifiedAt || "") || null,
         note: noteRaw && typeof noteRaw === "object" && noteRaw.text
           ? {
               text: String(noteRaw.text).slice(0, 800),
@@ -155,21 +163,32 @@ export function volumePrefilterPass(
 }
 
 export type AlertEval = {
+  matching: boolean;
   fired: boolean;
-  status: "fired" | "watching" | "off-watchlist" | "volume-prefilter";
+  status: "fired" | "watching" | "off-watchlist" | "volume-prefilter" | "muted" | "cooldown";
 };
+
+export function inCooldown(alert: PriceAlert, now = Date.now()): boolean {
+  if (!alert.lastNotifiedAt) return false;
+  const then = new Date(alert.lastNotifiedAt).getTime();
+  if (Number.isNaN(then)) return false;
+  return now - then < alert.cooldownMinutes * 60_000;
+}
 
 export function evaluateAlert(
   alert: PriceAlert,
   quote: { price?: number | null; change24h?: number | null; volume?: number | null },
-  opts: { watched: boolean; lastVolume?: number | null },
+  opts: { watched: boolean; lastVolume?: number | null; now?: number },
 ): AlertEval {
-  if (!opts.watched) return { fired: false, status: "off-watchlist" };
+  if (!opts.watched) return { matching: false, fired: false, status: "off-watchlist" };
+  if (alert.muted) return { matching: false, fired: false, status: "muted" };
   if (!volumePrefilterPass(alert.volumeMultiplier, quote.volume, opts.lastVolume)) {
-    return { fired: false, status: "volume-prefilter" };
+    return { matching: false, fired: false, status: "volume-prefilter" };
   }
-  const fired = alertFired(alert, quote.price, quote.change24h);
-  return { fired, status: fired ? "fired" : "watching" };
+  const matching = alertFired(alert, quote.price, quote.change24h);
+  if (!matching) return { matching: false, fired: false, status: "watching" };
+  if (inCooldown(alert, opts.now)) return { matching: true, fired: false, status: "cooldown" };
+  return { matching: true, fired: true, status: "fired" };
 }
 
 export function useAlerts() {
@@ -186,9 +205,12 @@ export function useAlerts() {
     };
   }, []);
 
-  function add(item: Omit<PriceAlert, "id" | "createdAt" | "note"> & { id?: string; note?: AlertNote | null }) {
+  function add(item: Omit<PriceAlert, "id" | "createdAt" | "note" | "lastNotifiedAt"> & { id?: string; note?: AlertNote | null; lastNotifiedAt?: string | null }) {
     const next: PriceAlert = {
       ...item,
+      muted: Boolean(item.muted),
+      cooldownMinutes: item.cooldownMinutes || DEFAULT_COOLDOWN_MINUTES,
+      lastNotifiedAt: item.lastNotifiedAt ?? null,
       note: item.note ?? null,
       id: item.id || `${item.coinId}-${item.kind}-${item.threshold}-${Date.now()}`,
       createdAt: new Date().toISOString(),

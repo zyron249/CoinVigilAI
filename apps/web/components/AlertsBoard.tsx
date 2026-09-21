@@ -2,9 +2,10 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { MarketAsset } from "../lib/api";
-import { getAssetInsight } from "../lib/api";
+import { getAssetInsight, getWatchlistSentiment, postAlertNotify } from "../lib/api";
 import {
   ALERTS_LIMIT,
+  DEFAULT_COOLDOWN_MINUTES,
   evaluateAlert,
   rememberVolume,
   readVolumeSeen,
@@ -15,9 +16,11 @@ import {
   type AlertSensitivity,
   type PriceAlert,
 } from "../lib/alerts";
+import { recordFire } from "../lib/alert-history";
 import { hydrateQuotes } from "../lib/snapshot-quotes";
 import { useWatchlist } from "../lib/watchlist";
-import { formatPercent, formatUsd } from "../lib/format";
+import { formatAge, formatPercent, formatUsd, sourceLabel } from "../lib/format";
+import { AlertHistory } from "./AlertHistory";
 import Link from "next/link";
 
 function ruleLabel(item: PriceAlert) {
@@ -26,11 +29,13 @@ function ruleLabel(item: PriceAlert) {
   return `${item.kind} ${formatUsd(item.threshold)}${vol}`;
 }
 
-function tailHonesty(analysis: AlertAnalysis) {
-  if (analysis === "technical") {
-    return " No on-chain whale feed on this instance — CoinVigil does not invent whale prints.";
-  }
-  return " Social sentiment is not wired (no NLP model). No on-chain whale feed — CoinVigil does not invent whale prints.";
+function statusLabel(status: string) {
+  if (status === "fired") return "Triggered";
+  if (status === "cooldown") return "Cooldown";
+  if (status === "muted") return "Muted";
+  if (status === "off-watchlist") return "Skipped";
+  if (status === "volume-prefilter") return "Held";
+  return "Watching";
 }
 
 export function AlertsBoard({
@@ -44,14 +49,19 @@ export function AlertsBoard({
   const { items: watched, ids: watchIds } = useWatchlist();
   const [assets, setAssets] = useState<MarketAsset[]>([]);
   const [source, setSource] = useState("unavailable");
+  const [stale, setStale] = useState(false);
+  const [checkedAt, setCheckedAt] = useState<string | null>(null);
   const [coinId, setCoinId] = useState(initialCoin);
   const [kind, setKind] = useState<AlertKind>(["above", "below", "change_24h"].includes(initialKind) ? initialKind : "above");
   const [sensitivity, setSensitivity] = useState<AlertSensitivity>("normal");
   const [analysis, setAnalysis] = useState<AlertAnalysis>("technical");
   const [volumeOn, setVolumeOn] = useState(false);
+  const [muted, setMuted] = useState(false);
+  const [cooldownMinutes, setCooldownMinutes] = useState(DEFAULT_COOLDOWN_MINUTES);
   const [threshold, setThreshold] = useState(initialKind === "change_24h" ? String(SENSITIVITY.normal.changePct) : "100000");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [lastVolume, setLastVolume] = useState<Record<string, number>>({});
+  const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
     if (!coinId && watched[0]) setCoinId(watched[0].id);
@@ -63,68 +73,106 @@ export function AlertsBoard({
   }, []);
 
   useEffect(() => {
+    const tick = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(tick);
+  }, []);
+
+  useEffect(() => {
     let active = true;
+    let timer: number | undefined;
+    const delayRef = { current: 10_000 };
     async function refresh() {
+      if (typeof document !== "undefined" && document.visibilityState === "hidden") {
+        timer = window.setTimeout(refresh, 30_000);
+        return;
+      }
       const ids = items.map((item) => item.coinId);
-      const { byId, source: nextSource } = await hydrateQuotes(ids);
+      const snap = await hydrateQuotes(ids);
       if (!active) return;
-      setAssets([...byId.values()]);
-      setSource(nextSource);
+      setAssets([...snap.byId.values()]);
+      setSource(snap.source);
+      setStale(Boolean(snap.stale));
+      setCheckedAt(snap.checkedAt);
       const seen = { ...readVolumeSeen() };
-      for (const asset of byId.values()) {
+      for (const asset of snap.byId.values()) {
         if (asset.total_volume != null) rememberVolume(asset.id, asset.total_volume);
       }
       setLastVolume(seen);
+      const failed = snap.source === "unavailable" || Boolean(snap.error);
+      delayRef.current = failed ? Math.min(60_000, Math.max(20_000, delayRef.current * 2)) : 10_000;
+      timer = window.setTimeout(refresh, delayRef.current);
     }
     void refresh();
-    const timer = window.setInterval(refresh, 30_000);
+    const onVis = () => {
+      if (document.visibilityState === "visible") void refresh();
+    };
+    document.addEventListener("visibilitychange", onVis);
     return () => {
       active = false;
-      window.clearInterval(timer);
+      if (timer) window.clearTimeout(timer);
+      document.removeEventListener("visibilitychange", onVis);
     };
   }, [items]);
 
   const byId = useMemo(() => new Map(assets.map((asset) => [asset.id, asset])), [assets]);
+  const tone = sourceLabel(source, { stale });
 
   function evalRow(item: PriceAlert) {
     const live = byId.get(item.coinId);
     return evaluateAlert(
       item,
       { price: live?.current_price, change24h: live?.price_change_percentage_24h, volume: live?.total_volume },
-      { watched: watchIds.has(item.coinId), lastVolume: lastVolume[item.coinId] },
+      { watched: watchIds.has(item.coinId), lastVolume: lastVolume[item.coinId], now },
     );
   }
 
-  const fired = items.filter((item) => evalRow(item).fired);
-  const pendingNotes = fired.filter((item) => !item.note).map((item) => item.id).join(",");
+  const matching = items.filter((item) => evalRow(item).matching);
+  const notifyIds = items.filter((item) => evalRow(item).fired).map((item) => item.id).join(",");
 
   useEffect(() => {
-    if (!pendingNotes) return;
+    if (!notifyIds) return;
     let cancelled = false;
-    async function attachNotes() {
+    async function attachAndRecord() {
+      const wantSentiment = items.some((item) => notifyIds.split(",").includes(item.id) && (item.analysis === "sentiment" || item.analysis === "all"));
+      const sentiment = wantSentiment
+        ? await getWatchlistSentiment(watched.map((row) => row.id))
+        : null;
       for (const item of items) {
-        if (!pendingNotes.split(",").includes(item.id) || item.note) continue;
+        if (!notifyIds.split(",").includes(item.id)) continue;
         const insight = await getAssetInsight(item.coinId);
         if (cancelled) return;
-        const body = item.analysis === "sentiment"
-          ? "Social sentiment is not wired on this instance — no NLP model is configured. Quote context from tools follows."
-          : insight.answer;
-        patch(item.id, {
-          note: {
-            text: `${body}${tailHonesty(item.analysis)}`.slice(0, 800),
-            engine: insight.engine || "heuristic-tools",
-            generated: Boolean(insight.generated),
-            at: new Date().toISOString(),
-          },
+        let extra = " No on-chain whale feed on this instance — CoinVigil does not invent whale prints.";
+        if (item.analysis === "sentiment" || item.analysis === "all") {
+          extra = sentiment?.available
+            ? ` Headline sentiment (${sentiment.engine}, ${sentiment.lean}): ${sentiment.items.slice(0, 2).map((row) => row.title).join(" · ") || "matched RSS"}. ${sentiment.note || ""}`
+            : ` ${sentiment?.reason || "sentiment unavailable"}.`;
+        }
+        const note = {
+          text: `${insight.answer}${extra}`.slice(0, 800),
+          engine: insight.engine || "heuristic-tools",
+          generated: Boolean(insight.generated),
+          at: new Date().toISOString(),
+        };
+        const delivery = await postAlertNotify({
+          coin_id: item.coinId,
+          name: item.name,
+          symbol: item.symbol,
+          kind: item.kind,
+          threshold: item.threshold,
+          note: note.text,
+          at: note.at,
         });
+        if (cancelled) return;
+        recordFire(item, byId.get(item.coinId)?.current_price, note, delivery.delivered);
+        patch(item.id, { note, lastNotifiedAt: note.at });
       }
     }
-    void attachNotes();
+    void attachAndRecord();
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- patch notes once per newly fired id
-  }, [pendingNotes]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [notifyIds]);
 
   function applySensitivity(next: AlertSensitivity) {
     setSensitivity(next);
@@ -145,6 +193,8 @@ export function AlertsBoard({
       sensitivity,
       analysis,
       volumeMultiplier: volumeOn ? SENSITIVITY[sensitivity].volumeMult : null,
+      muted,
+      cooldownMinutes,
     };
     if (editingId) {
       patch(editingId, payload);
@@ -155,21 +205,23 @@ export function AlertsBoard({
   }
 
   return (
+    <>
     <section className="card alerts-card">
       <div className="section-heading">
         <div>
           <div className="eyebrow">WATCHLIST ALERTS</div>
           <h2>Rule-based prefilter, then a grounded note</h2>
         </div>
-        <span className="muted">{items.length} / {ALERTS_LIMIT} · {source === "demo" ? "Demo quotes" : "Snapshot quotes"}</span>
+        <span className="muted">{items.length} / {ALERTS_LIMIT} · {tone.text} · poll {formatAge(checkedAt, now)}</span>
       </div>
       <p className="muted alerts-note">
-        Only coins on your watchlist are evaluated — CoinVigil does not spam the whole market. Price/volume rules run
-        before any AI cost. In-tab only; Telegram/Discord/push are documented later, not faked. No on-chain whale feed.
+        Only coins on your watchlist are evaluated. Quotes poll the CoinGecko snapshot (no WebSocket tick stream).
+        Price/volume rules run before any AI cost. History stays in this browser. Telegram bots are not implemented;
+        optional HTTPS webhook is env-gated. No on-chain whale feed.
       </p>
-      {fired.length ? (
+      {matching.length ? (
         <p className="alerts-fired-banner" role="status">
-          {fired.length} watchlist rule{fired.length === 1 ? "" : "s"} triggered in this snapshot (in-tab only — no push).
+          {matching.length} watchlist rule{matching.length === 1 ? "" : "s"} matching this snapshot (in-tab + local history — no fake push).
         </p>
       ) : null}
       {items.length === 0 ? (
@@ -187,7 +239,7 @@ export function AlertsBoard({
             return (
               <li
                 key={item.id}
-                className={result.fired ? "is-fired" : undefined}
+                className={result.matching ? "is-fired" : undefined}
                 data-alert-coin={item.coinId}
                 data-alert-status={result.status}
               >
@@ -195,7 +247,7 @@ export function AlertsBoard({
                   <strong>
                     <Link href={`/asset/${item.coinId}`}>{live?.name || item.name}</Link>
                     {" "}
-                    <span className="muted">{item.sensitivity} · {item.analysis}</span>
+                    <span className="muted">{item.sensitivity} · {item.analysis} · {item.cooldownMinutes}m cooldown</span>
                   </strong>
                   <span className="muted">{ruleLabel(item)}</span>
                   <span className="muted">
@@ -203,11 +255,13 @@ export function AlertsBoard({
                       ? "Off watchlist — not evaluated (never spam the whole market)"
                       : result.status === "volume-prefilter"
                         ? "Volume prefilter held this back vs last-seen 24h volume"
-                        : live
-                          ? `${formatUsd(live.current_price)} · ${formatPercent(live.price_change_percentage_24h)}`
-                          : "Not in this snapshot yet"}
+                        : result.status === "muted"
+                          ? "Muted — this rule will not fire or write history"
+                          : live
+                            ? `${formatUsd(live.current_price)} · ${formatPercent(live.price_change_percentage_24h)}`
+                            : "Not in this snapshot yet"}
                   </span>
-                  {result.fired && item.note ? (
+                  {result.matching && item.note ? (
                     <span className="alert-note">
                       {item.note.generated ? "AI-generated from tools" : "Heuristic tools"} · {item.note.engine}: {item.note.text}
                     </span>
@@ -216,9 +270,14 @@ export function AlertsBoard({
                   ) : null}
                 </div>
                 <div className="alert-actions">
-                  <span className={result.fired ? "pill" : "muted"}>
-                    {result.fired ? "Triggered" : result.status === "off-watchlist" ? "Skipped" : "Watching"}
-                  </span>
+                  <span className={result.matching ? "pill" : "muted"}>{statusLabel(result.status)}</span>
+                  <button
+                    type="button"
+                    className="ghost tool-button"
+                    onClick={() => patch(item.id, { muted: !item.muted })}
+                  >
+                    {item.muted ? "Unmute" : "Mute"}
+                  </button>
                   <button
                     type="button"
                     className="ghost tool-button"
@@ -230,6 +289,8 @@ export function AlertsBoard({
                       setSensitivity(item.sensitivity);
                       setAnalysis(item.analysis);
                       setVolumeOn(item.volumeMultiplier != null);
+                      setMuted(item.muted);
+                      setCooldownMinutes(item.cooldownMinutes);
                     }}
                   >
                     Edit
@@ -296,8 +357,16 @@ export function AlertsBoard({
             Analysis
             <select value={analysis} onChange={(event) => setAnalysis(event.target.value as AlertAnalysis)}>
               <option value="technical">Technical anomaly</option>
-              <option value="sentiment">Social sentiment (stub)</option>
-              <option value="all">All (sentiment stubbed)</option>
+              <option value="sentiment">Headline sentiment</option>
+              <option value="all">All (headline sentiment)</option>
+            </select>
+          </label>
+          <label>
+            Cooldown
+            <select value={String(cooldownMinutes)} onChange={(event) => setCooldownMinutes(Number(event.target.value))}>
+              <option value="5">5 minutes</option>
+              <option value="15">15 minutes</option>
+              <option value="60">60 minutes</option>
             </select>
           </label>
           <label className="checkbox-label">
@@ -305,9 +374,16 @@ export function AlertsBoard({
             <input type="checkbox" checked={volumeOn} onChange={(event) => setVolumeOn(event.target.checked)} />
             <span className="muted">{volumeOn ? `${SENSITIVITY[sensitivity].volumeMult}× last 24h volume seen in this browser` : "Off"}</span>
           </label>
+          <label className="checkbox-label">
+            Mute
+            <input type="checkbox" checked={muted} onChange={(event) => setMuted(event.target.checked)} />
+            <span className="muted">{muted ? "Will not fire" : "Off"}</span>
+          </label>
           <button type="submit">{editingId ? "Save edit" : "Save locally"}</button>
         </form>
       )}
     </section>
+    <AlertHistory />
+    </>
   );
 }

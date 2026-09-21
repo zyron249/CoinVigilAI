@@ -22,9 +22,10 @@ export default async function AlertsPage({
         <div className="eyebrow hero-tag">ALERTS</div>
         <h1>Watchlist only.<br /><span>Never the whole market.</span></h1>
         <p>
-          Smart alerts prefilter price and volume on coins you star. Then a short tool-grounded note (heuristic or AI)
-          explains what moved. Free watchlist is 3 coins. No push/Telegram/Discord yet — in-app only. Informational
-          research, not financial advice.
+          Smart alerts prefilter price and volume on coins you star, then attach a short tool-grounded note.
+          Quotes poll the CoinGecko snapshot — there is no WebSocket tick stream. Fires land in local history.
+          Free watchlist is 3 coins. Optional HTTPS webhook via ALERT_WEBHOOK_URL; Telegram is not implemented.
+          In-app only — no push unless a configured webhook actually delivers. Informational research, not financial advice.
         </p>
       </section>
       <AlertsBoard initialCoin={coin} initialKind={kind} />
