@@ -10,10 +10,11 @@
   --danger: #ff7e8c;
   --warning: #ffd59a;
   --site-header-height: 108px;
+  --sticky-offset: 160px;
 }
 
 * { box-sizing: border-box; }
-html { background: var(--bg); scroll-behavior: smooth; scroll-padding-top: 160px; }
+html { background: var(--bg); scroll-behavior: smooth; scroll-padding-top: var(--sticky-offset); }
 body { margin: 0; color: var(--text); background: radial-gradient(circle at 75% 10%, rgba(42, 168, 125, .14), transparent 25%), var(--bg); font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
 a { color: inherit; text-decoration: none; }
 button, .button-link, .nav-cta { border: 1px solid rgba(89,242,180,.35); background: var(--accent); color: #062019; padding: 10px 16px; border-radius: 10px; font-weight: 800; cursor: pointer; font: inherit; }
@@ -84,7 +85,7 @@ nav { min-height: 72px; display: flex; align-items: center; justify-content: spa
 .nav-backdrop { display: none; }
 .chart-canvas { cursor: crosshair; }
 .chart-canvas.is-drawing { outline: 1px dashed rgba(255,213,154,.35); outline-offset: -6px; }
-#watchlist, #markets, #ai-brief, #movers, #radar, #ai-council, #community, #overview, #contracts, #chart-lab, #markets-tab { scroll-margin-top: 160px; }
+#watchlist, #markets, #ai-brief, #movers, #radar, #ai-council, #community, #overview, #contracts, #chart-lab, #markets-tab { scroll-margin-top: var(--sticky-offset); }
 .hero { min-height: 430px; display: grid; grid-template-columns: 1.35fr .65fr; align-items: center; border-bottom: 1px solid var(--line); }
 .hero h1 { font-size: clamp(44px, 6vw, 82px); line-height: .98; letter-spacing: -4px; margin: 16px 0 20px; max-width: 850px; }
 .hero h1 span, .studio-hero h1 span { color: var(--accent); }
@@ -143,12 +144,13 @@ nav { min-height: 72px; display: flex; align-items: center; justify-content: spa
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
-  background: rgba(7, 16, 15, .94);
+  background: #07100f;
   border: 1px solid var(--line);
   border-bottom: 1px solid var(--line);
   border-radius: 12px;
   padding: 8px;
   margin: 0 0 14px;
+  box-shadow: 0 12px 24px rgba(0, 0, 0, .35);
 }
 .asset-subnav::-webkit-scrollbar { display: none; }
 .asset-subnav a {
@@ -160,9 +162,13 @@ nav { min-height: 72px; display: flex; align-items: center; justify-content: spa
   color: var(--muted);
   white-space: nowrap;
 }
-.asset-subnav a:hover, .asset-subnav a.is-on, .asset-subnav a[aria-current="location"] {
+.asset-subnav a:hover, .asset-subnav a.is-on, .asset-subnav a[aria-current="true"], .asset-subnav a[aria-current="location"] {
   color: #062019;
   background: var(--accent);
+}
+.asset-subnav a:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
 }
 .asset-overview-grid { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 14px; margin: 4px 0 16px; }
 .contracts-card { grid-column: 1 / -1; }
@@ -491,6 +497,10 @@ footer > div:first-child { overflow-wrap: anywhere; max-width: 52rem; }
   .markets-hero { grid-template-columns: 1fr; }
 }
 @media (max-width: 950px) {
+  :root {
+    --site-header-height: 96px;
+    --sticky-offset: 148px;
+  }
   .menu-toggle { display: inline-flex; z-index: 18; }
   .nav-cta-desktop { display: none; }
   .nav-cta-mobile { display: inline-flex; width: fit-content; }

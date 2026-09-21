@@ -30,11 +30,15 @@ RETRY_ATTEMPTS = 3
 RETRY_BASE_DELAY_SECONDS = 0.35
 MAX_RETRY_SLEEP_SECONDS = 1.2
 PAGE_GAP_SECONDS = 0.2
+PAGE_GAP_AFTER_SKIP_SECONDS = 0.25
+PAGE_FILL_PASSES = 1
+PAGE_FILL_SLEEP_SECONDS = 0.4
 # Short process cache so one dashboard render does not stampede CoinGecko
-# when Redis is down. Tests clear this via clear_market_memory_cache().
+# when Redis is down. Partial snapshots expire faster so the next tick can fill gaps.
 _MEMORY_TTL_SECONDS = 20.0
+_MEMORY_TTL_PARTIAL_SECONDS = 8.0
 _LAST_GOOD_TTL_SECONDS = 6 * 60 * 60
-_memory_cache: dict[str, tuple[float, Any]] = {}
+_memory_cache: dict[str, tuple[float, Any, float]] = {}
 _last_good: dict[str, dict[str, Any]] = {}
 SORT_FIELDS = {
     "rank": "market_cap_rank",
@@ -131,15 +135,19 @@ def _memory_get(key: str) -> Any | None:
     row = _memory_cache.get(key)
     if not row:
         return None
-    stamped, value = row
-    if time.time() - stamped > _MEMORY_TTL_SECONDS:
+    if len(row) == 3:
+        stamped, value, ttl = row
+    else:
+        stamped, value = row
+        ttl = _MEMORY_TTL_SECONDS
+    if time.time() - stamped > ttl:
         _memory_cache.pop(key, None)
         return None
     return value
 
 
-def _memory_set(key: str, value: Any) -> None:
-    _memory_cache[key] = (time.time(), value)
+def _memory_set(key: str, value: Any, ttl: float | None = None) -> None:
+    _memory_cache[key] = (time.time(), value, ttl if ttl is not None else _MEMORY_TTL_SECONDS)
 
 
 def _remember_last_good(kind: str, payload: dict[str, Any]) -> None:
@@ -493,13 +501,11 @@ async def peek_universe_status() -> dict[str, Any]:
             "observed": True,
         }
 
-    mem_row = _memory_cache.get("universe")
-    if mem_row:
-        _stamped, mem = mem_row
-        if isinstance(mem, UniverseSnapshot) and mem.assets:
-            return from_snapshot(mem)
-        if isinstance(mem, tuple) and len(mem) == 2 and mem[0]:
-            return from_snapshot(UniverseSnapshot(list(mem[0]), mem[1]))
+    mem = _memory_get("universe")
+    if isinstance(mem, UniverseSnapshot) and mem.assets:
+        return from_snapshot(mem)
+    if isinstance(mem, tuple) and len(mem) == 2 and mem[0]:
+        return from_snapshot(UniverseSnapshot(list(mem[0]), mem[1]))
 
     cache_key = UNIVERSE_CACHE_KEY
     cached = await cache_get(cache_key)
@@ -554,9 +560,10 @@ async def get_universe_snapshot() -> UniverseSnapshot:
                 "last_live_at": snapshot.last_live_at,
                 "partial": snapshot.partial,
             }
-            await cache_set(cache_key, envelope, settings.market_cache_ttl_seconds)
+            ttl = 12 if snapshot.partial else settings.market_cache_ttl_seconds
+            await cache_set(cache_key, envelope, ttl)
             await save_last_good("universe", envelope)
-            _memory_set("universe", snapshot)
+            _memory_set("universe", snapshot, _MEMORY_TTL_PARTIAL_SECONDS if snapshot.partial else _MEMORY_TTL_SECONDS)
             return snapshot
         logger.warning("CoinGecko markets returned an empty payload")
         reason = "unreachable"
@@ -637,50 +644,93 @@ def _coverage_note(snapshot: UniverseSnapshot) -> str:
     )
 
 
+def _markets_page_params(page: int) -> dict[str, Any]:
+    return {
+        "vs_currency": "usd",
+        "order": "market_cap_desc",
+        "per_page": MARKET_UNIVERSE_LIMIT,
+        "page": page,
+        "sparkline": "true",
+        "price_change_percentage": "1h,24h,7d",
+    }
+
+
+def _absorb_market_page(payload: list[Any], collected: list[MarketAsset], seen: set[str]) -> int:
+    added = 0
+    for item in payload:
+        if not isinstance(item, dict) or not item.get("id"):
+            continue
+        asset = market_asset_from_payload(item)
+        if asset.id in seen:
+            continue
+        seen.add(asset.id)
+        collected.append(asset)
+        added += 1
+    return added
+
+
 async def _fetch_coingecko_market_universe() -> UniverseSnapshot | None:
     settings = get_settings()
     collected: list[MarketAsset] = []
     seen: set[str] = set()
-    skipped = 0
+    failed: list[int] = []
+    url = f"{settings.coingecko_base_url}/coins/markets"
+
+    async def pull(client: httpx.AsyncClient, page: int) -> list[Any] | None:
+        response = await _coingecko_get(client, url, _markets_page_params(page))
+        payload = response.json()
+        if not isinstance(payload, list):
+            return None
+        return payload
+
     async with httpx.AsyncClient(timeout=12.0, headers=_headers()) as client:
         for page in range(1, MARKET_UNIVERSE_PAGES + 1):
-            params = {
-                "vs_currency": "usd",
-                "order": "market_cap_desc",
-                "per_page": MARKET_UNIVERSE_LIMIT,
-                "page": page,
-                "sparkline": "true",
-                "price_change_percentage": "1h,24h,7d",
-            }
             try:
-                response = await _coingecko_get(client, f"{settings.coingecko_base_url}/coins/markets", params)
-                payload = response.json()
+                payload = await pull(client, page)
             except Exception:
                 if not collected:
                     raise
-                skipped += 1
-                logger.warning("CoinGecko markets page %s failed after retries; continuing for remaining pages", page)
+                failed.append(page)
+                logger.warning("CoinGecko markets page %s failed after retries; will try a fill-in pass", page)
+                if page < MARKET_UNIVERSE_PAGES:
+                    await _sleep(PAGE_GAP_AFTER_SKIP_SECONDS)
                 continue
-            if not isinstance(payload, list) or not payload:
-                if collected and skipped == 0:
+            if payload is None or not payload:
+                if collected and not failed:
                     break
-                skipped += 1
+                failed.append(page)
                 continue
-            for item in payload:
-                if not isinstance(item, dict) or not item.get("id"):
-                    continue
-                asset = market_asset_from_payload(item)
-                if asset.id in seen:
-                    continue
-                seen.add(asset.id)
-                collected.append(asset)
-            if len(payload) < MARKET_UNIVERSE_LIMIT and skipped == 0:
+            _absorb_market_page(payload, collected, seen)
+            if len(payload) < MARKET_UNIVERSE_LIMIT and not failed:
                 break
             if page < MARKET_UNIVERSE_PAGES:
                 await _sleep(PAGE_GAP_SECONDS)
+
+        remaining = list(failed)
+        for fill_pass in range(PAGE_FILL_PASSES):
+            if not remaining:
+                break
+            await _sleep(PAGE_FILL_SLEEP_SECONDS)
+            still: list[int] = []
+            for page in remaining:
+                try:
+                    payload = await pull(client, page)
+                except Exception:
+                    still.append(page)
+                    logger.warning("CoinGecko markets fill-in pass %s failed for page %s", fill_pass + 1, page)
+                    continue
+                if payload is None or not payload:
+                    still.append(page)
+                    continue
+                added = _absorb_market_page(payload, collected, seen)
+                logger.info("CoinGecko markets fill-in recovered page %s (%s assets)", page, added)
+            remaining = still
+        failed = remaining
+
     if not collected:
         return None
     target = _coverage_target()
+    skipped = len(failed)
     partial = skipped > 0 or len(collected) < target
     reason = "rate_limited" if skipped else None
     return UniverseSnapshot(
